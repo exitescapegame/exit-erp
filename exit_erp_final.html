@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXIT GAMES ERP — Supabase Multi‑computador</title>
+<style>
+  :root{--bg:#f8f8fc;--bg2:#ffffff;--bg3:#f1f1f7;--accent:#C9A84C;--accent2:#b8962e;--text:#111118;--text2:#44445a;--success:#16a34a;--danger:#dc2626;--warn:#d97706;--info:#2563eb;--purple:#7c3aed;--sidebar-w:230px;--r:10px;--rsm:6px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui;background:#f4f4fa;color:#111118;font-size:14px;display:flex;overflow:hidden}
+  #sidebar{width:var(--sidebar-w);background:#0f0f1a;height:100vh;position:fixed;left:0;top:0;z-index:100}
+  .sb-logo{padding:16px;border-bottom:1px solid rgba(255,255,255,0.08)}
+  .sb-user{padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,0.08)}
+  .sb-av{width:32px;height:32px;border-radius:50%;background:rgba(201,168,76,.15);display:flex;align-items:center;justify-content:center;color:#C9A84C;border:1.5px solid #C9A84C}
+  .sb-uname{font-size:12px;color:#f0f0f8}
+  .sb-ucargo{font-size:10px;color:rgba(255,255,255,0.5)}
+  .sb-nav{flex:1;overflow-y:auto;padding:6px 0}
+  .sb-item{display:flex;align-items:center;gap:9px;padding:9px 16px;cursor:pointer;color:rgba(255,255,255,0.55);border-left:3px solid transparent}
+  .sb-item:hover{background:rgba(255,255,255,0.07);color:#f0f0f8}
+  .sb-item.active{background:rgba(201,168,76,.12);color:#C9A84C;border-left-color:#C9A84C}
+  .sb-bottom{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08)}
+  .sb-logout{width:100%;background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);padding:8px;border-radius:6px;cursor:pointer}
+  #main{margin-left:var(--sidebar-w);flex:1;height:100vh;overflow-y:auto;background:#f4f4fa;border-top:3px solid #C9A84C}
+  .ph{padding:20px 24px 16px;background:#fff;border-bottom:1px solid #e8e8f0;display:flex;justify-content:space-between;align-items:center}
+  .pt{font-size:20px;font-weight:700}
+  .ps{font-size:12px;color:var(--text2);margin-top:2px}
+  .pb{padding:0 24px 40px}
+  .card{background:#fff;border:1px solid #e8e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
+  .ct{font-size:13px;font-weight:700;margin-bottom:12px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .met{background:#f8f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:12px}
+  .ml{font-size:10px;color:#888;text-transform:uppercase}
+  .mv{font-size:22px;font-weight:700}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:6px;border:none;cursor:pointer;font-weight:600}
+  .bp{background:#C9A84C;color:#000}
+  .bg{background:transparent;border:1px solid #ccc}
+  .bd{background:#dc2626;color:#fff}
+  .bs{background:#16a34a;color:#fff}
+  input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-family:inherit}
+  .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;z-index:1000}
+  .mo.open{display:flex}
+  .md{background:#fff;border-radius:10px;width:100%;max-width:500px;max-height:90vh;overflow:auto}
+  .mh{padding:16px;border-bottom:1px solid #e8e8f0;display:flex;justify-content:space-between;background:#f8f8fc}
+  .mti{font-size:15px;font-weight:700}
+  .mb{padding:20px}
+  .mf{padding:14px;border-top:1px solid #e8e8f0;display:flex;justify-content:flex-end;gap:8px}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:7px}
+  .hsl{border:1px solid #ddd;border-radius:6px;padding:8px;text-align:center;cursor:pointer;background:#fff}
+  .hsl.ocupado{background:#fee;border-color:#dc2626}
+  .sala-card{background:#fff;border:1px solid #e8e8f0;border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .sala-img{width:100%;height:90px;object-fit:cover}
+  .sala-body{padding:14px}
+  .sala-nome{font-size:14px;font-weight:700}
+  .clk{font-size:32px;font-weight:800;font-family:monospace;color:#C9A84C;text-align:center;background:#0f0f1a;border-radius:8px;padding:8px}
+  .toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:#f0f0f8;padding:12px 18px;border-radius:8px;z-index:9999;transition:all .25s}
+  .print-area{display:none}
+  @media print{body *{display:none}.print-area{display:block}}
+  @media(max-width:700px){#sidebar{position:fixed;transform:translateX(-100%)}#main{margin-left:0}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<nav id="sidebar">
+  <div class="sb-logo">EXIT GAMES</div>
+  <div class="sb-user"><div class="sb-av" id="sbAv">--</div><div><div class="sb-uname" id="sbNm">—</div><div class="sb-ucargo" id="sbCg">—</div></div></div>
+  <div class="sb-nav" id="sbNav"></div>
+  <div class="sb-bottom"><button class="sb-logout" onclick="doLogout()">↩ Sair</button></div>
+</nav>
+<main id="main"><div id="pc"></div></main>
+<div id="toast" class="toast"></div>
+
+<!-- Modal Login -->
+<div class="mo open" id="mLogin">
+  <div class="md">
+    <div class="mh"><span class="mti">🔐 Acesso</span><button class="mc" onclick="CM('mLogin')">×</button></div>
+    <div class="mb">
+      <div class="fg"><label>Colaborador</label><select id="lUser"></select></div>
+      <div class="fg"><label>PIN</label><input type="password" id="lPin" maxlength="6" placeholder="••••••"></div>
+      <div id="lErr" style="display:none;color:var(--danger);font-size:12px">❌ PIN incorreto.</div>
+      <button class="btn bp" style="width:100%" onclick="doLogin()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Venda -->
+<div class="mo" id="mVenda">
+  <div class="md">
+    <div class="mh"><span class="mti">💰 Nova Venda</span><button class="mc" onclick="CM('mVenda')">×</button></div>
+    <div class="mb">
+      <div class="fg"><label>Jogadores</label><input type="number" id="mVJ" value="2" min="1"></div>
+      <div class="fg"><label>Valor Total (R$)</label><input type="number" id="mVV" step="0.01"></div>
+      <div class="fg"><label>Canal</label><select id="mVC"><option>PDV</option><option>WhatsApp</option><option>Site</option></select></div>
+      <input type="hidden" id="mVendaSalaId">
+      <input type="hidden" id="mVendaHorario">
+    </div>
+    <div class="mf"><button class="btn bg" onclick="CM('mVenda')">Cancelar</button><button class="btn bp" onclick="confirmarVenda()">Confirmar</button></div>
+  </div>
+</div>
+
+<!-- Modal Cliente -->
+<div class="mo" id="mCliente">
+  <div class="md">
+    <div class="mh"><span class="mti">👤 Cliente</span><button class="mc" onclick="CM('mCliente')">×</button></div>
+    <div class="mb">
+      <input type="hidden" id="mClienteId">
+      <div class="fg"><label>Nome</label><input type="text" id="mClienteNome"></div>
+      <div class="fg"><label>Telefone</label><input type="text" id="mClienteTel"></div>
+      <div class="fg"><label>Cidade</label><input type="text" id="mClienteCidade" value="Aracaju"></div>
+    </div>
+    <div class="mf"><button class="btn bg" onclick="CM('mCliente')">Cancelar</button><button class="btn bp" onclick="salvarCliente()">Salvar</button></div>
+  </div>
+</div>
+
+<script>
+// ==================== SUPABASE CREDENCIAIS ====================
+const SUPABASE_URL = 'https://tbrgfwresuwumzrgtfyr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRicmdmd3Jlc3V3dW16cmd0ZnlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MjU0NDEsImV4cCI6MjA5NTIwMTQ0MX0.26eqf9AZuVot2OvQAdOE8erfkN1KoITzTvxbDcsFiGM';
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ==============================================================
+
+// Estado global
+let UA = null;
+let sessao = { expiresAt: 0 };
+const SD = 8 * 60 * 60 * 1000;
+let _vendaCtx = {};
+
+// Dados locais (fallback para quando supabase falhar)
+let unidades = [];
+let salas = [];
+let clientes = [];
+let vendas = [];
+
+// ==================== AUXILIARES ====================
+function el(id) { return document.getElementById(id); }
+function ev(id) { let e = el(id); return e ? e.value : ''; }
+function CM(id) { let e = el(id); if(e) e.classList.remove('open'); }
+function OM(id) { let e = el(id); if(e) e.classList.add('open'); }
+function toast(msg, tipo='') { let e = el('toast'); if(e) { e.textContent = msg; e.className = 'toast show'; setTimeout(()=>e.classList.remove('show'), 3000); } }
+function hoje() { return new Date().toISOString().split('T')[0]; }
+function agora() { return new Date().toISOString(); }
+function fM(v) { return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+function fD(s){ if(!s) return ''; let [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; }
+function san(s){ let d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+function hp(pin){ let h=0x811c9dc5; for(let i=0;i<pin.length;i++){ h^=pin.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return 'fb:'+h.toString(16); }
+function isAdm(){ return UA && UA.cargoId === 'adm'; }
+function tP(p){ return UA && (UA.permissoes?.includes('tudo') || UA.permissoes?.includes(p)); }
+
+// ==================== SUPABASE CRUD ====================
+async function carregarUnidades() {
+  const { data, error } = await supabase.from('unidades').select('*');
+  if (error) { console.error(error); return false; }
+  unidades = data;
+  return true;
+}
+async function carregarSalas() {
+  const { data, error } = await supabase.from('salas').select('*');
+  if (error) { console.error(error); return false; }
+  salas = data;
+  return true;
+}
+async function carregarClientes() {
+  const { data, error } = await supabase.from('clientes').select('*').order('nome');
+  if (error) { console.error(error); return false; }
+  clientes = data;
+  return true;
+}
+async function carregarVendas() {
+  const { data, error } = await supabase.from('vendas').select('*').order('criado_em', { ascending: false });
+  if (error) { console.error(error); return false; }
+  vendas = data;
+  return true;
+}
+async function salvarClienteSupabase(cliente) {
+  const { error } = await supabase.from('clientes').upsert(cliente);
+  if (error) throw error;
+}
+async function salvarVendaSupabase(venda) {
+  const { error } = await supabase.from('vendas').insert(venda);
+  if (error) throw error;
+}
+
+// ==================== LOGIN ====================
+async function prepLogin() {
+  // Carrega colaboradores do Supabase (se não houver, cria o admin)
+  let { data: colaboradores, error } = await supabase.from('colaboradores').select('*');
+  if (error || !colaboradores.length) {
+    // Insere admin padrão
+    const admin = {
+      id: '1',
+      nome: 'Admin Master',
+      cargo_id: 'adm',
+      unidade_id: '1',
+      pin_hash: hp('0000'),
+      ativo: true,
+      valor_hora: 0
+    };
+    await supabase.from('colaboradores').upsert(admin);
+    colaboradores = [admin];
+  }
+  const select = el('lUser');
+  if (select) {
+    select.innerHTML = colaboradores.filter(c=>c.ativo).map(c=>`<option value="${c.id}">${san(c.nome)}</option>`).join('');
+  }
+  el('lPin').value = '';
+  el('lErr').style.display = 'none';
+}
+
+async function doLogin() {
+  const userId = ev('lUser');
+  const pin = ev('lPin');
+  const { data: colab, error } = await supabase.from('colaboradores').select('*').eq('id', userId).single();
+  if (error || !colab || hp(pin) !== colab.pin_hash) {
+    el('lErr').style.display = 'block';
+    el('lPin').value = '';
+    return;
+  }
+  UA = { id: colab.id, nome: colab.nome, cargoId: colab.cargo_id, permissoes: ['ver_pdv','ver_relatorios','gerenciar_clientes'], unidadeId: colab.unidade_id };
+  sessao.expiresAt = Date.now() + SD;
+  CM('mLogin');
+  await carregarUnidades();
+  await carregarSalas();
+  await carregarClientes();
+  await carregarVendas();
+  renderPage();
+  rSb();
+  toast(`Bem-vindo, ${colab.nome}!`);
+}
+
+function doLogout() {
+  UA = null;
+  renderPage();
+  rSb();
+  OM('mLogin');
+  prepLogin();
+}
+
+// ==================== SIDEBAR ====================
+const MENUS = [
+  { section: 'Operação' },
+  { id: 'pdv', lbl: 'PDV', ic: '🎮', perm: 'ver_pdv' },
+  { section: 'Administração' },
+  { id: 'dashboard', lbl: 'Dashboard', ic: '📊', perm: 'ver_relatorios' },
+  { id: 'vendas', lbl: 'Vendas', ic: '🧾', perm: 'ver_relatorios' },
+  { id: 'clientes', lbl: 'Clientes', ic: '👥', perm: 'gerenciar_clientes' }
+];
+let PA = 'pdv';
+
+function rSb() {
+  let nav = el('sbNav');
+  if (!nav) return;
+  if (!UA) { nav.innerHTML = ''; return; }
+  let html = '';
+  for (let m of MENUS) {
+    if (m.section) { html += `<div class="sb-section">${m.section}</div>`; continue; }
+    if (!isAdm() && !tP(m.perm)) continue;
+    html += `<div class="sb-item ${PA === m.id ? 'active' : ''}" onclick="goTo('${m.id}')">${m.ic}<span>${m.lbl}</span></div>`;
+  }
+  nav.innerHTML = html;
+  if (el('sbAv')) el('sbAv').textContent = (UA.nome || '--').slice(0,2).toUpperCase();
+  el('sbNm').textContent = UA.nome;
+  el('sbCg').textContent = 'Administrador';
+}
+
+function goTo(pg) {
+  if (!UA) { OM('mLogin'); return; }
+  PA = pg;
+  rSb();
+  renderPage();
+}
+
+// ==================== PÁGINAS ====================
+function renderPage() {
+  let pc = el('pc');
+  if (!pc) return;
+  if (PA === 'pdv') pc.innerHTML = renderPDV();
+  else if (PA === 'dashboard') pc.innerHTML = renderDashboard();
+  else if (PA === 'vendas') pc.innerHTML = renderVendas();
+  else if (PA === 'clientes') pc.innerHTML = renderClientes();
+  else pc.innerHTML = '<div class="pb">Página em desenvolvimento</div>';
+}
+
+function renderPDV() {
+  let unidade = unidades.find(u => u.id === UA.unidadeId) || unidades[0];
+  let salasFiltradas = salas.filter(s => s.unidade_id === UA.unidadeId);
+  let horarios = (unidade?.horarios || '14:00,15:30,17:00,18:30,20:00,21:30').split(',').map(h=>h.trim());
+  let html = `<div class="ph"><div><div class="pt">🎮 PDV</div><div class="ps">${san(unidade?.nome)} — ${fD(hoje())}</div></div><div class="br"><button class="btn bg" onclick="abrirVendaModal()">➕ Nova Venda</button></div></div><div class="pb">`;
+  for (let s of salasFiltradas) {
+    html += `<div class="sala-card"><div class="sala-body"><div class="sala-nome">${s.emoji} ${san(s.nome)}</div><div class="hgrid">`;
+    for (let h of horarios) {
+      html += `<div class="hsl" onclick="abrirVenda('${s.id}','${h}')"><div class="ht">${h}</div><div class="hl">Livre</div></div>`;
+    }
+    html += `</div></div></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderDashboard() {
+  let totalVendas = vendas.reduce((s,v)=>s+v.valor_total,0);
+  let hojeVendas = vendas.filter(v=>v.data===hoje()).reduce((s,v)=>s+v.valor_total,0);
+  return `<div class="ph"><div class="pt">📊 Dashboard</div></div><div class="pb"><div class="g4">
+    <div class="met"><div class="ml">Faturamento Total</div><div class="mv">${fM(totalVendas)}</div></div>
+    <div class="met"><div class="ml">Vendas Hoje</div><div class="mv">${fM(hojeVendas)}</div></div>
+  </div></div>`;
+}
+
+function renderVendas() {
+  let vendasList = [...vendas];
+  return `<div class="ph"><div class="pt">🧾 Vendas</div></div><div class="pb"><div class="tw"><table><thead><tr><th>Data</th><th>Valor</th><th>Canal</th><th>Status</th></tr></thead><tbody>
+    ${vendasList.map(v=>`<tr><td>${fD(v.data)}</td><td>${fM(v.valor_total)}</td><td>${san(v.canal||'PDV')}</td><td>${v.status||'confirmado'}</td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+
+function renderClientes() {
+  return `<div class="ph"><div class="pt">👥 Clientes</div><button class="btn bp" onclick="abrirClienteModal()">+ Novo</button></div>
+  <div class="pb"><div class="tw"><table><thead><tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Ações</th></tr></thead><tbody>
+    ${clientes.map(c=>`<tr><td>${san(c.nome)}</td><td>${san(c.telefone||'')}</td><td>${san(c.cidade||'')}</td><td><button class="btn bg bxs" onclick="editarCliente('${c.id}')">✏️</button></td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+
+// ==================== FUNÇÕES DE VENDA ====================
+function abrirVenda(salaId, horario) {
+  _vendaCtx = { salaId, horario };
+  el('mVendaSalaId').value = salaId;
+  el('mVendaHorario').value = horario;
+  let preco = (unidades.find(u=>u.id===UA.unidadeId)?.preco_semana || 89);
+  el('mVV').value = (preco * 2).toFixed(2);
+  el('mVJ').value = 2;
+  OM('mVenda');
+}
+
+function abrirVendaModal() {
+  _vendaCtx = { salaId: null, horario: null };
+  el('mVendaSalaId').value = '';
+  el('mVendaHorario').value = '';
+  el('mVV').value = '89.00';
+  el('mVJ').value = 2;
+  OM('mVenda');
+}
+
+async function confirmarVenda() {
+  let val = parseFloat(ev('mVV'));
+  let jog = parseInt(ev('mVJ'));
+  let canal = ev('mVC');
+  let salaId = ev('mVendaSalaId') || null;
+  let horario = ev('mVendaHorario') || null;
+  if (!val || val <= 0) { toast('Valor inválido', 'error'); return; }
+  let venda = {
+    id: Date.now().toString(),
+    data: hoje(),
+    horario: horario,
+    unidade_id: UA.unidadeId,
+    sala_id: salaId || null,
+    qtd_jogadores: jog,
+    valor_total: val,
+    canal: canal,
+    status: 'confirmado',
+    vendido_por: UA.id,
+    criado_em: agora()
+  };
+  try {
+    await salvarVendaSupabase(venda);
+    vendas.unshift(venda);
+    toast('Venda registrada!', 'success');
+    CM('mVenda');
+    renderPage();
+  } catch(e) {
+    toast('Erro ao salvar venda: ' + e.message, 'error');
+  }
+}
+
+// ==================== CLIENTES ====================
+function abrirClienteModal(id = null) {
+  if (id) {
+    let c = clientes.find(c=>c.id === id);
+    if (c) {
+      el('mClienteId').value = c.id;
+      el('mClienteNome').value = c.nome;
+      el('mClienteTel').value = c.telefone || '';
+      el('mClienteCidade').value = c.cidade || 'Aracaju';
+    }
+  } else {
+    el('mClienteId').value = '';
+    el('mClienteNome').value = '';
+    el('mClienteTel').value = '';
+    el('mClienteCidade').value = 'Aracaju';
+  }
+  OM('mCliente');
+}
+
+function editarCliente(id) {
+  abrirClienteModal(id);
+}
+
+async function salvarCliente() {
+  let id = ev('mClienteId');
+  let nome = ev('mClienteNome').trim();
+  if (!nome) { toast('Nome obrigatório', 'error'); return; }
+  let cliente = {
+    id: id || Date.now().toString(),
+    nome: nome,
+    telefone: ev('mClienteTel'),
+    cidade: ev('mClienteCidade'),
+    criado_em: id ? undefined : agora()
+  };
+  try {
+    await salvarClienteSupabase(cliente);
+    await carregarClientes();
+    toast('Cliente salvo!', 'success');
+    CM('mCliente');
+    renderPage();
+  } catch(e) {
+    toast('Erro ao salvar cliente: ' + e.message, 'error');
+  }
+}
+
+// ==================== INICIALIZAÇÃO ====================
+document.addEventListener('DOMContentLoaded', async () => {
+  await prepLogin();
+  rSb();
+  // Define funções globais
+  window.doLogin = doLogin;
+  window.doLogout = doLogout;
+  window.goTo = goTo;
+  window.CM = CM;
+  window.OM = OM;
+  window.abrirVenda = abrirVenda;
+  window.confirmarVenda = confirmarVenda;
+  window.abrirVendaModal = abrirVendaModal;
+  window.abrirClienteModal = abrirClienteModal;
+  window.editarCliente = editarCliente;
+  window.salvarCliente = salvarCliente;
+});
+</script>
+</body>
+</html>

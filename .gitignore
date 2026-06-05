@@ -1,0 +1,58 @@
+# ============================================================
+# EXIT ERP — .gitignore
+# Garante que só o site (index.html) vá para o GitHub público.
+# Mantém fora do repositório: backups, scripts internos, segredos.
+# ============================================================
+
+# --- Segredos e configuração sensível (caso algum dia existam) ---
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+config.secret.*
+# A chave service_role do Supabase NUNCA deve ir para o repositório:
+service_role*
+supabase_service*
+
+# --- Scripts de banco de dados (contêm a estrutura interna) ---
+# Mantenha esses arquivos só no seu computador, não no site público.
+*.sql
+SUPABASE_*.sql
+*RLS*.sql
+
+# --- Backups e versões de trabalho ---
+# Só o index.html deve ser publicado; backups ficam locais.
+_backup_*.html
+exit_erp_v*.html
+*_backup*.html
+*.bak
+*.old
+
+# --- Planos e relatórios internos (não precisam ser públicos) ---
+PLANO_*.md
+*_audit*.md
+*auditoria*.md
+*relatorio*.md
+*.audit.html
+
+# --- Arquivos temporários e de sistema ---
+*.tmp
+*.log
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Pastas de dependências (caso um dia use build) ---
+node_modules/
+dist/
+build/
+.cache/
+
+# ============================================================
+# O QUE FICA NO REPOSITÓRIO (publicado):
+#   - index.html   (o aplicativo)
+#   - README.md    (se você criar um)
+# Tudo o mais acima fica só no seu computador.
+# ============================================================

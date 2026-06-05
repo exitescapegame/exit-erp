@@ -2813,10 +2813,23 @@ function salaFoiExcluida(id) {
   return getSalasExcluidas().includes(String(id));
 }
 
-async function carregarDBSeguro(senhaMaster) {
+async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
   // Inicializa criptografia local (para PINs e audit log)
   const ok = await inicializarSeguranca(senhaMaster);
   if (!ok) return false;
+
+  // [v85] LOGIN DE UNIDADE ANTES da carga (para o RLS estrito funcionar).
+  // Se email/senha de unidade foram passados, autentica no Supabase primeiro.
+  // Com o login OK, lDBSupabase() usa o token da unidade (não a chave anon),
+  // e o RLS deixa passar só os dados daquela unidade (ou tudo, se ADM).
+  if (emailUnidade && senhaUnidade && !window._SUPA_DESLIGADO) {
+    const loginRes = await unidadeLogin(emailUnidade, senhaUnidade);
+    if (!loginRes.ok) {
+      // Login de unidade falhou — informa e não prossegue (evita carregar com anon)
+      window._ultimoErroLoginUnidade = loginRes.erro || 'Login de unidade falhou.';
+      return false;
+    }
+  }
 
   // Carrega dados do Supabase
   const dados = await lDBSupabase();
@@ -2914,6 +2927,18 @@ function mostrarTelaDesbloqueio() {
       </button>
       <div id="senhaErr" style="display:none;color:var(--danger);font-size:11px;margin-top:8px"></div>
     </div>
+    <div id="secLoginUnidade" style="margin-bottom:16px;padding:14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:8px">
+        🏢 Login da Unidade
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">
+        Entre com o email e senha desta unidade (ex: balcão de Salvador). O ADM vê todas as unidades.
+      </div>
+      <input type="email" id="unidadeEmail" placeholder="Email da unidade" autocomplete="username"
+        style="margin-bottom:6px" onkeydown="if(event.key==='Enter')document.getElementById('unidadeSenha')?.focus()">
+      <input type="password" id="unidadeSenha" placeholder="Senha da unidade" autocomplete="current-password"
+        style="margin-bottom:8px" onkeydown="if(event.key==='Enter')tentarDesbloquear()">
+    </div>
     <div id="loginNormal" style="display:none">`;
 
   // Adiciona seção de senha antes do conteúdo
@@ -3007,14 +3032,23 @@ async function tentarDesbloquear() {
     }
   }
 
+  // [v85] Lê o login de unidade (email/senha do Supabase), se os campos existirem
+  const emailUnidade = document.getElementById('unidadeEmail')?.value?.trim() || '';
+  const senhaUnidade = document.getElementById('unidadeSenha')?.value || '';
+
   const btn = document.querySelector('#secSetup .btn');
   if (btn) { btn.textContent = '⏳ Conectando ao banco...'; btn.disabled = true; }
 
-  const ok = await carregarDBSeguro(senha);
+  window._ultimoErroLoginUnidade = null;
+  const ok = await carregarDBSeguro(senha, emailUnidade, senhaUnidade);
 
   if (!ok) {
     if (btn) { btn.textContent = jaConfigurado ? '🔓 Desbloquear' : '🔐 Proteger e Iniciar'; btn.disabled = false; }
-    if (errEl) { errEl.textContent = 'Erro ao conectar. Verifique sua conexão.'; errEl.style.display = 'block'; }
+    // [v85] Se o erro foi no login de unidade, mostra mensagem específica
+    const msgErro = window._ultimoErroLoginUnidade
+      ? ('Login da unidade: ' + window._ultimoErroLoginUnidade)
+      : 'Erro ao conectar. Verifique sua conexão.';
+    if (errEl) { errEl.textContent = msgErro; errEl.style.display = 'block'; }
     return;
   }
 
@@ -5643,7 +5677,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v84] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅');
+  console.log('🔒 [INTEGRIDADE v85] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}

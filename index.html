@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=no">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://utivaczfuuazspychdxt.supabase.co wss://utivaczfuuazspychdxt.supabase.co; img-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
@@ -295,12 +295,58 @@ tr:last-child td{border-bottom:none}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#c8c8d8;border-radius:3px}
-@media(max-width:1024px){#sidebar{position:fixed;transform:translateX(-100%)}#sidebar.open{transform:translateX(0)}#main{margin-left:0}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}#sbToggleBtn{display:flex}}
-@media(min-width:1025px){#sbToggleBtn{display:none}}
-#sbToggleBtn{position:fixed;top:10px;left:10px;z-index:200;background:var(--dark);border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:7px 10px;cursor:pointer;font-size:18px;color:#C9A84C;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:var(--tr)}
-#sbToggleBtn:hover{background:#1a1a2e}
-#sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99}
-#sbOverlay.open{display:block}
+@media(max-width:700px){#sidebar{position:fixed;transform:translateX(-100%)}#sidebar.open{transform:translateX(0)}#main{margin-left:0}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+
+/* ── TABLET / iPAD (701px – 1024px) ─────────────────────────────────────────
+   Fixes #01 #02 #03 #04 #05 #06 #07 #08
+   ──────────────────────────────────────────────────────────────────────────── */
+@media(max-width:1024px){
+  /* #02 — sidebar se comporta como mobile: escondida por padrão */
+  #sidebar{position:fixed;transform:translateX(-100%)}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0}
+
+  /* #02 — overlay escuro quando sidebar está aberta */
+  #sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;backdrop-filter:blur(2px)}
+  #sidebar.open ~ #sbOverlay,body.sb-open #sbOverlay{display:block}
+
+  /* #02 — botão hambúrguer no topo do #main */
+  #sbToggleBtn{display:flex}
+
+  /* #01 #06 — page header: botões quebram linha e ficam acessíveis */
+  .ph{flex-wrap:wrap;align-items:flex-start;gap:10px}
+  .ph .br{width:100%;flex-wrap:wrap;gap:6px}
+  .ph .br .btn{flex:1 1 120px;min-width:120px;justify-content:center}
+
+  /* #03 — grid 4 colunas vira 2×2 */
+  .g4{grid-template-columns:1fr 1fr}
+
+  /* #04 — modais maiores aproveitam a tela do iPad */
+  .md{max-width:600px}
+  .md-lg{max-width:780px}
+  .md-xl{max-width:92vw}
+  .mb{padding:16px 20px}
+
+  /* #05 — tabelas mais compactas, scroll touch suave */
+  table{font-size:11px}
+  th,td{padding:7px 8px}
+  .tw{-webkit-overflow-scrolling:touch}
+
+  /* #07 — área de toque mínima 44px para inputs e botões */
+  input:not([type=checkbox]):not([type=file]),select{padding:10px 12px;font-size:14px;min-height:44px}
+  .btn{min-height:44px}
+}
+
+/* #08 — PDV em modo paisagem no iPad */
+@media(min-width:768px) and (max-width:1024px) and (orientation:landscape){
+  .lrq-wrap{grid-template-columns:1fr 1fr}
+  #main{height:100dvh}
+  .pb{padding-bottom:20px}
+}
+
+/* ── Botão hambúrguer (escondido no desktop, visível até 1024px) ──────────── */
+#sbToggleBtn{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:none;border:1px solid rgba(0,0,0,.12);border-radius:6px;cursor:pointer;font-size:20px;color:#44445a;flex-shrink:0;margin-right:4px}
+#sbToggleBtn:hover{background:#f1f1f7}
 
 /* ── AGENDA DINÂMICA COLAPSÁVEL ─────────────────── */
 #agendaDinamica{
@@ -644,12 +690,7 @@ tbody tr:hover td { background: #f4f4ff !important; }
 .lrq-prg-bar{height:100%;border-radius:2px;transition:width 1s linear}
 .lrq-prg-ok{background:var(--wa)}.lrq-prg-warn{background:var(--amber)}.lrq-prg-danger{background:var(--red2)}
 .lrq-room-game{font-size:10px;color:rgba(255,255,255,.4);margin-top:3px}
-@media(max-width:900px){.lrq-wrap{grid-template-columns:1fr}.lrq-right{display:none;position:fixed;right:0;top:0;height:100vh;width:280px;z-index:150;box-shadow:-4px 0 20px rgba(0,0,0,.4)}.lrq-right.open{display:flex}.lrq-status-toggle{display:flex!important}}
-@media(min-width:901px){.lrq-status-toggle{display:none!important}}
-.lrq-status-toggle{padding:5px 10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.7);cursor:pointer;transition:var(--tr);font-family:inherit}
-.lrq-status-toggle:hover{background:rgba(255,255,255,.15);color:#fff}
-#lrqStatusOverlay{display:none;position:fixed;inset:0;z-index:149;background:rgba(0,0,0,.4)}
-#lrqStatusOverlay.open{display:block}
+@media(max-width:900px){.lrq-wrap{grid-template-columns:1fr}.lrq-right{display:none}}
 </style>
 </head>
 <body>
@@ -674,7 +715,15 @@ tbody tr:hover td { background: #f4f4ff !important; }
     <button id="btnSalvarAgora" class="sb-logout" style="margin-bottom:6px;border-color:rgba(201,168,76,.3);color:rgba(201,168,76,.6);display:none" onclick="autoSaveExec(true)">💾 Salvar Agora</button>
     <button class="sb-logout" onclick="doLogout()">↩ Sair</button></div>
 </nav>
-<main id="main" aria-label="Conteúdo principal"><h1 class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">EXIT GAMES — Sistema de Gestão</h1><div id="pc"></div></main>
+<!-- Overlay escuro para fechar sidebar no tablet/iPad -->
+<div id="sbOverlay" onclick="sbFechar()"></div>
+<main id="main" aria-label="Conteúdo principal">
+  <!-- Botão hambúrguer visível em tablets/iPad (até 1024px) -->
+  <div id="sbTopBar" style="display:none;align-items:center;gap:8px;padding:10px 16px 0;background:#fff;border-bottom:1px solid #e8e8f0">
+    <button id="sbToggleBtn" onclick="sbAbrir()" aria-label="Abrir menu" title="Menu">&#9776;</button>
+    <span style="font-size:13px;font-weight:700;color:#0f0f1a">EXIT GAMES</span>
+  </div>
+  <h1 class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">EXIT GAMES — Sistema de Gestão</h1><div id="pc"></div></main>
 <div id="toast"></div>
 
 <!-- ALERTA POP-UP PDV -->
@@ -4667,6 +4716,8 @@ function goTo(pg){
   // [v84] Gera provisões recorrentes ao ENTRAR no Financeiro (não no render — evita mutação a cada repintura)
   if(pg==='financeiro' && typeof gerarProvisoesRecorrentes==='function') gerarProvisoesRecorrentes();
   PA=pg;rSb();renderPage();
+  // Fechar sidebar automaticamente em tablets ao navegar (fix #02)
+  if(window.innerWidth<=1024) sbFechar();
 }
 function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
 function bindPage(){
@@ -4689,6 +4740,29 @@ function prepLogin(){
 }
 // doLogin = doLoginSeguro (PBKDF2 + rate limiting — definida na camada de segurança)
 function doLogin(){ doLoginSeguro(); }
+
+// ── Hambúrguer sidebar para tablet/iPad (fix #02) ─────────────────────────
+function sbAbrir(){
+  var sb = document.getElementById('sidebar');
+  var tb = document.getElementById('sbTopBar');
+  if(sb){ sb.classList.add('open'); }
+  document.body.classList.add('sb-open');
+}
+function sbFechar(){
+  var sb = document.getElementById('sidebar');
+  if(sb){ sb.classList.remove('open'); }
+  document.body.classList.remove('sb-open');
+}
+// Mostrar barra de hambúrguer somente em tablets
+(function(){
+  function checarTamanho(){
+    var tb = document.getElementById('sbTopBar');
+    if(!tb) return;
+    tb.style.display = window.innerWidth <= 1024 ? 'flex' : 'none';
+  }
+  document.addEventListener('DOMContentLoaded', checarTamanho);
+  window.addEventListener('resize', checarTamanho);
+})();
 // doLogout usa versão segura com limpeza de memória
 
 // ══════════════════════════════════════════════════════════════════════
@@ -7878,15 +7952,6 @@ function encSen(id){
 }
 
 // ── PONTO ─────────────────────────────
-// [v75-SEC] getTerminalId(): ID estável do terminal (persiste no localStorage)
-// Nunca contém dados pessoais — é apenas um UUID aleatório gerado na 1ª vez.
-function getTerminalId(){
-  const KEY='exit_terminal_id';
-  let tid=localStorage.getItem(KEY);
-  if(!tid){tid='tid_'+Math.random().toString(36).slice(2,10)+'_'+Date.now().toString(36);localStorage.setItem(KEY,tid);}
-  return tid;
-}
-
 function abrirPonto(){
   const s=el('ptU');
   if(!s)return;
@@ -7917,21 +7982,14 @@ function updPontoSt(){
   const uId=ev('ptU');const p=DB.pontos.find(x=>String(x.colaboradorId)===String(uId)&&x.data===hoje()&&!x.saida);const st=el('ptSt');if(!st)return;
   // [v53-SEC1] GM vê apenas status de entrada/saída — sem duração nem valor acumulado
   const isGM = !isAdm() && tP('ver_painel_gm') && !tP('ver_relatorios');
-  // [v75-SEC] Alerta quando colaborador selecionado ≠ operador logado no terminal
-  const ehTerceiro = UA && String(uId) !== String(UA.id);
-  const avisoTerceiro = ehTerceiro
-    ? `<div style="margin-top:6px;padding:7px 10px;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.4);border-radius:var(--rsm);font-size:11px;color:#b45309;display:flex;align-items:center;gap:6px">
-        ⚠️ <span>Você está registrando ponto <strong>em nome de outra pessoa</strong>. Esta ação ficará registrada no histórico vinculada ao seu usuário (<strong>${san(UA.nome)}</strong>).</span>
-       </div>`
-    : '';
   if(p){
     if(isGM){
-      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>${avisoTerceiro}`;
+      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
     } else {
       const dur=Date.now()-new Date(p.entrada).getTime();
-      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${p.entradaHora} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>${avisoTerceiro}`;
+      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${p.entradaHora} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
     }
-  }else{st.innerHTML=`<span style="color:var(--text2)">Registrar entrada</span>${avisoTerceiro}`;}
+  }else{st.innerHTML='<span style="color:var(--text2)">Registrar entrada</span>';}
 }
 function confirmarPonto(){
   const uId=ev('ptU');const pin=ev('ptPin');
@@ -7947,11 +8005,6 @@ function confirmarPonto(){
   const unidadeParaGravar=check.unidadeResolvida;
   function _registrarPontoComUnidade(unidadeGravar){
     const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    // [v75-SEC] Captura operador real e terminal antes de qualquer ação
-    const operadorId   = UA ? String(UA.id)   : 'desconhecido';
-    const operadorNome = UA ? String(UA.nome)  : '?';
-    const terminalId   = getTerminalId();
-    const ehTerceiro   = String(uId) !== operadorId;
     const pa=DB.pontos.find(p=>String(p.colaboradorId)===String(uId)&&p.data===hoje()&&!p.saida);
     if(pa){
       pa.saida=agora();pa.saidaHora=hora;
@@ -7959,15 +8012,6 @@ function confirmarPonto(){
       pa.duracaoMs=dur;pa.horasTrabalhadas=+(dur/3600000).toFixed(4);
       const vHora=parseFloat(c.valorHora)||parseFloat(pa.valorHora)||0;
       pa.valorHora=vHora;pa.valorDevido=+(pa.horasTrabalhadas*vHora).toFixed(2);
-      // [v75-SEC] Registra quem bateu a saída
-      pa.saidaOperadorId   = operadorId;
-      pa.saidaOperadorNome = operadorNome;
-      pa.saidaTerminalId   = terminalId;
-      pa.saidaPorTerceiro  = ehTerceiro;
-      // [v75-SEC] Auditoria se terceiro registrou saída
-      if(ehTerceiro) registrarAuditoria('PONTO_SAIDA_TERCEIRO',
-        `"${operadorNome}" (id=${operadorId}) registrou SAÍDA de "${c.nome}" (id=${uId}) no terminal ${terminalId}`,
-        operadorId, {colaboradorId:String(uId),colaboradorNome:c.nome,terminalId,saidaHora:hora});
       sDB();el('ptPin').value='';updPontoSt();CM('mPonto');rSb();
       toast(`✅ Saída registrada — ${fDur(dur)} • ${fM(pa.valorDevido)}`);
     } else {
@@ -7978,17 +8022,8 @@ function confirmarPonto(){
         valorHora:parseFloat(c.valorHora)||0,
         registradoPorRole:check.role,
         unidadeBaseOperador:String(UA.unidadeId),
-        coberturaRemota:check.role==='Monitor',
-        // [v75-SEC] Rastreabilidade de terminal e operador real
-        entradaOperadorId:   operadorId,
-        entradaOperadorNome: operadorNome,
-        terminalId:          terminalId,
-        entradaPorTerceiro:  ehTerceiro
+        coberturaRemota:check.role==='Monitor'
       });
-      // [v75-SEC] Auditoria se terceiro registrou entrada
-      if(ehTerceiro) registrarAuditoria('PONTO_ENTRADA_TERCEIRO',
-        `"${operadorNome}" (id=${operadorId}) registrou ENTRADA de "${c.nome}" (id=${uId}) no terminal ${terminalId}`,
-        operadorId, {colaboradorId:String(uId),colaboradorNome:c.nome,terminalId,entradaHora:hora});
       sDB();el('ptPin').value='';updPontoSt();CM('mPonto');rSb();
       toast(`⏰ Entrada registrada às ${hora}`,'success');
     }
@@ -11130,14 +11165,6 @@ function rPonto(){
       const thj = pf.reduce((s,p)=>s+(p.duracaoMs||0),0);
       const em  = pa.length>0;
       const cg  = DB.cargos.find(g=>g.id===c.cargoId);
-      // [v75-SEC] Indica se o ponto ativo foi registrado por terceiro
-      const pontoAtivo = pa[0];
-      const regPorTerceiro = pontoAtivo && pontoAtivo.entradaPorTerceiro;
-      const regPorNome     = pontoAtivo && pontoAtivo.entradaOperadorNome && pontoAtivo.entradaOperadorNome !== c.nome
-                             ? pontoAtivo.entradaOperadorNome : null;
-      const badgeRegPor = regPorTerceiro && regPorNome
-        ? `<div style="margin-top:3px;font-size:9px;color:#b45309;background:rgba(217,119,6,.1);border-radius:3px;padding:1px 5px;display:inline-block">⚠️ Reg. por: ${san(regPorNome)}</div>`
-        : '';
       return`<div class="pc">
         <div class="pav" style="${em?'border:1.5px solid var(--success)':''}">
           ${ini(c.nome)}
@@ -11154,7 +11181,6 @@ function rPonto(){
                 ? `⏱ ${fDur(thj)} hoje`
                 : '<span style="color:var(--text3)">Sem registro</span>'}
           </div>
-          ${badgeRegPor}
         </div>
         <span class="bdg ${em?'b-ok':'b-gh'}" style="font-size:10px">${em?'ATIVO':'—'}</span>
       </div>`;

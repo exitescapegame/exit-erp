@@ -19,7 +19,7 @@
 :root{--bg:#f8f8fc;--bg2:#ffffff;--bg3:#f1f1f7;--bg4:#e8e8f0;--border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.15);--accent:#C9A84C;--accent2:#b8962e;--text:#111118;--text2:#44445a;--text3:#888899;--success:#16a34a;--danger:#dc2626;--warn:#d97706;--info:#2563eb;--purple:#7c3aed;--sidebar-w:230px;--r:10px;--rsm:6px;--wa:#25D366;--dark:#0f0f1a;--bg-light:#f0f0f8;--amber:#f59e0b;--red2:#ef4444;--r-lg:8px;--r-xs:3px;--r-pill:9px;--tr:all .15s;--tr-slow:all .2s;--ring:0 0 0 3px rgba(201,168,76,.15)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f4fa;color:#111118;font-size:14px;min-height:100vh;display:flex;overflow:hidden}
-#sidebar{width:var(--sidebar-w);background:var(--dark);border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100}
+#sidebar{width:var(--sidebar-w);background:var(--dark);border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;height:100vh;height:100dvh;position:fixed;left:0;top:0;z-index:100;max-height:-webkit-fill-available}
 .sb-logo{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .sb-logo-icon{width:38px;height:38px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#000;flex-shrink:0}
 .sb-logo-txt{font-weight:700;font-size:13px;line-height:1.3}.sb-logo-sub{font-size:10px;color:rgba(255,255,255,0.5)}
@@ -34,7 +34,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f4fa;color:#11111
 .sb-item.active{background:rgba(201,168,76,.12);color:#C9A84C;font-weight:600;border-left-color:#C9A84C}
 .sb-icon{font-size:15px;width:18px;text-align:center}
 .sb-badge{background:var(--danger);color:#fff;font-size:9px;padding:1px 5px;border-radius:10px;margin-left:auto}
-.sb-bottom{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08)}
+.sb-bottom{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);flex-shrink:0}
 .sb-logout{width:100%;background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);padding:8px;border-radius:var(--rsm);cursor:pointer;font-size:12px;transition:var(--tr)}
 .sb-logout:hover{border-color:var(--danger);color:var(--danger)}
 #main{margin-left:var(--sidebar-w);flex:1;height:100vh;overflow-y:auto;background:#f4f4fa;border-top:3px solid #C9A84C}
@@ -277,8 +277,8 @@ tr:last-child td{border-bottom:none}
 .calc-g{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .cb{background:var(--bg-light);border:1px solid #dcdcec;color:#111118;padding:12px 6px;border-radius:var(--rsm);cursor:pointer;font-size:14px;font-weight:600;transition:var(--tr);font-family:inherit}
 .cb:hover{background:#e0e0ec}.cb.op{background:rgba(201,168,76,.15);color:#b8962e}.cb.eq{background:var(--accent);color:#000}.cb.cl{background:rgba(239,68,68,.15);color:var(--danger)}
-.tabs{display:flex;gap:2px;background:#ebebf5;border:1px solid #dcdcec;border-radius:var(--rsm);padding:3px;margin-bottom:16px;flex-wrap:wrap}
-.tab{padding:7px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:var(--tr);white-space:nowrap}
+.tabs{display:flex;gap:2px;background:#ebebf5;border:1px solid #dcdcec;border-radius:var(--rsm);padding:3px;margin-bottom:16px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{padding:7px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:var(--tr);white-space:nowrap;flex-shrink:0}
 .tab.active{background:#ffffff;color:#C9A84C;border:1px solid #dcdcec;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
 .fi{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ebebf5}
 .fi:last-child{border-bottom:none}
@@ -302,8 +302,12 @@ tr:last-child td{border-bottom:none}
    ──────────────────────────────────────────────────────────────────────────── */
 @media(max-width:1024px){
   /* #02 — sidebar se comporta como mobile: escondida por padrão */
-  #sidebar{position:fixed;transform:translateX(-100%)}
+  #sidebar{position:fixed;transform:translateX(-100%);height:100dvh;height:100vh;max-height:-webkit-fill-available}
   #sidebar.open{transform:translateX(0)}
+  /* [BUG-FIX] Garante que .sb-bottom (Salvar/Sair) nunca fica cortado:
+     .sb-nav cede espaço e o bottom fica sempre visível com scroll seguro */
+  .sb-nav{flex:1;overflow-y:auto;min-height:0;padding-bottom:4px}
+  .sb-bottom{flex-shrink:0;position:sticky;bottom:0;background:var(--dark);padding-bottom:max(12px,env(safe-area-inset-bottom));z-index:1}
   #main{margin-left:0}
 
   /* #02 — overlay escuro quando sidebar está aberta */
@@ -4654,6 +4658,7 @@ const MENUS=[
   {id:'vendas',lbl:'Vendas',ic:'🧾',perm:'ver_vendas_metas'},
   {id:'clientes',lbl:'Clientes',ic:'👥',perm:'gerenciar_clientes'},
   {id:'financeiro',lbl:'Financeiro',ic:'💰',perm:'ver_financeiro'},
+  {id:'_shopping',lbl:'Rel. Shopping',ic:'🛍️',perm:'ver_financeiro',_acao:'abrirRelatorioShopping'},
   {id:'ponto',lbl:'Ponto & RH',ic:'⏱️',perm:'ver_rh'},
   {id:'salas',lbl:'Salas',ic:'🚪',perm:'tudo'},
   {id:'staff',lbl:'Equipe',ic:'👤',perm:'gerenciar_staff'},
@@ -4679,7 +4684,12 @@ function rSb(){
         : (isAdm()||tP(m.perm));
     if(!permOk)return;
     const notif=m.id==='ponto'?DB.pontos.filter(p=>!p.saida&&p.data===hoje()).length:m.comm?nMsgsNaoLidas():m.gmBadge?nAlertsGM():m.lrqBadge?nReservasPendentesLRQ():0;
-    h+=`<div class="sb-item ${PA===m.id?'active':''}" onclick="goTo('${m.id}')">${m.ic}<span>${m.lbl}</span>${notif>0?`<span class="sb-badge">${notif}</span>`:''}</div>`;
+    // Item de ação direta (ex: Rel. Shopping) — não navega para página, chama função
+    if(m._acao){
+      h+=`<div class="sb-item" onclick="if(window.innerWidth<=1024)sbFechar();${m._acao}()">${m.ic}<span>${m.lbl}</span></div>`;
+    } else {
+      h+=`<div class="sb-item ${PA===m.id?'active':''}" onclick="goTo('${m.id}')">${m.ic}<span>${m.lbl}</span>${notif>0?`<span class="sb-badge">${notif}</span>`:''}</div>`;
+    }
   });
   nav.innerHTML=h;
   el('sbAv').textContent=ini(UA.nome);
@@ -4729,6 +4739,8 @@ function bindPage(){
   // Liberação Rápida: fecha modal ao clicar no overlay
   const lrqOv=el('lrqModalOverlay');
   if(lrqOv)lrqOv.onclick=function(e){if(e.target===this)_lrqCloseModal();};
+  // [FIX] Aba Shopping do Financeiro — abre o modal automaticamente
+  if(PA==='financeiro'&&window._fTab===9){setTimeout(()=>{window._fTab=4;abrirRelatorioShopping();},60);}
 }
 
 // ── LOGIN ─────────────────────────────
@@ -5130,7 +5142,7 @@ function rPDV(){
           ${cx.aberto?`<button class="btn bd bsm" onclick="fecharCx()">Fechar Caixa</button>`:''}
           ${cx.aberto&&(isAdm()||tP('ver_caixa'))?`<button class="btn bg bsm" onclick="OM('mRet')">💸 Retirada</button>`:''}
         </div>
-        ${cx.historico.length?`<div style="margin-top:10px">${cx.historico.slice(-5).reverse().map(h=>`<div class="fi"><div class="fi-ic" style="background:${h.tipo==='entrada'?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'}">${h.tipo==='entrada'?'↑':'↓'}</div><div style="flex:1"><div style="font-size:12px">${san(h.desc)}</div><div style="font-size:10px;color:var(--text3)">${h.hora||''}</div></div><div class="fv ${h.tipo==='entrada'?'pos':'neg'}">${h.tipo==='entrada'?'+':'-'}${fM(h.valor)}</div></div>`).join('')}</div>`:''}
+        ${cx.historico.length?`<div style="margin-top:10px;max-height:260px;overflow-y:auto;padding-right:2px">${cx.historico.slice().reverse().map((h,idx)=>{const realIdx=cx.historico.length-1-idx;const podeEstornar=(h.tipo==='entrada'||h.tipo==='saida')&&(isAdm()||tP('ver_caixa'));const btnEstorno=podeEstornar?`<button class="btn bg bxs" style="font-size:10px;padding:2px 7px;margin-left:6px" title="Estornar lançamento" onclick="estornarLancamentoCx(${realIdx})">↩</button>`:'';return`<div class="fi"><div class="fi-ic" style="background:${h.tipo==='entrada'?'rgba(34,197,94,.1)':h.tipo==='saida'?'rgba(239,68,68,.1)':'rgba(100,100,100,.1)'}">${h.tipo==='entrada'?'↑':h.tipo==='saida'?'↓':'·'}</div><div style="flex:1"><div style="font-size:12px">${san(h.desc)}</div><div style="font-size:10px;color:var(--text3)">${h.hora||''}</div></div><div class="fv ${h.tipo==='entrada'?'pos':h.tipo==='saida'?'neg':''}" style="white-space:nowrap">${h.tipo==='entrada'?'+':h.tipo==='saida'?'-':''}${h.valor>0?fM(h.valor):''}${btnEstorno}</div></div>`}).join('')}</div>`:''}
       </div>
       <!-- [v44] Linha de status resumido sempre visível (sem revelar valores) -->
       <div id="pdvCxResumido" style="margin-top:8px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px">
@@ -8169,6 +8181,32 @@ function _fecharCxConfirmado(){
   });
 }
 
+// [BUG-FIX] Estorno de lançamento avulso do caixa (entrada ou saída)
+function estornarLancamentoCx(idx){
+  if(!isAdm()&&!tP('ver_caixa')){toast('Sem permissão para estornar lançamentos.','error');return;}
+  const uId=String(pdvUID());
+  const cx=getCx(uId);
+  const h=cx.historico[idx];
+  if(!h||(h.tipo!=='entrada'&&h.tipo!=='saida')){toast('Lançamento não pode ser estornado.','warn');return;}
+  if(h._estornado){toast('Lançamento já estornado.','warn');return;}
+  if(!confirm(`Estornar "${h.desc}" (${h.tipo==='entrada'?'+':'-'}${fM(h.valor)})?`))return;
+  // Marca original como estornado
+  h._estornado=true;
+  // Lança o reverso
+  const hora_=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  if(h.tipo==='entrada'){
+    cx.entradas=Math.max(0,cx.entradas-(h.valor||0));
+    cx.saldoAtual=Math.max(0,cx.saldoAtual-(h.valor||0));
+    cx.historico.push({tipo:'saida',desc:`↩ Estorno: ${h.desc}`,valor:h.valor||0,hora:hora_,data:hoje(),_ehEstorno:true,operadorId:UA.id});
+  } else {
+    cx.saidas=Math.max(0,cx.saidas-(h.valor||0));
+    cx.saldoAtual+=(h.valor||0);
+    cx.historico.push({tipo:'entrada',desc:`↩ Estorno: ${h.desc}`,valor:h.valor||0,hora:hora_,data:hoje(),_ehEstorno:true,operadorId:UA.id});
+  }
+  registrarAuditoria('CAIXA_ESTORNO',`Estorno de lançamento: "${h.desc}" (${fM(h.valor)})`,UA.id);
+  sDB();renderPage();toast('↩ Lançamento estornado.','ok');
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // [v54] FECHAMENTO DE SESSÃO DE CAIXA — Módulo completo
 // Implementa: consolidação, relatório, transferência de fundo e reset
@@ -8238,12 +8276,31 @@ function abrirFechamentoCaixa(){
         if(totaisMeio[met]!==undefined) totaisMeio[met]+=p.valor||0;
         else totaisMeio.outros+=p.valor||0;
       });
+    } else if(v.formaPagamento){
+      const met=v.formaPagamento;
+      if(totaisMeio[met]!==undefined) totaisMeio[met]+=v.valorTotal||0;
+      else totaisMeio.outros+=v.valorTotal||0;
     } else {
       totaisMeio.outros+=(v.valorTotal||0);
     }
   });
 
-  const totalVendas=vendasSessao.reduce((s,v)=>s+(v.valorTotal||0),0);
+  // [BUG-FIX] Inclui lançamentos avulsos do cx.historico (tabuleiro, melhor idade,
+  // reservas diretas, etc.) que NÃO estão em DB.vendas
+  const idsVendasNoHistorico=new Set(vendasSessao.map(v=>v.id));
+  cx.historico.forEach(h=>{
+    if(h.tipo!=='entrada'||h._estornado)return;
+    // Só adiciona se não for uma venda já contabilizada acima
+    // (entradas de venda de escape já passam por cx.historico mas estão em vendasSessao)
+    // Verificamos pela descrição de venda — entradas com _vendaId duplicariam
+    if(h._vendaId&&idsVendasNoHistorico.has(h._vendaId))return;
+    if(h._ehEstorno)return;
+    const met=h.metodo||'outros';
+    if(totaisMeio[met]!==undefined) totaisMeio[met]+=h.valor||0;
+    else totaisMeio.outros+=h.valor||0;
+  });
+
+  const totalVendas=cx.entradas||0; // usa cx.entradas que já acumula TUDO (vendas + avulsos)
   const totalSaidas=cx.saidas||0;
   const saldoEsperado=+(((cx.saldoInicial||0)+totalVendas-totalSaidas).toFixed(2));
 
@@ -9793,8 +9850,8 @@ function gerarProvisoesRecorrentes(){
 function rFin(){
   // [v84] gerarProvisoesRecorrentes() saiu daqui (render não deve mutar dados).
   // Agora é chamado no goTo('financeiro'). O guard mensal interno garante idempotência.
-  const tabs=['📋 Contas a Pagar','📥 Contas a Receber','📊 Provisões','👥 Folha de Pagamento','📈 Relatório','💵 Vendas','🤖 Assistente','🔒 Fechamentos','💸 Devoluções'];
-  const cont=[rContas,rContasReceber,rProvisoes,rFolha,rRelFin,rRelVendas,rAssistenteFin,rFechamentosCaixa,()=>rRelDevolucoesV74(isAdm()?null:UA.unidadeId)][window._fTab]();
+  const tabs=['📋 Contas a Pagar','📥 Contas a Receber','📊 Provisões','👥 Folha de Pagamento','📈 Relatório','💵 Vendas','🤖 Assistente','🔒 Fechamentos','💸 Devoluções','🛍️ Shopping'];
+  const cont=[rContas,rContasReceber,rProvisoes,rFolha,rRelFin,rRelVendas,rAssistenteFin,rFechamentosCaixa,()=>rRelDevolucoesV74(isAdm()?null:UA.unidadeId),()=>''][window._fTab]();
   const btnNova=window._fTab===0?`<button class="btn bp bsm" onclick="abrirConta()">+ Nova Conta</button>`:
                 window._fTab===1?`<button class="btn bp bsm" onclick="abrirContaReceber()">+ A Receber</button>`:'';
   // Badge de unidade — não-ADM vê apenas a sua
@@ -9930,7 +9987,7 @@ function rContas(){
     <div class="met bl"><div class="ml">Total Contas</div><div class="mv">${cs.length}</div></div>
   </div>
   ${cs.length?`<div class="tw"><table><thead><tr><th>Categoria</th><th>Descrição</th><th>Unidade</th><th>Valor/Critério</th><th>Vencimento</th><th>Recorrência</th><th>Status</th><th></th></tr></thead><tbody>
-    ${cs.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat. (≈${fM(fatMes(c.unidadeId||null)*(c.percentual/100))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
+    ${cs.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat. (≈${fM(fatMes(c.unidadeId||null)*(c.percentual/100))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''} ${c.pago&&(isAdm()||tP('ver_financeiro'))?`<button class="btn bg bxs" title="Estornar pagamento" onclick="estornarContaPagar('${c.id}')">↩</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
   </tbody></table></div>`:'<div class="empty"><div class="empty-ic">📋</div><div>Nenhuma conta cadastrada.</div></div>'}`;
 }
 function pagarConta(id){
@@ -9954,6 +10011,29 @@ function excConta(id){
   if(!confirm('Excluir esta conta a pagar?'))return;
   registrarAuditoria('CONTA_PAGAR_EXCLUIDA',`"${c?.desc||id}" excluída por ${UA.nome} (pago=${c?.pago})`,UA.id);
   DB.contasPagar=DB.contasPagar.filter(x=>x.id!==id);sDB();renderPage();
+}
+// [BUG-FIX] Estorno de conta a pagar — reverte saída do caixa e status para pendente
+function estornarContaPagar(id){
+  if(!isAdm()&&!tP('ver_financeiro')){toast('Sem permissão para estornar contas.','error');return;}
+  const c=DB.contasPagar.find(x=>x.id===id);if(!c){toast('Conta não encontrada.','error');return;}
+  if(c.unidadeId&&!rlsCanAccess(c.unidadeId)){toast('Sem permissão para conta de outra unidade.','error');return;}
+  if(!c.pago){toast('Esta conta ainda não foi paga — nada a estornar.','warn');return;}
+  const val=c.tipo==='percentual'?fatMes(c.unidadeId||null)*(c.percentual/100):c.valor;
+  if(!confirm(`Estornar pagamento de "${c.desc}" (${fM(val)})?\n\nO valor será devolvido ao caixa e a conta voltará para Pendente.`))return;
+  // Reverte saída no caixa
+  const uId=c.unidadeId||UA.unidadeId;
+  const cx=getCx(uId);
+  if(cx.aberto){
+    cx.saidas=Math.max(0,cx.saidas-val);
+    cx.saldoAtual+=val;
+    cx.historico.push({tipo:'entrada',desc:`↩ Estorno conta a pagar: ${c.desc}`,valor:val,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),_ehEstorno:true,operadorId:UA.id});
+  }
+  // Reverte status da conta
+  const snapAntes={pago:true,paidAt:c.paidAt,paidBy:c.paidBy};
+  c.pago=false;c.paidAt=null;c.paidBy=null;
+  c._estornadoEm=agora();c._estornadoPor=UA.id;
+  registrarAuditoria('CONTA_PAGAR_ESTORNADA',`"${c.desc}" (${fM(val)}) estornada por ${UA.nome}`,UA.id,{antes:snapAntes,depois:{pago:false,estornadoPor:UA.id}});
+  sDB();renderPage();toast('↩ Pagamento estornado. Conta voltou para Pendente.','ok');
 }
 
 function rProvisoes(){
@@ -10951,6 +11031,20 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
   const taxaS=_fu?fatMes(parseInt(_fu))*((DB.config.taxaShopping||15)/100):DB.unidades.reduce((s,u)=>s+fatMes(u.id)*((DB.config.taxaShopping||15)/100),0);
   const folha=DB.colaboradores.filter(c=>c.ativo&&(!_fu||String(c.unidadeId)===_fu)).reduce((s,c)=>{return s+DB.pontos.filter(p=>p.data&&p.data.startsWith(mes)&&p.colaboradorId===c.id&&p.saida).reduce((a,p)=>a+(p.valorDevido||0),0);},0);
   const res=fm-taxaS-folha-desp;
+
+  // [BUG-FIX] Cálculo de descontos e cortesias no período
+  const vendasMes=(DB.vendas||[]).filter(v=>v.status!=='cancelado'&&v.data&&v.data.startsWith(mes)&&(!_fu||String(v.unidadeId)===_fu));
+  const totalDescontos=vendasMes.reduce((s,v)=>{
+    // Desconto registrado diretamente na venda
+    if(v.descontoTotal>0) return s+v.descontoTotal;
+    // Desconto via descontos[] (ajustes)
+    if(v.descontos&&v.descontos.length) return s+v.descontos.reduce((a,d)=>a+(d.valor||0),0);
+    // Desconto implícito: valorOriginal > valorTotal
+    if(v._valorOriginal&&v._valorOriginal>v.valorTotal) return s+(v._valorOriginal-v.valorTotal);
+    return s;
+  },0);
+  const cortesiaVendas=vendasMes.filter(v=>v.cortesia===true||v.canal==='cortesia'||v.valorTotal===0);
+  const totalCortesias=cortesiaVendas.reduce((s,v)=>s+(v._valorOriginal||v.valorOriginal||0),0);
   const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px"><span style="font-size:12px;font-weight:600;color:var(--text2)">Filtrar:</span><select onchange="window._relFinUnidade=this.value;renderPage()"><option value="">Consolidado (todas)</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select></div>`:'';
 
   // ── Caixa por unidade (ADM) ──
@@ -10993,6 +11087,8 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
   return`${filtroHtml}<div style="margin-bottom:14px"><button class="btn bp" onclick="abrirRelatorioShopping()" style="width:100%">🛍️ Relatório Semanal do Shopping (segunda a domingo)</button></div><div class="g2" style="margin-bottom:0">
     <div class="card"><div class="ct">📈 DRE — ${mes}${_fu?' ('+san(DB.unidades.find(u=>u.id==_fu)?.nome||'')+')':`(consolidado)`}</div>
       <div class="fi"><div class="fi-ic" style="background:rgba(34,197,94,.1)">+</div><div style="flex:1">Faturamento Total</div><div class="fv pos">${fM(fm)}</div></div>
+      ${totalDescontos>0?`<div class="fi"><div class="fi-ic" style="background:rgba(251,191,36,.1)">🏷️</div><div style="flex:1">Descontos Concedidos</div><div class="fv" style="color:var(--warn)">- ${fM(totalDescontos)}</div></div>`:''}
+      ${(totalCortesias>0||cortesiaVendas.length>0)?`<div class="fi"><div class="fi-ic" style="background:rgba(139,92,246,.1)">🎁</div><div style="flex:1">Cortesias (${cortesiaVendas.length})</div><div class="fv" style="color:#8b5cf6">- ${fM(totalCortesias)}</div></div>`:''}
       <div class="fi"><div class="fi-ic" style="background:rgba(239,68,68,.1)">-</div><div style="flex:1">Taxa Shopping (${DB.config.taxaShopping||15}%)</div><div class="fv neg">${fM(taxaS)}</div></div>
       <div class="fi"><div class="fi-ic" style="background:rgba(239,68,68,.1)">-</div><div style="flex:1">Folha (apurada)</div><div class="fv neg">${fM(folha)}</div></div>
       <div class="fi"><div class="fi-ic" style="background:rgba(239,68,68,.1)">-</div><div style="flex:1">Despesas Pagas</div><div class="fv neg">${fM(desp)}</div></div>
@@ -16159,6 +16255,11 @@ function enviarWhatsApp(){
   const motivo=(ev('waMotivo')||'').trim();
   if(!motivo&&tipo!=='confirmacao'){toast('Preencha o motivo.','error');el('waMotivo').focus();return;}
   const v=_waCtx.venda;const cli=_waCtx.cliente;const sala=_waCtx.sala;
+  // [BUG-FIX] Cliente avulso (cli=null) pode receber mensagem sem verificação de consentimento
+  if(!cli){
+    _waExecutarEnvio(tipo,motivo,v,cli,sala);
+    return;
+  }
   // [v74.74] Se o cliente ainda não autorizou, em vez de só bloquear, oferece LIBERAR com um clique
   if(!_waVerificarConsentimento(cli,'enviarWhatsApp:'+tipo)){
     sDB();
@@ -16228,16 +16329,23 @@ function _waExecutarEnvio(tipo,motivo,v,cli,sala){
     if(tipo==='cancelamento') msg+='\n\n'+waGetTermoCancelamento();
   }
   const cfgTotem=lerCfgTotem();
-  const tel=(cli?.telefone||cfgTotem.whatsappNumero||'').replace(/\D/g,'');
-  const waNum=tel?'55'+tel:'';
-  const url=waNum
-    ?`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`
-    :`https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(url,'_blank');
+  // [BUG-FIX] Normaliza telefone: remove não-dígitos, adiciona DDI 55 se ausente
+  let telRaw=(cli?.telefone||cfgTotem.whatsappNumero||'').replace(/\D/g,'');
+  if(telRaw&&!telRaw.startsWith('55')&&telRaw.length<=11) telRaw='55'+telRaw;
+  const waNum=telRaw||'';
+  if(!waNum){toast('Telefone não cadastrado para este cliente.','warn');return;}
+  const url=`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`;
+  // [BUG-FIX] window.open dentro de callback assíncrono é bloqueado pelo navegador.
+  // Usamos uma âncora temporária clicada programaticamente — isso preserva o gesto do usuário.
+  try{
+    const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  }catch(e){ location.href=url; }
   sDB();CM('mWhatsApp');
   const tipoLabel=(WA_TEMPLATES[tipo]?.label)||tipo;
   toast(`WhatsApp ${tipoLabel} enviado!`,'success');
   pdvAlerta(`Notificação de <b>${tipoLabel}</b> enviada via WhatsApp para <b>${cli?.nome||'Cliente'}</b>.<br>Sala: ${sala?.nome||'—'} • ${v.horario||'—'}`,'📱 WHATSAPP ENVIADO','📱');
+  registrarAuditoria('WA_ENVIADO',`Notificação "${tipoLabel}" enviada a ${cli?.nome||'Avulso'} (${waNum}) — Sala: ${sala?.nome||'—'} ${v.horario||''}`,UA?.id);
 }
 function salvarTemplateWA(tipo,texto){
   if(!DB.cfgGeral)DB.cfgGeral={};

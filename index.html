@@ -3521,11 +3521,22 @@ async function _setupLoginUnidade(){
   showErr(''); 
   const res = await unidadeLogin(email, senha);
   if(!res.ok){ showErr('⛔ '+res.erro); return; }
-  if(!res.session.unidade_id){
+  // [FIX-ADM] ADM master (cargo_id=1 ou papel='adm') não tem unidade_id — tem acesso a todas as unidades
+  const _appMeta = (res.session.user && res.session.user.app_metadata) || {};
+  const _isAdmMaster = (
+    res.session.papel === 'adm' ||
+    _appMeta.papel === 'adm' ||
+    parseInt(_appMeta.cargo_id) === 1
+  );
+  if(!res.session.unidade_id && !_isAdmMaster){
     showErr('⚠️ Login OK, mas este usuário não tem "unidade_id" configurado no Supabase (app_metadata). Configure-o antes de usar.');
     return;
   }
-  toast('✅ Balcão conectado à unidade: '+res.session.unidade_id,'success');
+  if(_isAdmMaster && !res.session.unidade_id){
+    toast('✅ ADM Master conectado — acesso a todas as unidades.','success');
+  } else {
+    toast('✅ Balcão conectado à unidade: '+res.session.unidade_id,'success');
+  }
   CM('mSetupUnidade');
 }
 function _setupLogoutUnidade(){

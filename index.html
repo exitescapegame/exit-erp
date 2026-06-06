@@ -3664,7 +3664,8 @@ async function sDBSupabase() {
     { chave: 'chatGM', valor: DB.chatGM||[] },
     { chave: 'sessoesSenior', valor: DB.sessoesSenior||[] },
     { chave: 'pontos', valor: DB.pontos||[] },
-    { chave: 'manutencoes', valor: DB.manutencoes||[] }
+    { chave: 'manutencoes', valor: DB.manutencoes||[] },
+    { chave: 'mensagens', valor: DB.mensagens||[] }
   ]));
 
   // Unidades
@@ -3801,6 +3802,7 @@ async function lDBSupabase() {
       sessoesSenior: cfg.sessoesSenior || [],
       pontos: cfg.pontos || [],
       manutencoes: cfg.manutencoes || [],
+      mensagens: cfg.mensagens || [],
       unidades: _unidadesDedup,
       salas: (saRows||[]).map(r => { const s=r.dados; if(s&&r.unidade_id)s.unidadeId=String(r.unidade_id); return s; }), // [RLS-v59] fonte de verdade: coluna unidade_id
       colaboradores: (coRows||[]).map(r => {
@@ -12202,6 +12204,46 @@ function gmPollingVendas(){
 }
 // Inicia polling a cada 10s quando o módulo GM está ativo
 setInterval(()=>{ if(UA&&(PA==='gm'||tP('ver_painel_gm'))) gmPollingVendas(); },10000);
+
+// [v83 sync] Polling do chatGM a cada 5s — necessário pois o Realtime nao detecta
+// mudancas em blobs JSON dentro de uma mesma linha da tabela config de forma confiavel.
+let _gmChatUltimoId = null;
+setInterval(async ()=>{
+  if(!UA||!(PA==='gm'||tP('ver_painel_gm'))) return;
+  try {
+    const rows = await supaFetch('config?select=valor&chave=eq.chatGM');
+    if(!rows||!rows[0]) return;
+    const msgs = rows[0].valor || [];
+    const uid_ = gmUnidadeId();
+    const msgsUnidade = msgs.filter(m=>String(m.unidadeId)===String(uid_));
+    if(!msgsUnidade.length) return;
+    const ultima = msgsUnidade[msgsUnidade.length-1];
+    if(_gmChatUltimoId === null){ _gmChatUltimoId = ultima.id; return; }
+    if(ultima.id === _gmChatUltimoId) return;
+    _gmChatUltimoId = ultima.id;
+    DB.chatGM = msgs;
+    if(typeof _gmRenderChat==='function') _gmRenderChat();
+  } catch(e){}
+}, 5000);
+
+// [v83 sync] Polling de mensagens a cada 5s — mensagens sao salvas como blob em config
+let _mensagensUltimoId = null;
+setInterval(async ()=>{
+  if(!UA) return;
+  try {
+    const rows = await supaFetch('config?select=valor&chave=eq.mensagens');
+    if(!rows||!rows[0]) return;
+    const msgs = rows[0].valor || [];
+    if(!msgs.length) return;
+    const ultima = msgs[msgs.length-1];
+    if(_mensagensUltimoId === null){ _mensagensUltimoId = ultima.id; return; }
+    if(ultima.id === _mensagensUltimoId) return;
+    _mensagensUltimoId = ultima.id;
+    DB.mensagens = msgs;
+    if(typeof rSb==='function') rSb();
+    if(typeof renderCommLista==='function' && document.getElementById('mComm')?.classList.contains('open')) renderCommLista();
+  } catch(e){}
+}, 5000);
 
 // ── [GM-MODAL] Modal de Alerta da Sala ───────────────────────────
 function abrirModalAlertaGM(salaId, horario){

@@ -2769,8 +2769,8 @@ async function inicializarSeguranca(senhaMaster) {
 
 // ── 13. CARREGAR DB (Supabase) ────────────────────────────────
 // ── CACHE LOCAL (fallback offline + auto-save) ──────────────
-const SK_LOCAL_CACHE = 'exit_erp_v25_cache';
-const SK_DELETED_SALAS = 'exit_erp_v25_deleted_salas'; // tombstone para salas excluídas
+const SK_LOCAL_CACHE = 'exit_erp_v26_cache';
+const SK_DELETED_SALAS = 'exit_erp_v26_deleted_salas'; // tombstone para salas excluídas
 
 function salvarCacheLocal() {
   try {
@@ -2778,7 +2778,7 @@ function salvarCacheLocal() {
     const payload = {
       db: DB,
       savedAt: new Date().toISOString(),
-      versao: 'v25'
+      versao: 'v26'
     };
     localStorage.setItem(SK_LOCAL_CACHE, JSON.stringify(payload));
   } catch(e) { if(typeof obsLog==='function') obsLog('warn','cache_local_salvar_falhou',{origem:'salvarCacheLocal',mensagem:e.message}); else console.warn('cache local error:', e); }
@@ -2789,7 +2789,7 @@ function carregarCacheLocal() {
     const raw = localStorage.getItem(SK_LOCAL_CACHE);
     if (!raw) return null;
     const payload = JSON.parse(raw);
-    if (payload && payload.db && payload.versao === 'v25') return payload.db;
+    if (payload && payload.db && payload.versao === 'v26') return payload.db;
     return null;
   } catch(e) { return null; }
 }

@@ -3113,8 +3113,8 @@ async function tentarDesbloquear() {
       if (typeof supaFetch==='function') {
         Promise.allSettled([
           supaFetch('vendas?id=neq.00000000-0000-0000-0000-000000000000','DELETE'),
-          supaFetch('ocupacao?chave=neq.__nunca__','DELETE'),
-          supaFetch('caixa_unidades?unidade_id=neq.__nunca__','DELETE')
+          supaFetch('ocupacao?chave=not.is.null','DELETE'),
+          supaFetch('caixa_unidades?unidade_id=not.is.null','DELETE')
         ]);
       }
       try{ if(typeof SK_SLOT_LOCK!=='undefined') localStorage.removeItem(SK_SLOT_LOCK); }catch(_){}
@@ -24899,14 +24899,14 @@ function _executarLimpezaDados(){
       if (isAdm()) {
         // ADM limpa tudo — usa filtro que casa qualquer registro
         ops.push(supaFetch('vendas?id=neq.00000000-0000-0000-0000-000000000000','DELETE'));
-        ops.push(supaFetch('ocupacao?chave=neq.__nunca__','DELETE'));
-        ops.push(supaFetch('caixa_unidades?unidade_id=neq.__nunca__','DELETE'));
+        ops.push(supaFetch('ocupacao?chave=not.is.null','DELETE'));
+        ops.push(supaFetch('caixa_unidades?unidade_id=not.is.null','DELETE'));
       } else {
         // Operador limpa só a própria unidade
         const u=encodeURIComponent(UA.unidadeId);
         ops.push(supaFetch('vendas?unidade_id=eq.'+u,'DELETE'));
         ops.push(supaFetch('caixa_unidades?unidade_id=eq.'+u,'DELETE'));
-        ops.push(supaFetch('ocupacao?chave=neq.__nunca__','DELETE'));
+        ops.push(supaFetch('ocupacao?chave=not.is.null','DELETE'));
       }
       Promise.allSettled(ops).then(()=>{
         console.info('[Limpeza] Dados removidos do Supabase.');

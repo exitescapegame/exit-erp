@@ -3515,8 +3515,9 @@ function iniciarRealtime() {
     _realtimeWS = new WebSocket(wsUrl);
     _realtimeWS.onopen = () => {
       setConexaoStatus(true);
-      // Assina tabelas críticas (envia o token no payload, não na URL)
-      ['vendas','ocupacao','caixa_unidades'].forEach(tbl => {
+      // [v83 sync] Assina todas as tabelas que podem mudar entre usuários
+      // vendas/ocupacao/caixa_unidades: originais | config/salas/colaboradores/clientes/unidades: adicionadas para sync completo
+      ['vendas','ocupacao','caixa_unidades','config','salas','colaboradores','clientes','unidades'].forEach(tbl => {
         _realtimeWS.send(JSON.stringify({
           topic: `realtime:public:${tbl}`,
           event: 'phx_join',
@@ -3592,6 +3593,34 @@ async function sincTabela(tbl) {
       if (rows) {
         rows.forEach(r => { DB.caixaUnidades[String(r.unidade_id)] = r.dados; });
       }
+    } else if (tbl === 'config') {
+      // [v83 sync] Recarrega blobs de config — RLS garante que só ADM recebe tudo;
+      // não-ADM não assina config, mas caso receba, o Supabase já filtra pelo RLS.
+      const rows = await supaFetch('config?select=chave,valor');
+      if (rows) rows.forEach(r => { if (r.chave in DB) DB[r.chave] = r.valor; });
+    } else if (tbl === 'salas') {
+      // [v83 sync] Recarrega salas — RLS filtra por unidade automaticamente
+      const filtroSala = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
+        ? ''
+        : `&unidade_id=eq.${UA.unidadeId}`;
+      const rows = await supaFetch(`salas?select=dados${filtroSala}`);
+      if (rows) DB.salas = rows.map(r => r.dados);
+    } else if (tbl === 'colaboradores') {
+      // [v83 sync] Recarrega colaboradores — RLS filtra por unidade automaticamente
+      // Não recarrega pinHash/pinHashSec/pinSalt (nunca estão no select de dados)
+      const filtroColab = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
+        ? ''
+        : `&unidade_id=eq.${UA.unidadeId}`;
+      const rows = await supaFetch(`colaboradores?select=dados${filtroColab}`);
+      if (rows) DB.colaboradores = rows.map(r => r.dados);
+    } else if (tbl === 'clientes') {
+      // [v83 sync] Recarrega clientes — RLS permite authenticated ver tudo (mascaramento LGPD no backend)
+      const rows = await supaFetch('clientes?select=dados');
+      if (rows) DB.clientes = rows.map(r => r.dados);
+    } else if (tbl === 'unidades') {
+      // [v83 sync] Recarrega unidades — RLS filtra: ADM vê tudo, demais só a própria
+      const rows = await supaFetch('unidades?select=dados');
+      if (rows) DB.unidades = rows.map(r => r.dados);
     }
   } catch(e) { console.warn('sincTabela error:', tbl, e); }
 }

@@ -3512,10 +3512,11 @@ function setConexaoStatus(ok) {
 }
 function iniciarRealtime() {
   try {
-    // [v82 seg] A chave NÃO vai mais na URL (evita vazar em logs de proxy/servidor).
-    // O Supabase Realtime aceita o token no payload do phx_join (forma recomendada).
-    const wsUrl = SUPA_URL.replace('https','wss') + '/realtime/v1/websocket?vsn=1.0.0';
+    // [v83 fix] Token enviado na URL (apikey) E no payload do phx_join.
+    // O Supabase Realtime rejeita a conexao WS se nao houver apikey na URL,
+    // independentemente do token enviado no phx_join.
     const _tokenRealtime = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
+    const wsUrl = SUPA_URL.replace('https','wss') + '/realtime/v1/websocket?vsn=1.0.0&apikey=' + SUPA_KEY;
     _realtimeWS = new WebSocket(wsUrl);
     _realtimeWS.onopen = () => {
       setConexaoStatus(true);

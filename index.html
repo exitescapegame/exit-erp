@@ -762,47 +762,7 @@ tbody tr:hover td { background: #f4f4ff !important; }
 </div>
 
 <!-- WHATSAPP CLIENTE -->
-<div class="mo" id="mWhatsApp">
-  <div class="md md-lg">
-    <div class="mh" style="background:linear-gradient(135deg,#075e54,#128c7e);border-radius:10px 10px 0 0">
-      <span class="mti" style="color:#fff">📱 Notificação WhatsApp</span>
-      <button class="mc" style="color:rgba(255,255,255,.7)" onclick="CM('mWhatsApp')">×</button>
-    </div>
-    <div class="mb">
-      <div id="waClienteInfo" style="background:var(--bg3);border-radius:var(--rsm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--text2)"></div>
-      <div class="fg"><label>Tipo de Notificação — toque para escolher</label>
-        <div id="waTipoBotoes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button type="button" class="wa-tipo-btn" data-tipo="confirmacao" onclick="waEscolherTipo('confirmacao')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">✅ Confirmação de Reserva</button>
-          <button type="button" class="wa-tipo-btn" data-tipo="atraso" onclick="waEscolherTipo('atraso')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">⏰ Atraso na sala</button>
-          <button type="button" class="wa-tipo-btn" data-tipo="adiantamento" onclick="waEscolherTipo('adiantamento')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">⚡ Adiantamento</button>
-          <button type="button" class="wa-tipo-btn" data-tipo="cancelamento" onclick="waEscolherTipo('cancelamento')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">❌ Cancelamento</button>
-        </div>
-        <input type="hidden" id="waTipo" value="confirmacao">
-      </div>
-      <div id="waTemplateArea"></div>
-      <div class="fg" style="margin-top:12px"><label>Descrição do Motivo (opcional)</label>
-        <textarea id="waMotivo" rows="3" placeholder="Ex: Problemas técnicos na sala, aguardamos resolução em breve..." oninput="waAtualizarPreview()"></textarea>
-      </div>
-      <div class="fg"><label>Prévia da Mensagem</label>
-        <div class="wa-preview" id="waPreview" style="min-height:60px"></div>
-      </div>
-      <!-- LGPD & Termo -->
-      <div id="waLgpdSection" style="margin-top:10px;background:rgba(37,211,102,.05);border:1px solid rgba(37,211,102,.2);border-radius:var(--rsm);padding:10px;font-size:11px;color:var(--text2)">
-        <div style="font-weight:700;color:#25D366;margin-bottom:5px">🔒 LGPD — Lei Geral de Proteção de Dados</div>
-        <div id="waLgpdTexto" style="white-space:pre-wrap;line-height:1.6"></div>
-        <div id="waTermoCancelamento" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(37,211,102,.2);display:none">
-          <div style="font-weight:700;color:var(--warn);margin-bottom:4px">📋 Política de Cancelamento</div>
-          <div id="waTermoCanTexto" style="white-space:pre-wrap;line-height:1.6"></div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">⚠️ A mensagem será enviada via API do WhatsApp Business configurada nas integrações.</div>
-    </div>
-    <div class="mf">
-      <button class="btn bg" onclick="CM('mWhatsApp')">Cancelar</button>
-      <button class="btn bs" onclick="enviarWhatsApp()" style="background:#25D366">📤 Enviar WhatsApp</button>
-    </div>
-  </div>
-</div>
+<!-- [FIX] Modal WhatsApp agora é criado dinamicamente em abrirWhatsApp() —>
 
 <!-- LIBERAÇÃO TOTEM (Código de Venda) -->
 <div class="mo" id="mLiberarTotem">
@@ -2806,6 +2766,17 @@ async function salvarColabSeguro() {
     if (typeof registrarAuditoria === 'function') {
       registrarAuditoria(id ? 'COLAB_EDITADO' : 'COLAB_CRIADO', `Colaborador "${n}" ${id?'editado':'criado'}`, UA?.id);
     }
+    // [FIX] Força sincronização imediata da tabela colaboradores no Supabase
+    // para que outros dispositivos vejam o novo colaborador sem depender apenas do realtime WebSocket
+    setTimeout(async () => {
+      try {
+        if (typeof sDBSupabase === 'function') {
+          await sDBSupabase();
+          if (typeof sincTabela === 'function') await sincTabela('colaboradores');
+          if (typeof renderPage === 'function') renderPage();
+        }
+      } catch(e) { console.warn('[FIX-COLAB-SYNC]', e); }
+    }, 800);
     // Limpa campos sensíveis do formulário após salvar
     const _pinConf = document.getElementById('mClPinConf'); if(_pinConf)_pinConf.value='';
     const _pinEl2 = document.getElementById('mClPin'); if(_pinEl2)_pinEl2.value='';
@@ -10904,38 +10875,54 @@ function _enviarRelatorioDiario(uId){
   OM('mEnviarRel');
 }
 
-// [v74.70] Abre o Relatório Semanal do Shopping (editável, imprimível, enviável por e-mail)
+// [v74.70+FIX] Abre o Relatório Semanal do Shopping — sempre por unidade, com seletor para ADM
 function abrirRelatorioShopping(){
   const cfg=_cfgShopping();
   const {ini,fim}=_semanaAnterior();
-  const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
-  // Se ADM sem unidade selecionada, soma todas
-  const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
+  // [FIX] ADM pode escolher unidade específica ou ver todas; não-ADM vê somente a sua
+  if(!window._relShopUnidade) window._relShopUnidade = '';
+  const uFiltro = isAdm() ? window._relShopUnidade : String(UA.unidadeId||'');
+  const unidadesAlvo = uFiltro ? DB.unidades.filter(u=>String(u.id)===uFiltro) : DB.unidades;
   let m=el('mRelShopping'); if(m) m.remove();
   m=document.createElement('div'); m.className='mo open'; m.id='mRelShopping';
   document.body.appendChild(m);
 
-  const linhasUnidade = unidadesAlvo.map(u=>{
-    const d=_dadosShopping(u.id, ini, fim);
+  // [FIX] Seletor de unidade para ADM (visível apenas para admins com múltiplas unidades)
+  const seletorUnidadeHtml = isAdm() && DB.unidades.length > 1 ? `
+    <div style="margin-bottom:14px;background:#f0f0f8;border-radius:8px;padding:10px">
+      <label style="font-size:10px;font-weight:700;color:#666;display:block;margin-bottom:6px">🏢 FILTRAR POR UNIDADE</label>
+      <select id="shopUnidadeSel" onchange="window._relShopUnidade=this.value;abrirRelatorioShopping()" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;color:#1a1a2e;background:#fff">
+        <option value="">🌐 Todas as Unidades</option>
+        ${DB.unidades.map(u=>`<option value="${san(u.id)}" ${String(u.id)===uFiltro?'selected':''}>${san(u.nome)}</option>`).join('')}
+      </select>
+    </div>` : '';
+
+  // [FIX] Cada unidade ganha sua própria linha no relatório com dados calculados uma vez só
+  const dadosPorUnidade = unidadesAlvo.map(u=>({u, d:_dadosShopping(u.id, ini, fim)}));
+  const linhasUnidade = dadosPorUnidade.map(({u,d})=>{
+    const taxa=(d.valor*((DB.config.taxaShopping||15)/100));
     return `<tr style="border-bottom:1px solid #e0e0e8">
-      <td style="padding:8px;font-size:13px;color:#1a1a2e">${san(u.nome)}</td>
+      <td style="padding:8px;font-size:13px;color:#1a1a2e;font-weight:600">${san(u.nome)}</td>
       <td style="padding:8px;font-size:13px;text-align:center;color:#1a1a2e">${d.jogadores}</td>
       <td style="padding:8px;font-size:13px;text-align:right;font-weight:700;color:#16a34a">${fM(d.valor)}</td>
+      <td style="padding:8px;font-size:12px;text-align:right;color:#dc2626">${fM(taxa)}</td>
     </tr>`;
   }).join('');
-  const totJ=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,ini,fim).jogadores,0);
-  const totV=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,ini,fim).valor,0);
+  const totJ=dadosPorUnidade.reduce((s,{d})=>s+d.jogadores,0);
+  const totV=dadosPorUnidade.reduce((s,{d})=>s+d.valor,0);
+  const totTaxa=totV*((DB.config.taxaShopping||15)/100);
 
   // Logo EXIT (usa config de logo do sistema)
   const lg=DB.config?.logo||{tipo:'texto',texto:'EXIT',corFundo:'#EAB308',corTexto:'#000'};
   const logoHtml = cfg.mostrarLogo ? `<div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:10px;background:${lg.corFundo||'#EAB308'};color:${lg.corTexto||'#000'};font-weight:900;font-size:18px;letter-spacing:1px">${san(lg.texto||'EXIT')}</div>` : '';
 
-  m.innerHTML=`<div class="md" style="max-width:640px;background:#fff;color:#1a1a2e">
+  m.innerHTML=`<div class="md" style="max-width:660px;background:#fff;color:#1a1a2e">
     <div class="mh" style="background:#f5f5fa;border-bottom:1px solid #e0e0e8">
-      <span class="mti" style="color:#1a1a2e">🛍️ Relatório Semanal — ${san(cfg.nomeShopping)}</span>
-      <button class="mc" onclick="CM('mRelShopping')" style="color:#666">×</button>
+      <span class="mti" style="color:#1a1a2e">🛍️ Relatório por Unidade — ${san(cfg.nomeShopping)}</span>
+      <button class="mc" onclick="window._relShopUnidade='';CM('mRelShopping')" style="color:#666">×</button>
     </div>
     <div class="mb">
+      ${seletorUnidadeHtml}
       <!-- Configuração editável -->
       <div style="background:#f5f5fa;border-radius:8px;padding:10px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:#666;margin-bottom:6px">⚙️ Configuração (editável)</div>
@@ -10952,7 +10939,7 @@ function abrirRelatorioShopping(){
           ${logoHtml}
           <div>
             <div style="font-size:18px;font-weight:900;color:#1a1a2e">EXIT GAMES</div>
-            <div style="font-size:12px;color:#666">Relatório Semanal de Movimento</div>
+            <div style="font-size:12px;color:#666">Relatório por Unidade — ${uFiltro ? san(DB.unidades.find(u=>String(u.id)===uFiltro)?.nome||'') : 'Todas as Unidades'}</div>
           </div>
           <div style="margin-left:auto;text-align:right">
             <div style="font-size:13px;font-weight:700;color:#1a1a2e">${san(cfg.nomeShopping)}</div>
@@ -10964,12 +10951,14 @@ function abrirRelatorioShopping(){
             <th style="padding:8px;text-align:left;font-size:11px;color:#666">Unidade</th>
             <th style="padding:8px;text-align:center;font-size:11px;color:#666">Jogadores</th>
             <th style="padding:8px;text-align:right;font-size:11px;color:#666">Valor Vendido</th>
+            <th style="padding:8px;text-align:right;font-size:11px;color:#dc2626">Taxa (${DB.config.taxaShopping||15}%)</th>
           </tr></thead>
           <tbody>${linhasUnidade}</tbody>
           <tfoot><tr style="border-top:2px solid #1a1a2e;background:#faf8f0">
             <td style="padding:10px;font-size:13px;font-weight:800;color:#1a1a2e">TOTAL</td>
             <td style="padding:10px;font-size:13px;font-weight:800;text-align:center;color:#1a1a2e">${totJ}</td>
             <td style="padding:10px;font-size:14px;font-weight:900;text-align:right;color:#16a34a">${fM(totV)}</td>
+            <td style="padding:10px;font-size:14px;font-weight:900;text-align:right;color:#dc2626">${fM(totTaxa)}</td>
           </tr></tfoot>
         </table>
         <div style="margin-top:14px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px">
@@ -11005,16 +10994,18 @@ function _imprimirRelShopping(){
 function _enviarRelShoppingEmail(){
   const cfg=_cfgShopping();
   const {ini,fim}=_semanaAnterior();
-  const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
-  const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
-  let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
+  const uFiltro = isAdm() ? (window._relShopUnidade||'') : String(UA.unidadeId||'');
+  const unidadesAlvo = uFiltro ? DB.unidades.filter(u=>String(u.id)===uFiltro) : DB.unidades;
+  const taxaP=DB.config.taxaShopping||15;
+  let corpo=`RELATÓRIO POR UNIDADE — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
   let totJ=0, totV=0;
   unidadesAlvo.forEach(u=>{
     const d=_dadosShopping(u.id,ini,fim);
+    const taxa=d.valor*(taxaP/100);
     totJ+=d.jogadores; totV+=d.valor;
-    corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n\n`;
+    corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n  Taxa Shopping (${taxaP}%): ${fM(taxa)}\n\n`;
   });
-  corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n\n`;
+  corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n  Taxa Shopping total: ${fM(totV*(taxaP/100))}\n\n`;
   corpo+=`Emitido em ${fD(hoje())} por ${UA.nome}\nEXIT GAMES — Inteligência e Diversão`;
   const assunto=`Relatório Semanal EXIT — ${cfg.nomeShopping} — ${fD(ini)} a ${fD(fim)}`;
   const mailto=`mailto:${encodeURIComponent(cfg.emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
@@ -16196,12 +16187,54 @@ function abrirWhatsApp(vendaId){
   const cli=v.clienteId?DB.clientes.find(c=>c.id==v.clienteId):null;
   const sala=DB.salas.find(s=>s.id==v.salaId);
   _waCtx={venda:v,cliente:cli,sala};
-  // Info do cliente
+  // [FIX v74+] Cria o modal dinamicamente para evitar conflitos de z-index e pointer-events
+  let m=el('mWhatsApp'); if(m) m.remove();
+  m=document.createElement('div'); m.className='mo open'; m.id='mWhatsApp';
+  m.style.zIndex='1100'; // acima de outros modais
+  m.onclick=ev=>{if(ev.target===m)CM('mWhatsApp');};
+  document.body.appendChild(m);
+  m.innerHTML=`<div class="md md-lg" style="max-height:90vh;overflow-y:auto">
+    <div class="mh" style="background:linear-gradient(135deg,#075e54,#128c7e);border-radius:10px 10px 0 0">
+      <span class="mti" style="color:#fff">📱 Notificação WhatsApp</span>
+      <button class="mc" style="color:rgba(255,255,255,.7)" onclick="CM('mWhatsApp')">×</button>
+    </div>
+    <div class="mb">
+      <div id="waClienteInfo" style="background:var(--bg3);border-radius:var(--rsm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--text2)"></div>
+      <div class="fg"><label>Tipo de Notificação — toque para escolher</label>
+        <div id="waTipoBotoes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button type="button" class="wa-tipo-btn" data-tipo="confirmacao" onclick="waEscolherTipo('confirmacao')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">✅ Confirmação de Reserva</button>
+          <button type="button" class="wa-tipo-btn" data-tipo="atraso" onclick="waEscolherTipo('atraso')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">⏰ Atraso na sala</button>
+          <button type="button" class="wa-tipo-btn" data-tipo="adiantamento" onclick="waEscolherTipo('adiantamento')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">⚡ Adiantamento</button>
+          <button type="button" class="wa-tipo-btn" data-tipo="cancelamento" onclick="waEscolherTipo('cancelamento')" style="padding:12px;border:2px solid var(--border);border-radius:var(--rsm);background:var(--bg3);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);text-align:left;transition:all .15s">❌ Cancelamento</button>
+        </div>
+        <input type="hidden" id="waTipo" value="atraso">
+      </div>
+      <div id="waTemplateArea"></div>
+      <div class="fg" style="margin-top:12px"><label>Descrição do Motivo (opcional)</label>
+        <textarea id="waMotivo" rows="3" placeholder="Ex: Problemas técnicos na sala, aguardamos resolução em breve..." oninput="waAtualizarPreview()"></textarea>
+      </div>
+      <div class="fg"><label>Prévia da Mensagem</label>
+        <div class="wa-preview" id="waPreview" style="min-height:60px"></div>
+      </div>
+      <div id="waLgpdSection" style="margin-top:10px;background:rgba(37,211,102,.05);border:1px solid rgba(37,211,102,.2);border-radius:var(--rsm);padding:10px;font-size:11px;color:var(--text2)">
+        <div style="font-weight:700;color:#25D366;margin-bottom:5px">🔒 LGPD — Lei Geral de Proteção de Dados</div>
+        <div id="waLgpdTexto" style="white-space:pre-wrap;line-height:1.6"></div>
+        <div id="waTermoCancelamento" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(37,211,102,.2);display:none">
+          <div style="font-weight:700;color:var(--warn);margin-bottom:4px">📋 Política de Cancelamento</div>
+          <div id="waTermoCanTexto" style="white-space:pre-wrap;line-height:1.6"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">⚠️ A mensagem será enviada via API do WhatsApp Business configurada nas integrações.</div>
+    </div>
+    <div class="mf">
+      <button class="btn bg" onclick="CM('mWhatsApp')">Cancelar</button>
+      <button class="btn bs" onclick="enviarWhatsApp()" style="background:#25D366">📤 Enviar WhatsApp</button>
+    </div>
+  </div>`;
+  // Preenche info do cliente
   const infoEl=el('waClienteInfo');
   if(infoEl)infoEl.innerHTML=`<b>${san(cli?.nome||'Cliente Avulso')}</b> ${cli?.telefone?'• 📱 '+san(cli.telefone):''}<br>Sala: <b>${san(sala?.nome||'—')}</b> • Horário: <b>${san(v.horario||'—')}</b>`;
-  el('waMotivo').value='';
   waEscolherTipo('atraso');
-  OM('mWhatsApp');
 }
 // [v74.74] Escolha do tipo de mensagem por CLIQUE (botões em vez de dropdown)
 function waEscolherTipo(tipo){
@@ -16273,6 +16306,7 @@ function _waPedirAutorizacao(cli, onConfirm){
   window.__waOnAutorizar = onConfirm;
   let m=el('mWaAutorizar'); if(m) m.remove();
   m=document.createElement('div'); m.className='mo open'; m.id='mWaAutorizar';
+  m.style.zIndex='1200'; // acima do mWhatsApp (1100)
   document.body.appendChild(m);
   m.innerHTML=`<div class="md" style="max-width:440px">
     <div class="mh" style="background:linear-gradient(135deg,#075e54,#128c7e)">

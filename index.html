@@ -295,7 +295,12 @@ tr:last-child td{border-bottom:none}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#c8c8d8;border-radius:3px}
-@media(max-width:700px){#sidebar{position:fixed;transform:translateX(-100%)}#sidebar.open{transform:translateX(0)}#main{margin-left:0}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+@media(max-width:1024px){#sidebar{position:fixed;transform:translateX(-100%)}#sidebar.open{transform:translateX(0)}#main{margin-left:0}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}#sbToggleBtn{display:flex}}
+@media(min-width:1025px){#sbToggleBtn{display:none}}
+#sbToggleBtn{position:fixed;top:10px;left:10px;z-index:200;background:var(--dark);border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:7px 10px;cursor:pointer;font-size:18px;color:#C9A84C;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:var(--tr)}
+#sbToggleBtn:hover{background:#1a1a2e}
+#sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99}
+#sbOverlay.open{display:block}
 
 /* ── AGENDA DINÂMICA COLAPSÁVEL ─────────────────── */
 #agendaDinamica{
@@ -639,7 +644,12 @@ tbody tr:hover td { background: #f4f4ff !important; }
 .lrq-prg-bar{height:100%;border-radius:2px;transition:width 1s linear}
 .lrq-prg-ok{background:var(--wa)}.lrq-prg-warn{background:var(--amber)}.lrq-prg-danger{background:var(--red2)}
 .lrq-room-game{font-size:10px;color:rgba(255,255,255,.4);margin-top:3px}
-@media(max-width:900px){.lrq-wrap{grid-template-columns:1fr}.lrq-right{display:none}}
+@media(max-width:900px){.lrq-wrap{grid-template-columns:1fr}.lrq-right{display:none;position:fixed;right:0;top:0;height:100vh;width:280px;z-index:150;box-shadow:-4px 0 20px rgba(0,0,0,.4)}.lrq-right.open{display:flex}.lrq-status-toggle{display:flex!important}}
+@media(min-width:901px){.lrq-status-toggle{display:none!important}}
+.lrq-status-toggle{padding:5px 10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.7);cursor:pointer;transition:var(--tr);font-family:inherit}
+.lrq-status-toggle:hover{background:rgba(255,255,255,.15);color:#fff}
+#lrqStatusOverlay{display:none;position:fixed;inset:0;z-index:149;background:rgba(0,0,0,.4)}
+#lrqStatusOverlay.open{display:block}
 </style>
 </head>
 <body>
@@ -7868,6 +7878,15 @@ function encSen(id){
 }
 
 // ── PONTO ─────────────────────────────
+// [v75-SEC] getTerminalId(): ID estável do terminal (persiste no localStorage)
+// Nunca contém dados pessoais — é apenas um UUID aleatório gerado na 1ª vez.
+function getTerminalId(){
+  const KEY='exit_terminal_id';
+  let tid=localStorage.getItem(KEY);
+  if(!tid){tid='tid_'+Math.random().toString(36).slice(2,10)+'_'+Date.now().toString(36);localStorage.setItem(KEY,tid);}
+  return tid;
+}
+
 function abrirPonto(){
   const s=el('ptU');
   if(!s)return;
@@ -7898,14 +7917,21 @@ function updPontoSt(){
   const uId=ev('ptU');const p=DB.pontos.find(x=>String(x.colaboradorId)===String(uId)&&x.data===hoje()&&!x.saida);const st=el('ptSt');if(!st)return;
   // [v53-SEC1] GM vê apenas status de entrada/saída — sem duração nem valor acumulado
   const isGM = !isAdm() && tP('ver_painel_gm') && !tP('ver_relatorios');
+  // [v75-SEC] Alerta quando colaborador selecionado ≠ operador logado no terminal
+  const ehTerceiro = UA && String(uId) !== String(UA.id);
+  const avisoTerceiro = ehTerceiro
+    ? `<div style="margin-top:6px;padding:7px 10px;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.4);border-radius:var(--rsm);font-size:11px;color:#b45309;display:flex;align-items:center;gap:6px">
+        ⚠️ <span>Você está registrando ponto <strong>em nome de outra pessoa</strong>. Esta ação ficará registrada no histórico vinculada ao seu usuário (<strong>${san(UA.nome)}</strong>).</span>
+       </div>`
+    : '';
   if(p){
     if(isGM){
-      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
+      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>${avisoTerceiro}`;
     } else {
       const dur=Date.now()-new Date(p.entrada).getTime();
-      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${p.entradaHora} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
+      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${p.entradaHora} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>${avisoTerceiro}`;
     }
-  }else{st.innerHTML='<span style="color:var(--text2)">Registrar entrada</span>';}
+  }else{st.innerHTML=`<span style="color:var(--text2)">Registrar entrada</span>${avisoTerceiro}`;}
 }
 function confirmarPonto(){
   const uId=ev('ptU');const pin=ev('ptPin');
@@ -7921,6 +7947,11 @@ function confirmarPonto(){
   const unidadeParaGravar=check.unidadeResolvida;
   function _registrarPontoComUnidade(unidadeGravar){
     const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    // [v75-SEC] Captura operador real e terminal antes de qualquer ação
+    const operadorId   = UA ? String(UA.id)   : 'desconhecido';
+    const operadorNome = UA ? String(UA.nome)  : '?';
+    const terminalId   = getTerminalId();
+    const ehTerceiro   = String(uId) !== operadorId;
     const pa=DB.pontos.find(p=>String(p.colaboradorId)===String(uId)&&p.data===hoje()&&!p.saida);
     if(pa){
       pa.saida=agora();pa.saidaHora=hora;
@@ -7928,6 +7959,15 @@ function confirmarPonto(){
       pa.duracaoMs=dur;pa.horasTrabalhadas=+(dur/3600000).toFixed(4);
       const vHora=parseFloat(c.valorHora)||parseFloat(pa.valorHora)||0;
       pa.valorHora=vHora;pa.valorDevido=+(pa.horasTrabalhadas*vHora).toFixed(2);
+      // [v75-SEC] Registra quem bateu a saída
+      pa.saidaOperadorId   = operadorId;
+      pa.saidaOperadorNome = operadorNome;
+      pa.saidaTerminalId   = terminalId;
+      pa.saidaPorTerceiro  = ehTerceiro;
+      // [v75-SEC] Auditoria se terceiro registrou saída
+      if(ehTerceiro) registrarAuditoria('PONTO_SAIDA_TERCEIRO',
+        `"${operadorNome}" (id=${operadorId}) registrou SAÍDA de "${c.nome}" (id=${uId}) no terminal ${terminalId}`,
+        operadorId, {colaboradorId:String(uId),colaboradorNome:c.nome,terminalId,saidaHora:hora});
       sDB();el('ptPin').value='';updPontoSt();CM('mPonto');rSb();
       toast(`✅ Saída registrada — ${fDur(dur)} • ${fM(pa.valorDevido)}`);
     } else {
@@ -7938,8 +7978,17 @@ function confirmarPonto(){
         valorHora:parseFloat(c.valorHora)||0,
         registradoPorRole:check.role,
         unidadeBaseOperador:String(UA.unidadeId),
-        coberturaRemota:check.role==='Monitor'
+        coberturaRemota:check.role==='Monitor',
+        // [v75-SEC] Rastreabilidade de terminal e operador real
+        entradaOperadorId:   operadorId,
+        entradaOperadorNome: operadorNome,
+        terminalId:          terminalId,
+        entradaPorTerceiro:  ehTerceiro
       });
+      // [v75-SEC] Auditoria se terceiro registrou entrada
+      if(ehTerceiro) registrarAuditoria('PONTO_ENTRADA_TERCEIRO',
+        `"${operadorNome}" (id=${operadorId}) registrou ENTRADA de "${c.nome}" (id=${uId}) no terminal ${terminalId}`,
+        operadorId, {colaboradorId:String(uId),colaboradorNome:c.nome,terminalId,entradaHora:hora});
       sDB();el('ptPin').value='';updPontoSt();CM('mPonto');rSb();
       toast(`⏰ Entrada registrada às ${hora}`,'success');
     }
@@ -11081,6 +11130,14 @@ function rPonto(){
       const thj = pf.reduce((s,p)=>s+(p.duracaoMs||0),0);
       const em  = pa.length>0;
       const cg  = DB.cargos.find(g=>g.id===c.cargoId);
+      // [v75-SEC] Indica se o ponto ativo foi registrado por terceiro
+      const pontoAtivo = pa[0];
+      const regPorTerceiro = pontoAtivo && pontoAtivo.entradaPorTerceiro;
+      const regPorNome     = pontoAtivo && pontoAtivo.entradaOperadorNome && pontoAtivo.entradaOperadorNome !== c.nome
+                             ? pontoAtivo.entradaOperadorNome : null;
+      const badgeRegPor = regPorTerceiro && regPorNome
+        ? `<div style="margin-top:3px;font-size:9px;color:#b45309;background:rgba(217,119,6,.1);border-radius:3px;padding:1px 5px;display:inline-block">⚠️ Reg. por: ${san(regPorNome)}</div>`
+        : '';
       return`<div class="pc">
         <div class="pav" style="${em?'border:1.5px solid var(--success)':''}">
           ${ini(c.nome)}
@@ -11097,6 +11154,7 @@ function rPonto(){
                 ? `⏱ ${fDur(thj)} hoje`
                 : '<span style="color:var(--text3)">Sem registro</span>'}
           </div>
+          ${badgeRegPor}
         </div>
         <span class="bdg ${em?'b-ok':'b-gh'}" style="font-size:10px">${em?'ATIVO':'—'}</span>
       </div>`;

@@ -7644,11 +7644,22 @@ async function confirmarVenda(){ // [B4] async for slot lock
   const horario=_vCtx.h||(horAv||null);
 
   // ── CONSTRUÇÃO DO PAYLOAD — apenas após validação completa ─
+    // [FIX-DESCONTO] Calcula valor original antes do desconto para exibir no relatório
+  const _valorOriginalVenda = j * _vCtx.preco;
+  const _descontoManualVenda = _vCtx.descontoManual || 0;
+  const _descontoPC = _vCtx.descontoPC || 0;
   const venda={
     id:uid(),data:dataVenda,horario,unidadeId:pdvUID(),salaId:salaId,
     clienteId:cliId||null,qtdJogadores:j,valorTotal:val,
-    canal,pagamentos:pgFinal,
+    canal: _vCtx.cortesia ? 'cortesia' : canal, pagamentos:pgFinal,
     cupom:_vCtx.cupomAplicado||null,
+    // [FIX-DESCONTO] Salva desconto manual para exibição no relatório de vendas
+    descontoManual: _descontoManualVenda > 0 ? _descontoManualVenda : undefined,
+    descontoPC: _descontoPC > 0 ? _descontoPC : undefined,
+    valorOriginal: _descontoManualVenda > 0 ? _valorOriginalVenda : undefined,
+    // [FIX-CORTESIA] Salva flag e motivo de cortesia
+    cortesia: _vCtx.cortesia || undefined,
+    cortesiaMotivo: _vCtx.cortesiaMotivo || undefined,
     status:'confirmado',        // status só recebe 'confirmado' aqui, nunca antes
     vendidoPor:UA.id,criadoEm:agora(),tipo:'escape',
     consentimentoMsg: !!(el('mVConsent')&&el('mVConsent').checked), // [v74.65] aceite de mensagens (LGPD)
@@ -8331,12 +8342,13 @@ function abrirFechamentoCaixa(){
       </div>
       <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:14px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;color:var(--info);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏦 Fundo de Troco para Amanhã</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Quanto deseja deixar no caixa como fundo de troco para amanhã?</p>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:6px">O fundo é retirado apenas do <strong>dinheiro físico</strong> disponível em caixa.</p>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">💵 Dinheiro disponível: <strong style="color:var(--success)">${fM(totaisMeio.dinheiro||0)}</strong></div>
         <div class="fg" style="margin-bottom:8px">
           <label>Valor do Fundo (R$)</label>
-          <input type="number" id="fcFundo" min="0" step="0.01" value="${Math.min(200,saldoEsperado).toFixed(2)}" style="font-size:16px;font-weight:700;text-align:center;font-family:monospace">
+          <input type="number" id="fcFundo" min="0" max="${(totaisMeio.dinheiro||0).toFixed(2)}" step="0.01" value="${Math.min(200,totaisMeio.dinheiro||0).toFixed(2)}" style="font-size:16px;font-weight:700;text-align:center;font-family:monospace">
         </div>
-        <div style="font-size:11px;color:var(--text2)">💡 Enviado ao financeiro: <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,saldoEsperado-Math.min(200,saldoEsperado)))}</strong></div>
+        <div style="font-size:11px;color:var(--text2)">💡 Enviado ao financeiro: <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,(totaisMeio.dinheiro||0)-Math.min(200,totaisMeio.dinheiro||0)))}</strong></div>
       </div>
       <div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:12px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📧 Relatório</div>
@@ -8360,7 +8372,16 @@ function abrirFechamentoCaixa(){
   if(fcFundo&&fcRest){
     fcFundo.addEventListener('input',()=>{
       const f=parseFloat(fcFundo.value)||0;
-      fcRest.textContent=fM(Math.max(0,saldoEsperado-f));
+      const dinheiroDisp=totaisMeio.dinheiro||0;
+      if(f>dinheiroDisp+0.01){
+        fcFundo.style.borderColor='var(--danger)';
+        fcRest.textContent='⛔ Excede o dinheiro disponível';
+        fcRest.style.color='var(--danger)';
+      } else {
+        fcFundo.style.borderColor='';
+        fcRest.textContent=fM(Math.max(0,dinheiroDisp-f));
+        fcRest.style.color='var(--accent)';
+      }
     });
   }
 }
@@ -8470,8 +8491,8 @@ function _fcConfirmar(){
   const fundo=Math.max(0,parseFloat(fcFundoEl?.value)||0);
   const fcErro=el('fcErro');
 
-  if(fundo>saldoEsperado+0.01){
-    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o saldo final ('+fM(saldoEsperado)+').';fcErro.style.display='block';}
+  if(fundo>(totaisMeio.dinheiro||0)+0.01){
+    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o dinheiro físico disponível ('+fM(totaisMeio.dinheiro||0)+'). O fundo só pode ser retirado do dinheiro em espécie.';fcErro.style.display='block';}
     return;
   }
   if(fcErro) fcErro.style.display='none';
@@ -8499,6 +8520,29 @@ function _fcConfirmar(){
     criadoEm:agora()
   };
   DB.fechamentosCaixa.push(relatorio);
+
+  // [FIX-SHOPPING] Acumula taxa do shopping diariamente ao fechar o caixa
+  if(DB.config.taxaShopping>0 && totalVendas>0){
+    if(!DB.taxaShoppingDiaria) DB.taxaShoppingDiaria=[];
+    const taxaValor=+(totalVendas*((DB.config.taxaShopping||15)/100)).toFixed(2);
+    // Evita duplicata: se já existe registro do mesmo dia+unidade, atualiza
+    const jaExiste=DB.taxaShoppingDiaria.find(t=>t.data===hoje()&&String(t.unidadeId)===String(uId));
+    if(jaExiste){
+      jaExiste.totalVendas=totalVendas;
+      jaExiste.taxaValor=taxaValor;
+      jaExiste.atualizadoEm=agora();
+    } else {
+      DB.taxaShoppingDiaria.push({
+        id:uid(), data:hoje(), unidadeId:uId,
+        totalVendas, taxaValor,
+        percentual:DB.config.taxaShopping||15,
+        criadoEm:agora()
+      });
+    }
+    registrarAuditoria('TAXA_SHOPPING_REGISTRADA',
+      `Taxa shopping do dia ${hoje()}: ${fM(taxaValor)} (${DB.config.taxaShopping}% de ${fM(totalVendas)})`,
+      UA.id, {unidadeId:uId, totalVendas, taxaValor});
+  }
 
   // 3. Fecha caixa e zera contagens para o próximo dia
   cx.aberto=false;cx.fechadoEm=agora();cx.fechadoPor=UA.id;
@@ -8761,7 +8805,7 @@ function abrirVendaAvulsa(){
   const salas=DB.salas.filter(s=>String(s.unidadeId)===String(pdvUID())&&!s.manutencao);
   const hs=horariosU(pdvUID());
   const preco=precoAtual(pdvUID());
-  _vCtx={sId:null,h:null,preco,cupomAplicado:null,avulsa:true};
+  _vCtx={sId:null,h:null,preco,cupomAplicado:null,avulsa:true,descontoManual:0,descontoPC:0};
   _pgtos=[];
   el('mVT').textContent='💰 Venda Avulsa';
   el('mVPRef').textContent=`Preço unitário: ${fM(preco)}`;
@@ -8780,8 +8824,45 @@ function abrirVendaAvulsa(){
     const sel=el('mVSalaAv');if(sel)sel.innerHTML='<option value="">— Sem sala específica —</option>'+salas.map(s=>`<option value="${s.id}">${san(s.nome)}</option>`).join('');
     const hor=el('mVHorAv');if(hor)hor.innerHTML='<option value="">— Sem horário —</option>'+hs.map(h=>`<option value="${h}">${h}</option>`).join('');
   }
+  // [FIX-CORTESIA] Injeta botão de cortesia no PDV avulsa se ADM ou gerente
+  if(isAdm()||tP('dar_descontos')){
+    let cortesiaBtn=el('avulsaCortesiaBtn');
+    if(!cortesiaBtn){
+      const mb=el('mVenda').querySelector('.mb');
+      if(mb){
+        const div=document.createElement('div');div.id='avulsaCortesiaBtn';div.style='margin-top:8px;';
+        div.innerHTML=`<button class="btn bg bsm" style="width:100%;background:rgba(139,92,246,.15);color:#8b5cf6;border-color:#8b5cf6" onclick="_pdvAplicarCortesia()">🎁 Cortesia (R$ 0,00)</button><div id="avulsaCortesiaInfo" style="font-size:11px;color:#8b5cf6;margin-top:4px;display:none"></div>`;
+        mb.appendChild(div);
+      }
+    } else { cortesiaBtn.style.display='block'; }
+  }
   if(el('avulsaGroup'))el('avulsaGroup').style.display='grid';
   OM('mVenda');
+}
+
+function _pdvAplicarCortesia(){
+  if(!isAdm()&&!tP('dar_descontos')){toast('Sem permissão para dar cortesia.','warn');return;}
+  const pin=prompt('🔒 Senha do atendente para autorizar a cortesia:');
+  if(!pin){return;}
+  const user=DB.colaboradores.find(c=>String(c.id)===String(UA.id));
+  const verificar = user&&user.pinHashSec
+    ? verificarPin(pin,user.pinHashSec,user.pinSalt)
+    : Promise.resolve(isAdm());
+  verificar.then(ok=>{
+    if(!ok){toast('Senha incorreta.','error');return;}
+    const motivo=prompt('Motivo da cortesia (ex: cliente VIP, problema na sala, brinde):');
+    if(!motivo){toast('Motivo obrigatório para cortesia.','warn');return;}
+    // Zera o valor — cortesia total
+    el('mVV').value='0.00';
+    _vCtx.descontoManual=_vCtx.preco*(parseInt(el('mVJ').value)||1);
+    _vCtx.descontoPC=100;
+    _vCtx.cortesia=true;
+    _vCtx.cortesiaMotivo=motivo;
+    _pgtos=[{metodo:'cortesia',valor:0}];
+    const info=el('avulsaCortesiaInfo');
+    if(info){info.textContent=`✅ Cortesia aplicada — motivo: ${motivo}`;info.style.display='block';}
+    toast('🎁 Cortesia aplicada! Valor zerado.','success');
+  });
 }
 
 // ── [v46] AJUSTE DE RESERVA — EDITAR JOGADORES ───────────────
@@ -9664,10 +9745,11 @@ function rVendas(){
       :'<span class="bdg b-if" style="font-size:10px">Visão Metas</span>';
   const thMetas=podeVerMetas?'<th>Sala/Desc</th><th>Horário</th><th>Jog.</th>':'';
   const thRH=podeVerRH?'<th>Vendedor</th>':'';
+  const thDesconto='<th>Desconto</th>';
   return`<div class="ph"><div><div class="pt">🧾 Vendas</div></div><div class="br">${filtroHtml}${badgeContexto}<span style="font-size:14px;color:var(--accent);font-weight:700">Total: ${fM(tot)}</span></div></div>
   <div class="pb">
   ${DB.unidades.length>1&&!_fu&&isAdm()?`<div class="g${Math.min(DB.unidades.length,4)}" style="margin-bottom:14px">${DB.unidades.map(u=>{const uv=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id));const ut=uv.reduce((s,v)=>s+v.valorTotal,0);const uhj=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id)&&v.data===hoje()).reduce((s,v)=>s+v.valorTotal,0);return`<div class="met yw"><div class="ml">${san(u.nome)}</div><div class="mv">${fM(ut)}</div><div class="ms">Hoje: ${fM(uhj)} • ${uv.length} vendas</div></div>`;}).join('')}</div>`:''}
-  <div class="tw"><table><thead><tr><th>Data</th><th>Unidade</th><th>Tipo</th>${thMetas}<th>Valor</th>${thRH}<th>Cupom</th><th>Canal</th><th>Status</th><th></th></tr></thead><tbody>
+  <div class="tw"><table><thead><tr><th>Data</th><th>Unidade</th><th>Tipo</th>${thMetas}<th>Valor</th>${thRH}<th>Desconto</th><th>Cupom</th><th>Canal</th><th>Status</th><th></th></tr></thead><tbody>
     ${vs.map(v=>{
       const s=DB.salas.find(x=>x.id==v.salaId);
       const u=DB.unidades.find(x=>String(x.id)===String(v.unidadeId));
@@ -9675,9 +9757,10 @@ function rVendas(){
       const tp=v.tipo==='tabuleiro'?'🎲 Tabuleiro':v.tipo==='senior'?'👴 Senior':'🚪 Escape';
       const termoIco=v.tipo==='tabuleiro'?(v.termoId?'<span title="Termo assinado" style="color:#16a34a;font-size:12px">📄✅</span>':'<span title="Sem termo" style="color:#d97706;font-size:12px">📄⚠️</span>'):'';
       const cupomInfo=v.cupom?`<span class="bdg b-pu" title="${san(v.cupom.tipo==='percentual'?v.cupom.valor+'%':'R$'+v.cupom.valor)}" style="cursor:help">🎟️ ${san(v.cupom.codigo)}</span>`:'<span style="color:var(--text3);font-size:11px">—</span>';
+      const descontoInfo=v.descontoManual>0?`<span class="bdg b-wn" title="Desconto manual: ${v.descontoPC||''}%">- ${fM(v.descontoManual)}</span>`:v.cupom?`<span style="color:var(--text3);font-size:11px">via cupom</span>`:'<span style="color:var(--text3);font-size:11px">—</span>';
       const celMetas=podeVerMetas?`<td>${san(s?.nome||v.desc||'—')}</td><td>${v.horario||'—'}</td><td>${v.qtdJogadores||'—'}</td>`:'';
       const celRH=podeVerRH?`<td style="font-size:11px">${san(op?.nome||v.vendidoPor||'—')}</td>`:'';
-      return`<tr><td>${fD(v.data)}</td><td style="font-size:11px">${san(u?.nome||'—')}</td><td>${tp} ${termoIco}</td>${celMetas}<td>${fM(v.valorTotal)}</td>${celRH}<td>${cupomInfo}</td><td>${san(v.canal||'')}</td><td><span class="bdg ${v.status==='cancelado'?'b-no':'b-ok'}">${v.status}</span></td><td style="display:flex;gap:4px">${v.status!=='cancelado'?`<button class="btn bg bxs" title="Reimprimir recibo" onclick="imprimirRecibo(DB.vendas.find(x=>x.id==='${v.id}'))">🖨️</button>`:''}${v.status!=='cancelado'&&v.tipo==='escape'&&(isAdm()||tP('fazer_vendas'))?`<button class="btn bxs" style="background:#25D366;color:#fff" title="WhatsApp cliente" onclick="abrirWhatsApp('${v.id}')">📱</button>`:''} ${v.status!=='cancelado'&&(isAdm()||tP('cancelar_vendas'))?`<button class="btn bg bxs" onclick="abrirCancelComSenha('${v.id}')">Cancelar</button>`:''}</td></tr>`;
+      return`<tr><td>${fD(v.data)}</td><td style="font-size:11px">${san(u?.nome||'—')}</td><td>${tp} ${termoIco}</td>${celMetas}<td>${fM(v.valorTotal)}</td>${celRH}<td>${descontoInfo}</td><td>${cupomInfo}</td><td>${san(v.canal||'')}</td><td><span class="bdg ${v.status==='cancelado'?'b-no':'b-ok'}">${v.status}</span></td><td style="display:flex;gap:4px">${v.status!=='cancelado'?`<button class="btn bg bxs" title="Reimprimir recibo" onclick="imprimirRecibo(DB.vendas.find(x=>x.id==='${v.id}'))">🖨️</button>`:''}${v.status!=='cancelado'&&v.tipo==='escape'&&(isAdm()||tP('fazer_vendas'))?`<button class="btn bxs" style="background:#25D366;color:#fff" title="WhatsApp cliente" onclick="abrirWhatsApp('${v.id}')">📱</button>`:''} ${v.status!=='cancelado'&&(isAdm()||tP('cancelar_vendas'))?`<button class="btn bg bxs" onclick="abrirCancelComSenha('${v.id}')">Cancelar</button>`:''}</td></tr>`;
     }).join('')}
   </tbody></table></div></div>`;
 }
@@ -10194,13 +10277,21 @@ function _semanaAnterior(){
 function _dadosShopping(uId, ini, fim){
   const vendas=(DB.vendas||[]).filter(v=>{
     if(v.status==='cancelado') return false;
-    if(v.tipo==='reserva_pagamento') return false; // evita dupla contagem
+    if(v.tipo==='reserva_pagamento') return false;
     if(uId && String(v.unidadeId)!==String(uId)) return false;
     return v.data>=ini && v.data<=fim;
   });
   const jogadores=vendas.reduce((s,v)=>s+(v.qtdJogadores||0),0);
   const valor=vendas.reduce((s,v)=>s+(v.valorTotal||0),0);
-  return { jogadores, valor, qtdVendas:vendas.length };
+  // [FIX-SHOPPING] Usa acumulador diário de taxa se disponível (mais preciso)
+  const taxaDiaria=(DB.taxaShoppingDiaria||[]).filter(t=>{
+    if(uId && String(t.unidadeId)!==String(uId)) return false;
+    return t.data>=ini && t.data<=fim;
+  });
+  const taxaAcumulada=taxaDiaria.length>0
+    ? taxaDiaria.reduce((s,t)=>s+(t.taxaValor||0),0)
+    : +(valor*((DB.config.taxaShopping||15)/100)).toFixed(2);
+  return { jogadores, valor, qtdVendas:vendas.length, taxaAcumulada };
 }
 
 // [v74.51] GOVERNANÇA DE RETIRADA DE SÓCIOS (Regra L99) — helpers de cálculo
@@ -10914,7 +11005,7 @@ function abrirRelatorioShopping(){
   // [FIX] Cada unidade ganha sua própria linha no relatório com dados calculados uma vez só
   const dadosPorUnidade = unidadesAlvo.map(u=>({u, d:_dadosShopping(u.id, ini, fim)}));
   const linhasUnidade = dadosPorUnidade.map(({u,d})=>{
-    const taxa=(d.valor*((DB.config.taxaShopping||15)/100));
+    const taxa=d.taxaAcumulada;
     return `<tr style="border-bottom:1px solid #e0e0e8">
       <td style="padding:8px;font-size:13px;color:#1a1a2e;font-weight:600">${san(u.nome)}</td>
       <td style="padding:8px;font-size:13px;text-align:center;color:#1a1a2e">${d.jogadores}</td>
@@ -10924,7 +11015,7 @@ function abrirRelatorioShopping(){
   }).join('');
   const totJ=dadosPorUnidade.reduce((s,{d})=>s+d.jogadores,0);
   const totV=dadosPorUnidade.reduce((s,{d})=>s+d.valor,0);
-  const totTaxa=totV*((DB.config.taxaShopping||15)/100);
+  const totTaxa=dadosPorUnidade.reduce((s,{d})=>s+d.taxaAcumulada,0);
 
   // Logo EXIT (usa config de logo do sistema)
   const lg=DB.config?.logo||{tipo:'texto',texto:'EXIT',corFundo:'#EAB308',corTexto:'#000'};

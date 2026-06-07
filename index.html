@@ -25317,14 +25317,24 @@ async function _keyoSend(){
   if(btn)btn.disabled=true;
   if(inp)inp.disabled=true;
   try{
-    // Usa a sessão de unidade do ERP (window._unidadeSession)
-    const session = window._unidadeSession;
-    if(!session || !session.access_token)throw new Error('Sessão expirada. Faça login novamente.');
+    // Usa a sessão de unidade do ERP
+    // 1) Tenta restaurar do localStorage se ainda não estiver em memória
+    if(!window._unidadeSession || !window._unidadeSession.access_token){
+      if(typeof unidadeRestaurarSessao === 'function') unidadeRestaurarSessao();
+    }
+    // 2) Tenta renovar o token se estiver próximo de expirar
+    if(window._unidadeSession && typeof unidadeRenovarToken === 'function'){
+      await unidadeRenovarToken();
+    }
+    // 3) Usa o token disponível — fallback para anon key se não houver sessão de unidade
+    const _keyoToken = (window._unidadeSession && window._unidadeSession.access_token)
+      ? window._unidadeSession.access_token
+      : SUPA_KEY;
     const histToSend=(_kHistory[_kAgent].slice(0,-1)).slice(-20);
     const unidadeId=UA?.unidadeId||1;
     const resp=await fetch(KEYO_EDGE_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_keyoToken},
       body:JSON.stringify({agente:_kAgent,mensagem:msg,historico:histToSend,unidade_id:unidadeId})
     });
     if(!resp.ok){const eb=await resp.json().catch(()=>({}));throw new Error(eb?.error||'Erro '+resp.status+' na Edge Function.');}

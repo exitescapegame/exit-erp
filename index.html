@@ -7746,7 +7746,10 @@ async function confirmarVenda(){ // [B4] async for slot lock
     const _creditoUsado = (pgFinal||[]).filter(p=>p.metodo==='credito_cliente').reduce((s,p)=>s+p.valor,0);
     const _entradaCaixa = +Math.max(0, val - _creditoUsado).toFixed(2); // dinheiro real referente a esta venda
     cx.entradas+=_entradaCaixa; cx.saldoAtual+=_entradaCaixa;
-    cx.historico.push({tipo:'entrada',desc:'Venda Escape Room'+(_creditoUsado>0?` (${fM(_creditoUsado)} em crédito)`:''),valor:_entradaCaixa,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+    // [FIX] Salva metodo de pagamento no historico para o fechamento de caixa classificar corretamente
+    const _metodosPrincipais = (pgFinal||[]).filter(p=>p.metodo!=='credito_cliente');
+    const _metodoCx = _metodosPrincipais.length===1 ? _metodosPrincipais[0].metodo : (_metodosPrincipais.length>1 ? 'outros' : (pgFinal&&pgFinal[0]?pgFinal[0].metodo:'outros'));
+    cx.historico.push({tipo:'entrada',desc:'Venda Escape Room'+(_creditoUsado>0?` (${fM(_creditoUsado)} em crédito)`:''),valor:_entradaCaixa,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),metodo:_metodoCx,_vendaId:venda.id});
   }
   const ag=el('avulsaGroup');if(ag)ag.style.display='none';
   _liberarGuard(); // libera lock antes de fechar modal

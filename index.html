@@ -4698,13 +4698,15 @@ function goTo(pg){
   // Fechar sidebar automaticamente em tablets ao navegar (fix #02)
   if(window.innerWidth<=1024) sbFechar();
 }
-function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
+function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM,keyo:rKEYO};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
 function bindPage(){
   if(PA==='pdv'){startClk();_agendaOnPageBind();}
   const ct=el('cpTp');if(ct)ct.onchange=updCpTipo;
   const pu=el('ptU');if(pu)pu.addEventListener('change',updPontoSt);
   // Painel GM: render do chat após injeção do DOM
   if(PA==='gm'&&_gmTab==='chat'){setTimeout(_gmRenderChat,80);}
+  // KEYO IA: inicializa histórico e foca o input após injeção do DOM
+  if(PA==='keyo'&&typeof _keyoInit==='function'){setTimeout(_keyoInit,80);}
   // Liberação Rápida: fecha modal ao clicar no overlay
   const lrqOv=el('lrqModalOverlay');
   if(lrqOv)lrqOv.onclick=function(e){if(e.target===this)_lrqCloseModal();};

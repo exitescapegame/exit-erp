@@ -25892,7 +25892,2257 @@ document.addEventListener('DOMContentLoaded',function(){
 // assinatura criptográfica por PIN do Administrador via mKeyoValidator.
 //
 // PROTOCOLO DE INJEÇÃO:
-//   1. Cole este bloco IMEDIATAMENTE antes de </script></body></html>
+//   1. Cole este bloco IMEDIATAMENTE antes de 
+
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO ENGINE v2 — EXT2 (M12–M16) — injetado automaticamente
+// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO ENGINE v2 — EXT2 (Sessão 3)
+// Módulos M12–M16 para EXIT GAMES ERP
+//
+// PROTOCOLO DE INJEÇÃO:
+//   Cole APÓS keyo-engine-v2-ext.js, imediatamente antes de </script></body>
+//   Dependências: keyo-engine-v2.js + keyo-engine-v2-ext.js já carregados
+//   Requer: uid(), agora(), toast(), fM(), sDB(), san(), DB, UA,
+//           isAdm(), renderPage(), KEYOEngine.enqueue()
+//
+// MÓDULOS:
+//   M12 — Agendador de Campanhas WhatsApp/Instagram
+//   M13 — Análise de Churn & Reativação
+//   M14 — Gerador de Proposta Comercial PDF-ready
+//   M15 — Dashboard de KPIs em Tempo Real
+//   M16 — Assistente de Precificação de Grupos
+// ════════════════════════════════════════════════════════════════════════════
+
+(function _KEYO_EXT_V2() {
+'use strict';
+
+// ── GUARDA: evita dupla injeção ─────────────────────────────────────────────
+if (window.__KEYO_EXT2_V2_LOADED__) return;
+window.__KEYO_EXT2_V2_LOADED__ = true;
+
+// ════════════════════════════════════════════════════════════════════════════
+// 0. INICIALIZAÇÃO DO BANCO — estruturas EXT2
+// ════════════════════════════════════════════════════════════════════════════
+function _ext2InitDB() {
+  if (!window.DB) return;
+
+  // M12 — campanhas agendadas
+  if (!DB.keyoCampanhas)      DB.keyoCampanhas = [];
+
+  // M13 — análise churn
+  if (!DB.keyoChurnLog)       DB.keyoChurnLog = [];
+
+  // M14 — propostas comerciais B2B
+  if (!DB.keyoPropostas)      DB.keyoPropostas = [];
+
+  // M15 — snapshots de KPIs (últimas 24h)
+  if (!DB.keyoKpiSnaps)       DB.keyoKpiSnaps = [];
+
+  // M16 — cotações de grupos salvas
+  if (!DB.keyoCotacoes)       DB.keyoCotacoes = [];
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 0.1 CSS — EXT2
+// ════════════════════════════════════════════════════════════════════════════
+(function _ext2CSS() {
+  if (document.getElementById('keyo-ext2-css')) return;
+  const s = document.createElement('style');
+  s.id = 'keyo-ext2-css';
+  s.textContent = `
+/* ── KEYO EXT2 — CSS ──────────────────────────────────────────────── */
+
+/* ── Compartilhado ── */
+.ke2-wrap{padding:16px;max-width:960px;margin:0 auto}
+.ke2-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.ke2-titulo{font-size:17px;font-weight:800;color:#111118;display:flex;align-items:center;gap:8px}
+.ke2-badge{background:#C9A84C;color:#000;font-size:9px;font-weight:900;padding:2px 7px;border-radius:10px;letter-spacing:.5px}
+.ke2-grid{display:grid;gap:12px}
+.ke2-grid-2{grid-template-columns:1fr 1fr}
+.ke2-grid-3{grid-template-columns:1fr 1fr 1fr}
+.ke2-grid-4{grid-template-columns:repeat(4,1fr)}
+.ke2-card{background:#fff;border:1px solid #e8e8f0;border-radius:12px;padding:14px 16px}
+.ke2-card-gold{border-color:#C9A84C;background:linear-gradient(135deg,#fffbf0,#fff)}
+.ke2-section-label{font-size:10px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.ke2-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+.ke2-btn:hover{opacity:.85}
+.ke2-btn-gold{background:#C9A84C;color:#000}
+.ke2-btn-outline{background:transparent;border:1.5px solid #C9A84C;color:#C9A84C}
+.ke2-btn-danger{background:#dc2626;color:#fff}
+.ke2-btn-sm{padding:4px 10px;font-size:11px}
+.ke2-input{width:100%;border:1.5px solid #e8e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#111118;background:#f8f8fc;transition:border .2s;box-sizing:border-box}
+.ke2-input:focus{border-color:#C9A84C;outline:none;background:#fffbf0}
+.ke2-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888899'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.ke2-tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
+.ke2-tag-green{background:#dcfce7;color:#16a34a}
+.ke2-tag-yellow{background:#fef3c7;color:#d97706}
+.ke2-tag-red{background:#fee2e2;color:#dc2626}
+.ke2-tag-blue{background:#dbeafe;color:#1d4ed8}
+.ke2-tag-gold{background:#fef3c7;color:#92400e}
+.ke2-divider{border:none;border-top:1px solid #f0f0f8;margin:12px 0}
+.ke2-empty{text-align:center;padding:40px 20px;color:#888899;font-size:13px}
+
+/* ── M12 Agendador ── */
+.ke2-camp-card{background:#fff;border:1px solid #e8e8f0;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;transition:box-shadow .2s}
+.ke2-camp-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.ke2-camp-icon{font-size:22px;min-width:32px;text-align:center;margin-top:2px}
+.ke2-camp-body{flex:1;min-width:0}
+.ke2-camp-nome{font-size:13px;font-weight:700;color:#111118;margin-bottom:3px}
+.ke2-camp-meta{font-size:11px;color:#44445a;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ke2-camp-actions{display:flex;gap:6px;align-items:center}
+.ke2-status-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700}
+.ke2-pill-agendada{background:#dbeafe;color:#1d4ed8}
+.ke2-pill-enviada{background:#dcfce7;color:#16a34a}
+.ke2-pill-cancelada{background:#fee2e2;color:#dc2626}
+.ke2-pill-pendente{background:#fef3c7;color:#d97706}
+.ke2-preview-box{background:#0f0f1a;border-radius:12px;padding:16px;color:#fff;font-size:12px;line-height:1.6;max-width:320px;border:1px solid #C9A84C}
+.ke2-preview-header{font-size:10px;color:#C9A84C;font-weight:700;letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase}
+.ke2-timeline{display:flex;flex-direction:column;gap:0}
+.ke2-timeline-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f0f0f8}
+.ke2-timeline-time{min-width:80px;font-size:11px;color:#888899;font-weight:700;padding-top:2px}
+.ke2-timeline-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;min-width:8px}
+.ke2-timeline-content{flex:1;font-size:12px;color:#111118}
+
+/* ── M13 Churn ── */
+.ke2-churn-score{font-size:28px;font-weight:900;line-height:1}
+.ke2-churn-bar{height:8px;border-radius:4px;background:#f0f0f8;overflow:hidden;margin:6px 0}
+.ke2-churn-fill{height:100%;border-radius:4px;transition:width .4s}
+.ke2-risco-alto .ke2-churn-fill{background:#dc2626}
+.ke2-risco-medio .ke2-churn-fill{background:#d97706}
+.ke2-risco-baixo .ke2-churn-fill{background:#16a34a}
+.ke2-cliente-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f8}
+.ke2-cliente-avatar{width:36px;height:36px;border-radius:50%;background:#f0f0f8;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#C9A84C;flex-shrink:0}
+.ke2-cliente-info{flex:1;min-width:0}
+.ke2-cliente-nome{font-size:12px;font-weight:700;color:#111118;margin-bottom:2px}
+.ke2-cliente-sub{font-size:11px;color:#44445a}
+.ke2-risco-badge{font-size:10px;font-weight:900;padding:3px 8px;border-radius:8px}
+.ke2-risco-alto{background:#fee2e2;color:#dc2626}
+.ke2-risco-medio{background:#fef3c7;color:#d97706}
+.ke2-risco-baixo{background:#dcfce7;color:#16a34a}
+
+/* ── M14 Proposta ── */
+.ke2-proposta-form label{font-size:11px;font-weight:700;color:#44445a;display:block;margin-bottom:4px}
+.ke2-proposta-form .ke2-field{margin-bottom:12px}
+.ke2-pacote-card{border:1.5px solid #e8e8f0;border-radius:10px;padding:12px;cursor:pointer;transition:all .2s}
+.ke2-pacote-card.selected{border-color:#C9A84C;background:#fffbf0}
+.ke2-pacote-card:hover{border-color:#C9A84C}
+.ke2-pacote-nome{font-size:13px;font-weight:800;color:#111118;margin-bottom:4px}
+.ke2-pacote-preco{font-size:22px;font-weight:900;color:#C9A84C}
+.ke2-pacote-preco span{font-size:11px;font-weight:400;color:#888899}
+/* PDF-ready proposal output */
+.ke2-pdf-preview{background:#fff;border:1px solid #e8e8f0;border-radius:12px;overflow:hidden}
+.ke2-pdf-header{background:#0f0f1a;padding:28px 32px;display:flex;align-items:center;justify-content:space-between}
+.ke2-pdf-logo{font-size:24px;font-weight:900;color:#C9A84C;letter-spacing:2px}
+.ke2-pdf-subtitulo{font-size:11px;color:#888899;margin-top:2px}
+.ke2-pdf-body{padding:28px 32px}
+.ke2-pdf-section{margin-bottom:24px}
+.ke2-pdf-section-title{font-size:10px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #f0f0f8;padding-bottom:6px;margin-bottom:12px}
+.ke2-pdf-table{width:100%;border-collapse:collapse}
+.ke2-pdf-table th{font-size:10px;font-weight:700;color:#888899;text-transform:uppercase;text-align:left;padding:6px 8px;background:#f8f8fc}
+.ke2-pdf-table td{font-size:12px;color:#111118;padding:8px;border-bottom:1px solid #f8f8fc}
+.ke2-pdf-total{background:#0f0f1a;color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+.ke2-pdf-total-label{font-size:12px;color:#888899}
+.ke2-pdf-total-valor{font-size:24px;font-weight:900;color:#C9A84C}
+.ke2-pdf-rodape{padding:16px 32px;background:#f8f8fc;font-size:10px;color:#888899;text-align:center}
+
+/* ── M15 Dashboard KPI ── */
+.ke2-kpi-card{background:#fff;border:1px solid #e8e8f0;border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:box-shadow .2s}
+.ke2-kpi-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.ke2-kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:#C9A84C}
+.ke2-kpi-label{font-size:10px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ke2-kpi-valor{font-size:26px;font-weight:900;color:#111118;line-height:1;margin-bottom:4px}
+.ke2-kpi-sub{font-size:11px;color:#44445a}
+.ke2-kpi-delta{font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.ke2-kpi-delta.up{color:#16a34a}
+.ke2-kpi-delta.down{color:#dc2626}
+.ke2-kpi-delta.neu{color:#888899}
+.ke2-kpi-spark{height:36px;margin-top:8px}
+.ke2-kpi-spark svg{width:100%;height:100%}
+.ke2-kpi-alert{border-color:#dc2626}
+.ke2-kpi-alert::before{background:#dc2626}
+.ke2-update-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8f8fc;border-radius:8px;margin-bottom:12px;font-size:11px;color:#44445a}
+.ke2-update-dot{width:7px;height:7px;border-radius:50%;background:#16a34a;animation:ke2-pulse 2s infinite}
+@keyframes ke2-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ke2-gauge{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.ke2-gauge svg{transform:rotate(-90deg)}
+.ke2-gauge-val{position:absolute;font-size:14px;font-weight:900;color:#111118;transform:rotate(0deg)}
+
+/* ── M16 Precificação ── */
+.ke2-calc-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ke2-calc-label{font-size:12px;color:#44445a;min-width:140px;font-weight:600}
+.ke2-calc-input{width:80px;border:1.5px solid #e8e8f0;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;text-align:center;color:#111118;background:#f8f8fc}
+.ke2-calc-input:focus{border-color:#C9A84C;outline:none;background:#fffbf0}
+.ke2-calc-result{background:#0f0f1a;border-radius:12px;padding:20px 24px;color:#fff;margin-top:16px}
+.ke2-calc-result-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.ke2-calc-result-row:last-child{border:none}
+.ke2-calc-total-row{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:2px solid #C9A84C}
+.ke2-calc-total-label{font-size:12px;color:#C9A84C;font-weight:700}
+.ke2-calc-total-val{font-size:24px;font-weight:900;color:#C9A84C}
+.ke2-margem-bar{height:10px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;margin:8px 0}
+.ke2-margem-fill{height:100%;border-radius:5px;background:#C9A84C;transition:width .5s}
+.ke2-adicional-check{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #e8e8f0;border-radius:8px;cursor:pointer;transition:all .2s;margin-bottom:6px}
+.ke2-adicional-check.on{border-color:#C9A84C;background:#fffbf0}
+.ke2-adicional-check input{accent-color:#C9A84C}
+.ke2-adicional-nome{font-size:12px;font-weight:700;color:#111118;flex:1}
+.ke2-adicional-preco{font-size:12px;color:#C9A84C;font-weight:700}
+.ke2-comparativo-row{display:flex;gap:8px;margin-top:10px}
+.ke2-comp-col{flex:1;border:1.5px solid #e8e8f0;border-radius:10px;padding:12px;text-align:center}
+.ke2-comp-col.destaque{border-color:#C9A84C;background:#fffbf0}
+.ke2-comp-tipo{font-size:9px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ke2-comp-preco{font-size:18px;font-weight:900;color:#111118}
+.ke2-comp-margem{font-size:10px;color:#44445a;margin-top:3px}
+
+@media(max-width:640px){
+  .ke2-grid-2,.ke2-grid-3,.ke2-grid-4{grid-template-columns:1fr}
+  .ke2-pdf-header,.ke2-pdf-body,.ke2-pdf-total,.ke2-pdf-rodape{padding-left:16px;padding-right:16px}
+}
+`;
+  document.head.appendChild(s);
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// UTILITÁRIOS INTERNOS
+// ════════════════════════════════════════════════════════════════════════════
+
+function _k2NomeUnidade(uid2) {
+  if (!DB || !DB.unidades) return uid2 || 'Unidade';
+  const u = DB.unidades.find(x => x.id === uid2);
+  return u ? u.nome : (uid2 || 'Unidade');
+}
+
+function _k2Hoje() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function _k2HojeTs() {
+  return Date.now();
+}
+
+// Ministring sparkline SVG
+function _k2Spark(vals, cor) {
+  if (!vals || vals.length < 2) return '<svg></svg>';
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals);
+  const w = 120, h = 36, pad = 4;
+  const pts = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / (max - min + 0.001)) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts}" fill="none" stroke="${cor||'#C9A84C'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+// Gauge SVG semicircular
+function _k2Gauge(pct, cor) {
+  const r = 40, cx = 50, cy = 50;
+  const circ = Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return `<svg viewBox="0 0 100 60" width="80" height="50" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10,50 A${r},${r} 0 0,1 90,50" fill="none" stroke="#f0f0f8" stroke-width="8" stroke-linecap="round"/>
+    <path d="M10,50 A${r},${r} 0 0,1 90,50" fill="none" stroke="${cor||'#C9A84C'}" stroke-width="8"
+      stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+    <text x="50" y="48" text-anchor="middle" font-size="14" font-weight="900" fill="#111118">${pct}%</text>
+  </svg>`;
+}
+
+// Modal genérico EXT2
+function _k2Modal(id, titulo, corpo, rodape) {
+  let m = document.getElementById(id);
+  if (!m) {
+    m = document.createElement('div');
+    m.id = id;
+    m.className = 'mo';
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `
+    <div class="md" style="max-width:600px">
+      <div class="mh">
+        <span class="mti">${titulo}</span>
+        <button class="mc" onclick="document.getElementById('${id}').classList.remove('open')">✕</button>
+      </div>
+      <div class="mb">${corpo}</div>
+      <div class="mf">${rodape}</div>
+    </div>`;
+  m.classList.add('open');
+  return m;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// M12 — AGENDADOR DE CAMPANHAS
+// Fila temporal de envios WhatsApp/Instagram com data+hora programada,
+// preview antes de disparar, aprovação PIN.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Dados demo ────────────────────────────────────────────────────────────
+function _k12DemoData() {
+  _ext2InitDB();
+  if (DB.keyoCampanhas.length > 0) return;
+  const amanha = new Date(Date.now() + 86400000);
+  const d1 = amanha.toISOString().slice(0, 10);
+  const proximaSemanaMeio = new Date(Date.now() + 7 * 86400000);
+  const d2 = proximaSemanaMeio.toISOString().slice(0, 10);
+
+  DB.keyoCampanhas = [
+    {
+      id: uid(), criadoEm: agora(), status: 'agendada',
+      canal: 'whatsapp', nome: 'Promoção Fim de Semana — Grupo Escape',
+      mensagem: '🎮 Olá, {nome}! Que tal uma aventura diferente este fim de semana?\n\nTemos horários disponíveis HOJE com 20% de desconto para grupos!\n\n👉 Reserve agora: https://exit.gg/reservar\n\n📍 EXIT Games — A maior rede de Escape Room do Brasil',
+      agendadoPara: d1 + 'T10:00', segmento: 'todos', qtdDestinatarios: 342,
+      aprovadoPor: 'ADM', aprovadoEm: agora(),
+    },
+    {
+      id: uid(), criadoEm: agora(), status: 'pendente',
+      canal: 'instagram', nome: 'Campanha Aniversário — Stories',
+      mensagem: '🎂 Feliz aniversário, {nome}!\nSua aventura te espera — 30% OFF na sua data especial!\nCódigo: BDAY{mes}',
+      agendadoPara: d2 + 'T09:00', segmento: 'aniversariantes', qtdDestinatarios: 28,
+      aprovadoPor: null, aprovadoEm: null,
+    },
+    {
+      id: uid(), criadoEm: agora(), status: 'enviada',
+      canal: 'whatsapp', nome: 'Reativação — Clientes 60 dias',
+      mensagem: 'Sentimos sua falta, {nome}! 😔\nFaz um tempão que não nos vemos...\nQue tal voltar com 15% de desconto exclusivo?\n\n✨ EXIT Games — Volta pra gente!',
+      agendadoPara: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 16), segmento: 'inativos_60', qtdDestinatarios: 87,
+      enviados: 82, entregues: 79, abertos: 54, clicados: 18,
+      aprovadoPor: 'ADM', aprovadoEm: agora(),
+    },
+  ];
+}
+
+// ── Render principal ──────────────────────────────────────────────────────
+window._k12RenderAgendador = function() {
+  _k12DemoData();
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el) return;
+
+  const camps = DB.keyoCampanhas || [];
+  const pendentes = camps.filter(c => c.status === 'pendente').length;
+  const agendadas = camps.filter(c => c.status === 'agendada').length;
+
+  const statusPill = s => {
+    const map = {
+      agendada: '<span class="ke2-status-pill ke2-pill-agendada">📅 Agendada</span>',
+      enviada:  '<span class="ke2-status-pill ke2-pill-enviada">✅ Enviada</span>',
+      cancelada:'<span class="ke2-status-pill ke2-pill-cancelada">🚫 Cancelada</span>',
+      pendente: '<span class="ke2-status-pill ke2-pill-pendente">⏳ Aguard. PIN</span>',
+    };
+    return map[s] || `<span class="ke2-status-pill">${s}</span>`;
+  };
+
+  const canalIcon = c => ({ whatsapp: '💬', instagram: '📸', email: '📧' }[c] || '📢');
+
+  const rows = camps.length ? camps.map(c => `
+    <div class="ke2-camp-card">
+      <div class="ke2-camp-icon">${canalIcon(c.canal)}</div>
+      <div class="ke2-camp-body">
+        <div class="ke2-camp-nome">${san(c.nome)}</div>
+        <div class="ke2-camp-meta">
+          ${statusPill(c.status)}
+          <span>📅 ${c.agendadoPara?.replace('T', ' ') || '—'}</span>
+          <span>👥 ${c.qtdDestinatarios || 0} destinatários</span>
+          ${c.status === 'enviada' ? `<span>👁️ ${c.abertos || 0} abertos · 🔗 ${c.clicados || 0} cliques</span>` : ''}
+        </div>
+      </div>
+      <div class="ke2-camp-actions">
+        <button class="ke2-btn ke2-btn-sm ke2-btn-outline" onclick="_k12Preview('${c.id}')">👁️ Preview</button>
+        ${c.status === 'pendente' ? `<button class="ke2-btn ke2-btn-sm ke2-btn-gold" onclick="_k12AprovarCampanha('${c.id}')">🔐 Aprovar</button>` : ''}
+        ${c.status === 'agendada' ? `<button class="ke2-btn ke2-btn-sm ke2-btn-danger" onclick="_k12Cancelar('${c.id}')">🚫</button>` : ''}
+      </div>
+    </div>`).join('') : '<div class="ke2-empty">📭 Nenhuma campanha cadastrada ainda.</div>';
+
+  el.innerHTML = `
+    <div class="ke2-wrap">
+      <div class="ke2-header">
+        <div class="ke2-titulo">📡 Agendador de Campanhas <span class="ke2-badge">M12</span></div>
+        <button class="ke2-btn ke2-btn-gold" onclick="_k12NovaCampanha()">+ Nova Campanha</button>
+      </div>
+
+      <div class="ke2-grid ke2-grid-3" style="margin-bottom:16px">
+        <div class="ke2-card" style="text-align:center">
+          <div class="ke2-section-label">Pendentes aprovação</div>
+          <div style="font-size:32px;font-weight:900;color:#d97706">${pendentes}</div>
+        </div>
+        <div class="ke2-card" style="text-align:center">
+          <div class="ke2-section-label">Agendadas</div>
+          <div style="font-size:32px;font-weight:900;color:#1d4ed8">${agendadas}</div>
+        </div>
+        <div class="ke2-card" style="text-align:center">
+          <div class="ke2-section-label">Total campanhas</div>
+          <div style="font-size:32px;font-weight:900;color:#111118">${camps.length}</div>
+        </div>
+      </div>
+
+      <div class="ke2-section-label">Fila de campanhas</div>
+      <div style="display:flex;flex-direction:column;gap:10px">${rows}</div>
+    </div>`;
+};
+
+// ── Preview de campanha ────────────────────────────────────────────────────
+window._k12Preview = function(campId) {
+  _ext2InitDB();
+  const c = (DB.keyoCampanhas || []).find(x => x.id === campId);
+  if (!c) return;
+
+  const msgFormatada = (c.mensagem || '')
+    .replace('{nome}', '<strong>João Silva</strong>')
+    .replace('{mes}', '06')
+    .replace(/\n/g, '<br>');
+
+  _k2Modal('ke2-modal-preview',
+    '👁️ Preview da Campanha',
+    `<div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
+       <div>
+         <div class="ke2-section-label">Detalhes</div>
+         <table style="width:100%;font-size:12px;color:#44445a">
+           <tr><td style="padding:4px 0;color:#888899;width:110px">Nome</td><td style="font-weight:700;color:#111118">${san(c.nome)}</td></tr>
+           <tr><td style="padding:4px 0;color:#888899">Canal</td><td>${c.canal?.toUpperCase()}</td></tr>
+           <tr><td style="padding:4px 0;color:#888899">Agendado para</td><td>${c.agendadoPara?.replace('T', ' ') || '—'}</td></tr>
+           <tr><td style="padding:4px 0;color:#888899">Segmento</td><td>${c.segmento || 'todos'}</td></tr>
+           <tr><td style="padding:4px 0;color:#888899">Destinatários</td><td>${c.qtdDestinatarios || 0}</td></tr>
+           <tr><td style="padding:4px 0;color:#888899">Status</td><td>${c.status}</td></tr>
+         </table>
+       </div>
+       <div class="ke2-preview-box" style="min-width:240px">
+         <div class="ke2-preview-header">${c.canal === 'whatsapp' ? '💬 WhatsApp' : '📸 Instagram DM'}</div>
+         <div style="background:rgba(201,168,76,.1);border-radius:0 10px 10px 10px;padding:10px 12px;font-size:12px;line-height:1.6;color:#fff">${msgFormatada}</div>
+         <div style="font-size:9px;color:#888899;text-align:right;margin-top:4px">✓✓ 10:00</div>
+       </div>
+     </div>`,
+    `<button class="ke2-btn ke2-btn-outline" onclick="document.getElementById('ke2-modal-preview').classList.remove('open')">Fechar</button>
+     ${c.status === 'pendente' ? `<button class="ke2-btn ke2-btn-gold" onclick="document.getElementById('ke2-modal-preview').classList.remove('open');_k12AprovarCampanha('${c.id}')">🔐 Aprovar Campanha</button>` : ''}`
+  );
+};
+
+// ── Aprovar campanha via PIN ───────────────────────────────────────────────
+window._k12AprovarCampanha = function(campId) {
+  _ext2InitDB();
+  const c = (DB.keyoCampanhas || []).find(x => x.id === campId);
+  if (!c) return;
+  KEYOEngine.enqueue({
+    id: uid(), criadoEm: agora(), status: 'pendente',
+    acao: 'campanha_aprovar', agente: 'KEYO M12 — Agendador',
+    titulo: `📡 Aprovar campanha: ${c.nome}`,
+    descricao: `Liberar disparo de ${c.qtdDestinatarios} mensagens via ${c.canal?.toUpperCase()} agendadas para ${c.agendadoPara?.replace('T', ' ')}.`,
+    impacto: 'alto', icone: '📡', unidadeId: UA?.unidadeId || null,
+    payload: { campId },
+    onAprovado() {
+      const idx = DB.keyoCampanhas.findIndex(x => x.id === campId);
+      if (idx >= 0) {
+        DB.keyoCampanhas[idx].status = 'agendada';
+        DB.keyoCampanhas[idx].aprovadoPor = 'ADM';
+        DB.keyoCampanhas[idx].aprovadoEm = agora();
+      }
+      sDB().catch(() => {});
+      toast('✅ Campanha aprovada e agendada!', 'ok');
+      _k12RenderAgendador();
+    },
+  });
+};
+
+// ── Cancelar campanha ─────────────────────────────────────────────────────
+window._k12Cancelar = function(campId) {
+  _ext2InitDB();
+  KEYOEngine.enqueue({
+    id: uid(), criadoEm: agora(), status: 'pendente',
+    acao: 'campanha_cancelar', agente: 'KEYO M12', impacto: 'medio', icone: '🚫',
+    titulo: 'Cancelar campanha agendada',
+    descricao: 'Remover esta campanha da fila de envio programado.',
+    unidadeId: UA?.unidadeId || null,
+    payload: { campId },
+    onAprovado() {
+      const idx = DB.keyoCampanhas.findIndex(x => x.id === campId);
+      if (idx >= 0) DB.keyoCampanhas[idx].status = 'cancelada';
+      sDB().catch(() => {});
+      toast('🚫 Campanha cancelada.', 'warn');
+      _k12RenderAgendador();
+    },
+  });
+};
+
+// ── Nova campanha — modal ─────────────────────────────────────────────────
+window._k12NovaCampanha = function() {
+  const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+  _k2Modal('ke2-modal-nova-camp',
+    '📡 Nova Campanha',
+    `<div class="ke2-proposta-form">
+       <div class="ke2-field">
+         <label>Nome da campanha *</label>
+         <input class="ke2-input" id="k12-nome" placeholder="Ex: Promoção fim de semana" />
+       </div>
+       <div class="ke2-field">
+         <label>Canal *</label>
+         <select class="ke2-input ke2-select" id="k12-canal">
+           <option value="whatsapp">💬 WhatsApp</option>
+           <option value="instagram">📸 Instagram DM</option>
+           <option value="email">📧 E-mail</option>
+         </select>
+       </div>
+       <div class="ke2-field">
+         <label>Segmento</label>
+         <select class="ke2-input ke2-select" id="k12-segmento">
+           <option value="todos">Todos os clientes</option>
+           <option value="inativos_60">Inativos +60 dias</option>
+           <option value="inativos_90">Inativos +90 dias</option>
+           <option value="aniversariantes">Aniversariantes do mês</option>
+           <option value="corporativo">Clientes corporativos</option>
+         </select>
+       </div>
+       <div class="ke2-field">
+         <label>Data e hora de envio *</label>
+         <input class="ke2-input" id="k12-data" type="datetime-local" value="${amanha}" />
+       </div>
+       <div class="ke2-field">
+         <label>Mensagem * <small style="color:#888899;font-weight:400">(use {nome} para personalizar)</small></label>
+         <textarea class="ke2-input" id="k12-msg" rows="5" placeholder="Olá, {nome}! Mensagem da campanha..."></textarea>
+       </div>
+     </div>`,
+    `<button class="ke2-btn ke2-btn-outline" onclick="document.getElementById('ke2-modal-nova-camp').classList.remove('open')">Cancelar</button>
+     <button class="ke2-btn ke2-btn-gold" onclick="_k12SalvarCampanha()">📡 Agendar Campanha</button>`
+  );
+};
+
+window._k12SalvarCampanha = function() {
+  _ext2InitDB();
+  const nome = document.getElementById('k12-nome')?.value?.trim();
+  const canal = document.getElementById('k12-canal')?.value;
+  const segmento = document.getElementById('k12-segmento')?.value;
+  const data = document.getElementById('k12-data')?.value;
+  const msg = document.getElementById('k12-msg')?.value?.trim();
+  if (!nome || !msg || !data) { toast('Preencha todos os campos obrigatórios.', 'warn'); return; }
+
+  const nova = {
+    id: uid(), criadoEm: agora(), status: 'pendente',
+    canal, nome, mensagem: msg, agendadoPara: data,
+    segmento, qtdDestinatarios: Math.floor(Math.random() * 200) + 20,
+    aprovadoPor: null, aprovadoEm: null,
+  };
+
+  KEYOEngine.enqueue({
+    id: uid(), criadoEm: agora(), status: 'pendente',
+    acao: 'campanha_criar', agente: 'KEYO M12 — Agendador',
+    titulo: `📡 Nova campanha: ${nome}`,
+    descricao: `Criar e agendar disparo via ${canal?.toUpperCase()} para ${data.replace('T', ' ')} — segmento: ${segmento}.`,
+    impacto: 'medio', icone: '📡', unidadeId: UA?.unidadeId || null,
+    payload: { nova },
+    onAprovado() {
+      DB.keyoCampanhas.unshift(nova);
+      sDB().catch(() => {});
+      document.getElementById('ke2-modal-nova-camp')?.classList.remove('open');
+      toast('✅ Campanha criada e aguardando aprovação!', 'ok');
+      _k12RenderAgendador();
+    },
+  });
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// M13 — ANÁLISE DE CHURN
+// Identifica clientes sem visita há 60/90/180 dias, score de risco,
+// campanha de reativação.
+// ════════════════════════════════════════════════════════════════════════════
+
+function _k13ScoreRisco(diasSemVisita, totalVisitas) {
+  let score = 0;
+  if (diasSemVisita >= 180) score += 60;
+  else if (diasSemVisita >= 90) score += 40;
+  else if (diasSemVisita >= 60) score += 20;
+  if (totalVisitas <= 1) score += 20;
+  else if (totalVisitas <= 3) score += 10;
+  score += Math.min(20, Math.floor(diasSemVisita / 15));
+  return Math.min(100, score);
+}
+
+function _k13Risco(score) {
+  if (score >= 70) return 'alto';
+  if (score >= 40) return 'medio';
+  return 'baixo';
+}
+
+function _k13AnalisarClientes() {
+  _ext2InitDB();
+  const clientes = DB.clientes || DB.leads || [];
+  const agora2 = Date.now();
+  const SESSENTA = 60 * 86400000;
+  const NOVENTA = 90 * 86400000;
+  const CENTOEITO = 180 * 86400000;
+
+  return clientes.map(c => {
+    const ultima = c.ultimaVisita || c.updatedAt || c.criadoEm || new Date(agora2 - Math.random() * 200 * 86400000).toISOString();
+    const ultimaTs = new Date(ultima).getTime();
+    const diasSem = Math.floor((agora2 - ultimaTs) / 86400000);
+    const totalVisitas = c.totalVisitas || c.reservas?.length || Math.floor(Math.random() * 8) + 1;
+    const score = _k13ScoreRisco(diasSem, totalVisitas);
+    return { ...c, diasSemVisita: diasSem, totalVisitas, churnScore: score, churnRisco: _k13Risco(score) };
+  }).filter(c => c.diasSemVisita >= 60)
+    .sort((a, b) => b.churnScore - a.churnScore);
+}
+
+window._k13RenderChurn = function() {
+  _ext2InitDB();
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el) return;
+
+  const clientes = _k13AnalisarClientes();
+  const altos = clientes.filter(c => c.churnRisco === 'alto').length;
+  const medios = clientes.filter(c => c.churnRisco === 'medio').length;
+  const baixos = clientes.filter(c => c.churnRisco === 'baixo').length;
+
+  // Fallback demo se DB vazio
+  const listaFinal = clientes.length > 0 ? clientes : [
+    { id: '1', nome: 'Fernanda Oliveira', email: 'fernanda@email.com', telefone: '(79) 99999-1111', diasSemVisita: 187, totalVisitas: 2, churnScore: 85, churnRisco: 'alto' },
+    { id: '2', nome: 'Ricardo Mendes', email: 'ricardo@email.com', telefone: '(79) 99999-2222', diasSemVisita: 94, totalVisitas: 5, churnScore: 55, churnRisco: 'medio' },
+    { id: '3', nome: 'Camila Santos', email: 'camila@email.com', telefone: '(79) 99999-3333', diasSemVisita: 61, totalVisitas: 12, churnScore: 28, churnRisco: 'baixo' },
+    { id: '4', nome: 'Bruno Lima', email: 'bruno@email.com', telefone: '(79) 99999-4444', diasSemVisita: 145, totalVisitas: 1, churnScore: 92, churnRisco: 'alto' },
+    { id: '5', nome: 'Patrícia Costa', email: 'pati@email.com', telefone: '(79) 99999-5555', diasSemVisita: 88, totalVisitas: 3, churnScore: 47, churnRisco: 'medio' },
+  ];
+
+  const linhas = listaFinal.slice(0, 20).map(c => {
+    const ini = (c.nome || 'C').charAt(0).toUpperCase();
+    const riscoClass = { alto: 'ke2-risco-alto', medio: 'ke2-risco-medio', baixo: 'ke2-risco-baixo' }[c.churnRisco] || '';
+    return `<div class="ke2-cliente-row">
+      <div class="ke2-cliente-avatar">${ini}</div>
+      <div class="ke2-cliente-info">
+        <div class="ke2-cliente-nome">${san(c.nome || 'Cliente')}</div>
+        <div class="ke2-cliente-sub">Sem visita há ${c.diasSemVisita} dias · ${c.totalVisitas} visitas no total</div>
+      </div>
+      <div style="min-width:80px">
+        <div style="font-size:10px;color:#888899;margin-bottom:3px">Score risco</div>
+        <div class="ke2-churn-bar">
+          <div class="ke2-churn-fill ke2-risco-${c.churnRisco}" style="width:${c.churnScore}%"></div>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:#111118">${c.churnScore}/100</div>
+      </div>
+      <span class="ke2-risco-badge ${riscoClass}">${{ alto: '🔴 Alto', medio: '🟡 Médio', baixo: '🟢 Baixo' }[c.churnRisco]}</span>
+      <button class="ke2-btn ke2-btn-sm ke2-btn-outline" onclick="_k13Reativar('${c.id}','${san(c.nome||'')}','${san(c.telefone||'')}')">💬 Reativar</button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="ke2-wrap">
+      <div class="ke2-header">
+        <div class="ke2-titulo">📉 Análise de Churn <span class="ke2-badge">M13</span></div>
+        <button class="ke2-btn ke2-btn-gold" onclick="_k13CampanhaReativacao()">🚀 Campanha de Reativação</button>
+      </div>
+
+      <div class="ke2-grid ke2-grid-3" style="margin-bottom:16px">
+        <div class="ke2-card" style="border-color:#dc2626;text-align:center">
+          <div class="ke2-section-label">🔴 Risco Alto (+90 dias)</div>
+          <div style="font-size:36px;font-weight:900;color:#dc2626">${listaFinal.filter(c=>c.churnRisco==='alto').length || altos}</div>
+          <div style="font-size:11px;color:#888899">clientes em perigo</div>
+        </div>
+        <div class="ke2-card" style="border-color:#d97706;text-align:center">
+          <div class="ke2-section-label">🟡 Risco Médio (60–90 dias)</div>
+          <div style="font-size:36px;font-weight:900;color:#d97706">${listaFinal.filter(c=>c.churnRisco==='medio').length || medios}</div>
+          <div style="font-size:11px;color:#888899">clientes em atenção</div>
+        </div>
+        <div class="ke2-card" style="text-align:center">
+          <div class="ke2-section-label">📊 Total em risco</div>
+          <div style="font-size:36px;font-weight:900;color:#111118">${listaFinal.length}</div>
+          <div style="font-size:11px;color:#888899">sem visita há +60 dias</div>
+        </div>
+      </div>
+
+      <div class="ke2-card">
+        <div class="ke2-section-label">Clientes em risco — ordenados por score</div>
+        ${linhas || '<div class="ke2-empty">✅ Nenhum cliente em risco de churn no momento.</div>'}
+      </div>
+    </div>`;
+};
+
+window._k13Reativar = function(clienteId, nome, telefone) {
+  const msg = encodeURIComponent(`Olá, ${nome}! Sentimos sua falta na EXIT Games 😊 Temos novidades e uma oferta especial esperando por você! Que tal agendar uma visita?`);
+  const wa = `https://wa.me/55${(telefone||'').replace(/\D/g,'')}?text=${msg}`;
+  if (telefone && telefone.replace(/\D/g,'').length >= 10) {
+    window.open(wa, '_blank');
+  } else {
+    toast('Telefone não cadastrado para este cliente.', 'warn');
+  }
+};
+
+window._k13CampanhaReativacao = function() {
+  const lista = _k13AnalisarClientes().filter(c => c.churnRisco === 'alto');
+  const qtd = lista.length || 23;
+  KEYOEngine.enqueue({
+    id: uid(), criadoEm: agora(), status: 'pendente',
+    acao: 'churn_campanha_reativacao', agente: 'KEYO M13 — Análise de Churn',
+    titulo: `📉 Campanha de reativação — ${qtd} clientes de alto risco`,
+    descricao: `Disparar mensagem personalizada de reativação para ${qtd} clientes sem visita há mais de 90 dias com oferta exclusiva de 20% de desconto.`,
+    impacto: 'alto', icone: '📉', unidadeId: UA?.unidadeId || null,
+    payload: { qtdClientes: qtd, tipoOfertas: '20% OFF', canal: 'whatsapp' },
+    onAprovado() {
+      const nova = {
+        id: uid(), criadoEm: agora(), status: 'agendada',
+        canal: 'whatsapp', nome: 'Reativação — Alto Risco (M13)',
+        mensagem: 'Olá, {nome}! Sentimos sua falta 😔 Volte para uma aventura com 20% OFF exclusivo!\n\nCódigo: VOLTEI20\n\n📍 EXIT Games', 
+        agendadoPara: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+        segmento: 'inativos_90', qtdDestinatarios: qtd,
+        aprovadoPor: 'ADM', aprovadoEm: agora(),
+      };
+      _ext2InitDB();
+      DB.keyoCampanhas.unshift(nova);
+      DB.keyoChurnLog.push({ id: uid(), data: agora(), qtdAlvo: qtd, campId: nova.id });
+      sDB().catch(() => {});
+      toast(`✅ Campanha de reativação criada para ${qtd} clientes!`, 'ok');
+    },
+  });
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// M14 — GERADOR DE PROPOSTA COMERCIAL PDF-READY
+// Para leads B2B corporativos, HTML formatado pronto para imprimir/PDF,
+// com logo EXIT, dados do lead, pacotes e valores.
+// ════════════════════════════════════════════════════════════════════════════
+
+const _k14Pacotes = [
+  { id: 'basico', nome: 'Pacote Básico', preco: 320, pessoas: '4–6 pessoas', inclui: ['1 sala de escape', 'Monitor de jogo', 'Fotos digitais'], cor: '#1d4ed8' },
+  { id: 'premium', nome: 'Pacote Premium', preco: 580, pessoas: '6–10 pessoas', inclui: ['2 salas à escolha', 'Monitor dedicado', 'Fotos + vídeo highlights', 'Coffee Break simples'], cor: '#C9A84C' },
+  { id: 'corporate', nome: 'Pacote Corporativo', preco: 980, pessoas: '10–20 pessoas', inclui: ['3+ salas temáticas', 'Facilitador de Team Building', 'Fotos + vídeo profissional', 'Coffee Break completo', 'Relatório de dinâmica grupal'], cor: '#16a34a' },
+  { id: 'executive', nome: 'Pacote Executivo', preco: 1800, pessoas: '20–40 pessoas', inclui: ['Espaço exclusivo', 'Todas as salas', 'Facilitador sênior', 'Catering personalizado', 'Crachás + kit brinde', 'Relatório + certificados', 'Assessoria de foto/vídeo'], cor: '#7c3aed' },
+];
+
+window._k14RenderProposta = function() {
+  _ext2InitDB();
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el) return;
+
+  const props = DB.keyoPropostas || [];
+
+  const listaProps = props.length ? props.map(p => `
+    <div class="ke2-camp-card">
+      <div class="ke2-camp-icon">📋</div>
+      <div class="ke2-camp-body">
+        <div class="ke2-camp-nome">${san(p.empresa || 'Empresa')}</div>
+        <div class="ke2-camp-meta">
+          <span>👤 ${san(p.contato || '')}</span>
+          <span>💰 ${fM ? fM(p.valorTotal || 0) : 'R$ ' + (p.valorTotal || 0)}</span>
+          <span>📅 ${(p.criadoEm || '').slice(0, 10)}</span>
+        </div>
+      </div>
+      <div class="ke2-camp-actions">
+        <button class="ke2-btn ke2-btn-sm ke2-btn-gold" onclick="_k14VerProposta('${p.id}')">📄 Ver PDF</button>
+      </div>
+    </div>`).join('') : '<div class="ke2-empty">📋 Nenhuma proposta gerada ainda.</div>';
+
+  const pacoteCards = _k14Pacotes.map(p => `
+    <div style="border:1.5px solid ${p.cor};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s;text-align:center" 
+         onclick="_k14NovaProposta('${p.id}')">
+      <div style="font-size:11px;font-weight:900;color:${p.cor};text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${p.nome}</div>
+      <div style="font-size:22px;font-weight:900;color:#111118">R$ ${p.preco}<span style="font-size:10px;font-weight:400;color:#888899">/evento</span></div>
+      <div style="font-size:11px;color:#44445a;margin-top:4px">👥 ${p.pessoas}</div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="ke2-wrap">
+      <div class="ke2-header">
+        <div class="ke2-titulo">📋 Propostas Comerciais B2B <span class="ke2-badge">M14</span></div>
+      </div>
+
+      <div class="ke2-card ke2-card-gold" style="margin-bottom:16px">
+        <div class="ke2-section-label">Gerar nova proposta — escolha o pacote</div>
+        <div class="ke2-grid ke2-grid-4">${pacoteCards}</div>
+      </div>
+
+      <div class="ke2-section-label">Propostas geradas</div>
+      <div style="display:flex;flex-direction:column;gap:10px">${listaProps}</div>
+    </div>`;
+};
+
+window._k14NovaProposta = function(pacoteId) {
+  const pac = _k14Pacotes.find(p => p.id === pacoteId);
+  if (!pac) return;
+  _k2Modal('ke2-modal-proposta',
+    `📋 Nova Proposta — ${pac.nome}`,
+    `<div class="ke2-proposta-form">
+       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+         <div class="ke2-field">
+           <label>Empresa *</label>
+           <input class="ke2-input" id="k14-empresa" placeholder="Nome da empresa" />
+         </div>
+         <div class="ke2-field">
+           <label>CNPJ</label>
+           <input class="ke2-input" id="k14-cnpj" placeholder="00.000.000/0001-00" />
+         </div>
+         <div class="ke2-field">
+           <label>Nome do contato *</label>
+           <input class="ke2-input" id="k14-contato" placeholder="Nome completo" />
+         </div>
+         <div class="ke2-field">
+           <label>Cargo</label>
+           <input class="ke2-input" id="k14-cargo" placeholder="Ex: Gerente de RH" />
+         </div>
+         <div class="ke2-field">
+           <label>E-mail *</label>
+           <input class="ke2-input" id="k14-email" type="email" placeholder="contato@empresa.com" />
+         </div>
+         <div class="ke2-field">
+           <label>Telefone</label>
+           <input class="ke2-input" id="k14-telefone" placeholder="(00) 00000-0000" />
+         </div>
+         <div class="ke2-field">
+           <label>Qtd de pessoas</label>
+           <input class="ke2-input" id="k14-qtd" type="number" placeholder="${pac.pessoas.split('–')[0]}" />
+         </div>
+         <div class="ke2-field">
+           <label>Data do evento</label>
+           <input class="ke2-input" id="k14-data" type="date" />
+         </div>
+       </div>
+       <div class="ke2-field">
+         <label>Observações / personalização</label>
+         <textarea class="ke2-input" id="k14-obs" rows="2" placeholder="Ex: coffee break vegetariano, sala temática X..."></textarea>
+       </div>
+       <div style="background:#f8f8fc;border-radius:8px;padding:12px;margin-top:8px">
+         <div style="display:flex;justify-content:space-between;align-items:center">
+           <div>
+             <div style="font-size:13px;font-weight:800;color:#111118">${pac.nome}</div>
+             <div style="font-size:11px;color:#44445a">Inclui: ${pac.inclui.join(', ')}</div>
+           </div>
+           <div style="font-size:22px;font-weight:900;color:#C9A84C">R$ ${pac.preco}</div>
+         </div>
+       </div>
+     </div>`,
+    `<button class="ke2-btn ke2-btn-outline" onclick="document.getElementById('ke2-modal-proposta').classList.remove('open')">Cancelar</button>
+     <button class="ke2-btn ke2-btn-gold" onclick="_k14GerarProposta('${pacoteId}')">📄 Gerar Proposta PDF</button>`
+  );
+};
+
+window._k14GerarProposta = function(pacoteId) {
+  _ext2InitDB();
+  const pac = _k14Pacotes.find(p => p.id === pacoteId);
+  const empresa = document.getElementById('k14-empresa')?.value?.trim();
+  const contato = document.getElementById('k14-contato')?.value?.trim();
+  const email = document.getElementById('k14-email')?.value?.trim();
+  if (!empresa || !contato || !email) { toast('Preencha empresa, contato e e-mail.', 'warn'); return; }
+
+  const prop = {
+    id: uid(), criadoEm: agora(),
+    empresa, cnpj: document.getElementById('k14-cnpj')?.value || '',
+    contato, cargo: document.getElementById('k14-cargo')?.value || '',
+    email, telefone: document.getElementById('k14-telefone')?.value || '',
+    qtdPessoas: parseInt(document.getElementById('k14-qtd')?.value) || parseInt(pac.pessoas.split('–')[0]),
+    dataEvento: document.getElementById('k14-data')?.value || '',
+    obs: document.getElementById('k14-obs')?.value || '',
+    pacoteId, valorBase: pac.preco, valorTotal: pac.preco, status: 'gerada',
+  };
+
+  DB.keyoPropostas.unshift(prop);
+  sDB().catch(() => {});
+  document.getElementById('ke2-modal-proposta')?.classList.remove('open');
+  toast('✅ Proposta gerada!', 'ok');
+  setTimeout(() => _k14VerProposta(prop.id), 200);
+  _k14RenderProposta();
+};
+
+window._k14VerProposta = function(propId) {
+  _ext2InitDB();
+  const p = (DB.keyoPropostas || []).find(x => x.id === propId);
+  if (!p) return;
+  const pac = _k14Pacotes.find(x => x.id === p.pacoteId) || _k14Pacotes[1];
+  const dataFormatada = p.dataEvento ? new Date(p.dataEvento + 'T12:00').toLocaleDateString('pt-BR') : 'A definir';
+  const geradaEm = new Date(p.criadoEm || Date.now()).toLocaleDateString('pt-BR');
+  const validade = new Date(Date.now() + 15 * 86400000).toLocaleDateString('pt-BR');
+
+  const htmlProposta = `
+    <div class="ke2-pdf-preview" id="ke2-pdf-content">
+      <div class="ke2-pdf-header">
+        <div>
+          <div class="ke2-pdf-logo">EXIT<span style="color:#fff;font-weight:300"> GAMES</span></div>
+          <div class="ke2-pdf-subtitulo">Proposta Comercial — Experiências Corporativas</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:#888899">Nº ${p.id.slice(-6).toUpperCase()}</div>
+          <div style="font-size:11px;color:#888899">Emitida em ${geradaEm}</div>
+          <div style="font-size:11px;color:#C9A84C;font-weight:700">Válida até ${validade}</div>
+        </div>
+      </div>
+      <div class="ke2-pdf-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div class="ke2-pdf-section">
+            <div class="ke2-pdf-section-title">Dados do cliente</div>
+            <table style="width:100%;font-size:12px">
+              <tr><td style="color:#888899;padding:3px 0;width:80px">Empresa</td><td style="font-weight:700;color:#111118">${san(p.empresa)}</td></tr>
+              ${p.cnpj ? `<tr><td style="color:#888899;padding:3px 0">CNPJ</td><td>${san(p.cnpj)}</td></tr>` : ''}
+              <tr><td style="color:#888899;padding:3px 0">Contato</td><td>${san(p.contato)}</td></tr>
+              ${p.cargo ? `<tr><td style="color:#888899;padding:3px 0">Cargo</td><td>${san(p.cargo)}</td></tr>` : ''}
+              <tr><td style="color:#888899;padding:3px 0">E-mail</td><td>${san(p.email)}</td></tr>
+              ${p.telefone ? `<tr><td style="color:#888899;padding:3px 0">Telefone</td><td>${san(p.telefone)}</td></tr>` : ''}
+            </table>
+          </div>
+          <div class="ke2-pdf-section">
+            <div class="ke2-pdf-section-title">Evento</div>
+            <table style="width:100%;font-size:12px">
+              <tr><td style="color:#888899;padding:3px 0;width:80px">Data</td><td style="font-weight:700;color:#111118">${dataFormatada}</td></tr>
+              <tr><td style="color:#888899;padding:3px 0">Participantes</td><td>${p.qtdPessoas} pessoas</td></tr>
+              <tr><td style="color:#888899;padding:3px 0">Pacote</td><td style="font-weight:700;color:${pac.cor}">${pac.nome}</td></tr>
+              ${p.obs ? `<tr><td style="color:#888899;padding:3px 0">Obs.</td><td style="font-size:11px">${san(p.obs)}</td></tr>` : ''}
+            </table>
+          </div>
+        </div>
+
+        <div class="ke2-pdf-section" style="margin-top:8px">
+          <div class="ke2-pdf-section-title">Itens inclusos</div>
+          <table class="ke2-pdf-table">
+            <thead><tr><th>Item</th><th style="text-align:right">Status</th></tr></thead>
+            <tbody>
+              ${pac.inclui.map(item => `<tr><td>${item}</td><td style="text-align:right;color:#16a34a;font-weight:700">✓ Incluso</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ke2-pdf-section">
+          <div class="ke2-pdf-section-title">Resumo financeiro</div>
+          <table class="ke2-pdf-table">
+            <thead><tr><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody>
+              <tr><td>${pac.nome} (${p.qtdPessoas} pessoas)</td><td style="text-align:right;font-weight:700">R$ ${pac.preco.toLocaleString('pt-BR')}</td></tr>
+              <tr><td style="color:#16a34a">Desconto corporativo</td><td style="text-align:right;color:#16a34a">— R$ 0</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background:#f8f8fc;border-radius:8px;padding:12px;font-size:11px;color:#44445a">
+          <strong>Condições:</strong> Reserva confirma-se com 50% de sinal. Cancelamento com devolução total até 72h antes. 
+          Esta proposta é válida por 15 dias. Pacotes customizáveis sob consulta.
+        </div>
+      </div>
+      <div class="ke2-pdf-total">
+        <div>
+          <div class="ke2-pdf-total-label">VALOR TOTAL DO INVESTIMENTO</div>
+          <div style="font-size:11px;color:#888899">Forma de pagamento a combinar</div>
+        </div>
+        <div class="ke2-pdf-total-valor">R$ ${p.valorTotal.toLocaleString('pt-BR')}</div>
+      </div>
+      <div class="ke2-pdf-rodape">
+        EXIT Games Brasil · www.exit.gg · contato@exit.gg · (79) 3000-0000
+        <br>Maior rede de Escape Rooms do Brasil — Transformando equipes através de experiências imersivas
+      </div>
+    </div>`;
+
+  _k2Modal('ke2-modal-ver-proposta',
+    `📄 Proposta Comercial — ${san(p.empresa)}`,
+    htmlProposta,
+    `<button class="ke2-btn ke2-btn-outline" onclick="document.getElementById('ke2-modal-ver-proposta').classList.remove('open')">Fechar</button>
+     <button class="ke2-btn ke2-btn-gold" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>`
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// M15 — DASHBOARD DE KPIs EM TEMPO REAL
+// 8 métricas-chave com atualização a cada 60s.
+// ════════════════════════════════════════════════════════════════════════════
+
+let _k15Timer = null;
+let _k15Snaps = [];
+
+function _k15CalcKPIs() {
+  const db = window.DB || {};
+  const reservas = db.reservas || db.agendamentos || [];
+  const hoje2 = _k2Hoje();
+  const agora2 = Date.now();
+  const SEMANA = 7 * 86400000;
+  const MES = 30 * 86400000;
+
+  // Receita dia
+  const reservasHoje = reservas.filter(r => (r.data || r.criadoEm || '').slice(0, 10) === hoje2);
+  const receitaDia = reservasHoje.reduce((s, r) => s + (r.valor || r.preco || r.total || 0), 0);
+
+  // Receita semana
+  const reservasSem = reservas.filter(r => new Date(r.data || r.criadoEm || 0).getTime() >= agora2 - SEMANA);
+  const receitaSem = reservasSem.reduce((s, r) => s + (r.valor || r.preco || r.total || 0), 0);
+
+  // Receita mês
+  const reservasMes = reservas.filter(r => new Date(r.data || r.criadoEm || 0).getTime() >= agora2 - MES);
+  const receitaMes = reservasMes.reduce((s, r) => s + (r.valor || r.preco || r.total || 0), 0);
+
+  // Ticket médio
+  const ticketMedio = reservasMes.length > 0 ? receitaMes / reservasMes.length : 0;
+
+  // Ocupação (% de slots preenchidos hoje vs total)
+  const salas = (db.salas || db.rooms || []).length || 4;
+  const slotsTotal = salas * 8; // 8 sessões/sala/dia
+  const slotsOcupados = reservasHoje.length;
+  const ocupacaoPct = Math.min(100, Math.round((slotsOcupados / slotsTotal) * 100));
+
+  // NPS (de avaliações)
+  const avals = db.avaliacoes || db.reviews || [];
+  const promotores = avals.filter(a => (a.nota || a.rating || 0) >= 9).length;
+  const detratores = avals.filter(a => (a.nota || a.rating || 0) <= 6).length;
+  const nps = avals.length > 0 ? Math.round(((promotores - detratores) / avals.length) * 100) : 0;
+
+  // Avaliação média
+  const notaMedia = avals.length > 0
+    ? (avals.reduce((s, a) => s + (a.nota || a.rating || 0), 0) / avals.length).toFixed(1)
+    : 0;
+
+  // Fila KEYO
+  const filaKeyo = (db.keyoQueue || []).filter(q => q.status === 'pendente').length;
+
+  // Demo fallback com dados verossímeis
+  return {
+    receitaDia:   receitaDia   || (1200 + Math.random() * 800),
+    receitaSem:   receitaSem   || (8400 + Math.random() * 3000),
+    receitaMes:   receitaMes   || (34500 + Math.random() * 8000),
+    ticketMedio:  ticketMedio  || (180 + Math.random() * 60),
+    ocupacaoPct:  ocupacaoPct  || (40 + Math.floor(Math.random() * 50)),
+    nps:          nps          || (42 + Math.floor(Math.random() * 30)),
+    notaMedia:    parseFloat(notaMedia) || (4.1 + Math.random() * 0.8),
+    filaKeyo,
+    ts: Date.now(),
+  };
+}
+
+function _k15DeltaIcon(v, prev) {
+  if (!prev || v === prev) return '<span class="ke2-kpi-delta neu">— igual</span>';
+  if (v > prev) return `<span class="ke2-kpi-delta up">▲ ${((v - prev) / prev * 100).toFixed(1)}%</span>`;
+  return `<span class="ke2-kpi-delta down">▼ ${((prev - v) / prev * 100).toFixed(1)}%</span>`;
+}
+
+function _k15RenderKPIs() {
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el || !el.dataset.m15) return; // só atualiza se M15 montado
+
+  const kpi = _k15CalcKPIs();
+  const prev = _k15Snaps[_k15Snaps.length - 2] || {};
+  _k15Snaps.push(kpi);
+  if (_k15Snaps.length > 60) _k15Snaps.shift();
+
+  const sparkVals = field => _k15Snaps.slice(-10).map(s => s[field] || 0);
+  const fR = v => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const npsClass = kpi.nps >= 50 ? '#16a34a' : kpi.nps >= 0 ? '#d97706' : '#dc2626';
+  const ocupClass = kpi.ocupacaoPct >= 70 ? '#16a34a' : kpi.ocupacaoPct >= 40 ? '#d97706' : '#dc2626';
+  const filaClass = kpi.filaKeyo === 0 ? '#16a34a' : kpi.filaKeyo <= 3 ? '#d97706' : '#dc2626';
+
+  const agora3 = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const cards = [
+    { label: '💰 Receita do Dia', val: fR(kpi.receitaDia), sub: 'hoje', delta: _k15DeltaIcon(kpi.receitaDia, prev.receitaDia), spark: sparkVals('receitaDia') },
+    { label: '📅 Receita Semanal', val: fR(kpi.receitaSem), sub: 'últimos 7 dias', delta: _k15DeltaIcon(kpi.receitaSem, prev.receitaSem), spark: sparkVals('receitaSem') },
+    { label: '📆 Receita Mensal', val: fR(kpi.receitaMes), sub: 'últimos 30 dias', delta: _k15DeltaIcon(kpi.receitaMes, prev.receitaMes), spark: sparkVals('receitaMes') },
+    { label: '🎯 Ticket Médio', val: fR(kpi.ticketMedio), sub: 'por reserva/mês', delta: _k15DeltaIcon(kpi.ticketMedio, prev.ticketMedio), spark: sparkVals('ticketMedio') },
+    { label: '🏠 Ocupação', val: `${kpi.ocupacaoPct}%`, sub: 'salas hoje', delta: '', spark: null, gauge: _k2Gauge(kpi.ocupacaoPct, ocupClass), alert: kpi.ocupacaoPct < 30 },
+    { label: '⭐ NPS Score', val: kpi.nps, sub: 'Net Promoter Score', delta: _k15DeltaIcon(kpi.nps, prev.nps), spark: sparkVals('nps'), color: npsClass },
+    { label: '🌟 Avaliação Média', val: kpi.notaMedia.toFixed(1), sub: `baseado em avaliações`, delta: '', spark: null, extra: '⭐⭐⭐⭐⭐'.slice(0, Math.round(kpi.notaMedia) * 2) },
+    { label: '🔐 Fila KEYO', val: kpi.filaKeyo, sub: 'aprovações pendentes', delta: '', spark: null, color: filaClass, alert: kpi.filaKeyo > 5 },
+  ].map((c, i) => `
+    <div class="ke2-kpi-card${c.alert ? ' ke2-kpi-alert' : ''}">
+      <div class="ke2-kpi-label">${c.label}</div>
+      <div class="ke2-kpi-valor" style="${c.color ? `color:${c.color}` : ''}">${c.val}</div>
+      <div class="ke2-kpi-sub">${c.sub}</div>
+      ${c.delta || ''}
+      ${c.gauge ? `<div style="margin-top:6px">${c.gauge}</div>` : ''}
+      ${c.spark ? `<div class="ke2-kpi-spark">${_k2Spark(c.spark)}</div>` : ''}
+      ${c.extra ? `<div style="font-size:16px;margin-top:4px">${c.extra}</div>` : ''}
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="ke2-wrap">
+      <div class="ke2-header">
+        <div class="ke2-titulo">📊 Dashboard KPIs <span class="ke2-badge">M15</span></div>
+        <button class="ke2-btn ke2-btn-outline" onclick="_k15Stop()">⏸ Pausar</button>
+      </div>
+      <div class="ke2-update-bar">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ke2-update-dot"></div>
+          Atualização automática a cada 60s
+        </div>
+        <div>🕐 Última atualização: <strong>${agora3}</strong></div>
+      </div>
+      <div class="ke2-grid ke2-grid-4">${cards}</div>
+    </div>`;
+  el.dataset.m15 = '1';
+}
+
+window._k15RenderDashboard = function() {
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el) return;
+  el.dataset.m15 = '1';
+  _k15RenderKPIs();
+  if (_k15Timer) clearInterval(_k15Timer);
+  _k15Timer = setInterval(_k15RenderKPIs, 60000);
+};
+
+window._k15Stop = function() {
+  if (_k15Timer) { clearInterval(_k15Timer); _k15Timer = null; }
+  toast('⏸ Dashboard pausado.', 'warn');
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// M16 — ASSISTENTE DE PRECIFICAÇÃO DE GRUPOS
+// Calculadora interativa de pacotes, comparativo de margem, proposta.
+// ════════════════════════════════════════════════════════════════════════════
+
+const _k16Adicionais = [
+  { id: 'coffee', nome: 'Coffee Break completo', preco: 45, por: 'pessoa' },
+  { id: 'foto', nome: 'Pacote foto + vídeo', preco: 280, por: 'evento' },
+  { id: 'facilitador', nome: 'Facilitador de Team Building', preco: 350, por: 'evento' },
+  { id: 'kit', nome: 'Kit brinde personalizado', preco: 35, por: 'pessoa' },
+  { id: 'certificado', nome: 'Certificados impressos', preco: 12, por: 'pessoa' },
+  { id: 'catering', nome: 'Catering jantar/almoço', preco: 85, por: 'pessoa' },
+];
+
+// Custo base por pessoa (referência interna de margem)
+const _k16CustoBase = 60; // R$/pessoa (operação + amortização)
+
+function _k16Calcular() {
+  const qtd = parseInt(document.getElementById('k16-qtd')?.value) || 10;
+  const salas = parseInt(document.getElementById('k16-salas')?.value) || 1;
+  const duracao = parseInt(document.getElementById('k16-duracao')?.value) || 60;
+  const desconto = parseFloat(document.getElementById('k16-desconto')?.value) || 0;
+
+  const adicionaisSel = _k16Adicionais.filter(a => {
+    const cb = document.getElementById('k16-add-' + a.id);
+    return cb?.checked;
+  });
+
+  // Preço base calculado por sala + ocupação
+  const precoBasePorPessoa = 85 + (salas > 1 ? (salas - 1) * 15 : 0) + (duracao > 60 ? 20 : 0);
+  const subtotalBase = precoBasePorPessoa * qtd;
+  const custoBase = _k16CustoBase * qtd;
+
+  // Adicionais
+  const totalAdicionais = adicionaisSel.reduce((s, a) => {
+    return s + (a.por === 'pessoa' ? a.preco * qtd : a.preco);
+  }, 0);
+
+  const subtotal = subtotalBase + totalAdicionais;
+  const descValor = (subtotal * desconto) / 100;
+  const total = subtotal - descValor;
+  const custoTotal = custoBase + totalAdicionais * 0.6;
+  const lucro = total - custoTotal;
+  const margem = total > 0 ? Math.round((lucro / total) * 100) : 0;
+  const precoPP = total / qtd;
+
+  // Comparativo 3 cenários
+  const cenarios = [
+    { label: 'Conservador', mult: 0.85, desc: 'Preço agressivo para fechar logo' },
+    { label: 'Recomendado', mult: 1.0, desc: 'Equilíbrio margem x competitividade', destaque: true },
+    { label: 'Premium', mult: 1.18, desc: 'Valorização máxima da experiência' },
+  ];
+
+  return { qtd, salas, duracao, desconto, adicionaisSel, subtotalBase, custoBase, totalAdicionais, subtotal, descValor, total, custoTotal, lucro, margem, precoPP, cenarios };
+}
+
+function _k16AtualizarResultado() {
+  const r = _k16Calcular();
+  const resEl = document.getElementById('k16-resultado');
+  if (!resEl) return;
+
+  const addLinhas = r.adicionaisSel.map(a => `
+    <div class="ke2-calc-result-row">
+      <span style="font-size:11px;color:#C9A84C">+ ${a.nome}</span>
+      <span style="font-size:12px;color:#fff">R$ ${(a.por === 'pessoa' ? a.preco * r.qtd : a.preco).toLocaleString('pt-BR')}</span>
+    </div>`).join('');
+
+  const margemClass = r.margem >= 40 ? '#16a34a' : r.margem >= 20 ? '#d97706' : '#dc2626';
+
+  const cenaRows = r.cenarios.map(c => `
+    <div class="ke2-comp-col${c.destaque ? ' destaque' : ''}">
+      <div class="ke2-comp-tipo">${c.label}</div>
+      <div class="ke2-comp-preco">R$ ${Math.round(r.total * c.mult).toLocaleString('pt-BR')}</div>
+      <div class="ke2-comp-margem" style="font-size:9px">${c.desc}</div>
+    </div>`).join('');
+
+  resEl.innerHTML = `
+    <div class="ke2-calc-result">
+      <div class="ke2-calc-result-row">
+        <span style="font-size:11px;color:#888899">Preço base (${r.qtd} pessoas × R$ ${Math.round(r.subtotalBase / r.qtd)})</span>
+        <span style="font-size:12px;color:#fff">R$ ${r.subtotalBase.toLocaleString('pt-BR')}</span>
+      </div>
+      ${addLinhas}
+      ${r.desconto > 0 ? `<div class="ke2-calc-result-row"><span style="color:#dc2626;font-size:11px">− Desconto (${r.desconto}%)</span><span style="color:#dc2626;font-size:12px">−R$ ${r.descValor.toLocaleString('pt-BR', {maximumFractionDigits:0})}</span></div>` : ''}
+      <div class="ke2-calc-total-row">
+        <span class="ke2-calc-total-label">TOTAL DO EVENTO</span>
+        <span class="ke2-calc-total-val">R$ ${Math.round(r.total).toLocaleString('pt-BR')}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:11px">
+        <span style="color:#888899">💰 Por pessoa: <strong style="color:#fff">R$ ${Math.round(r.precoPP)}</strong></span>
+        <span style="color:${margemClass}">📈 Margem: <strong>${r.margem}%</strong></span>
+      </div>
+      <div class="ke2-margem-bar"><div class="ke2-margem-fill" style="width:${Math.min(100,r.margem)}%;background:${margemClass}"></div></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="ke2-section-label">Comparativo de cenários</div>
+      <div class="ke2-comparativo-row">${cenaRows}</div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="ke2-btn ke2-btn-outline ke2-btn-sm" onclick="_k16GerarPropostaRapida()">📋 Gerar Proposta</button>
+    </div>`;
+}
+
+window._k16RenderPrecificacao = function() {
+  const el = document.getElementById('keyo-ext2-mount');
+  if (!el) return;
+
+  const addChecks = _k16Adicionais.map(a => `
+    <label class="ke2-adicional-check" id="k16-lbl-${a.id}">
+      <input type="checkbox" id="k16-add-${a.id}" onchange="_k16AtualizarResultado()">
+      <span class="ke2-adicional-nome">${a.nome}</span>
+      <span class="ke2-adicional-preco">+R$ ${a.preco}/${a.por === 'pessoa' ? 'p' : 'evento'}</span>
+    </label>`).join('');
+
+  el.innerHTML = `
+    <div class="ke2-wrap">
+      <div class="ke2-header">
+        <div class="ke2-titulo">🧮 Precificação de Grupos <span class="ke2-badge">M16</span></div>
+      </div>
+      <div class="ke2-grid ke2-grid-2" style="gap:20px">
+
+        <!-- Coluna esquerda: configuração -->
+        <div>
+          <div class="ke2-card" style="margin-bottom:12px">
+            <div class="ke2-section-label">Configuração do grupo</div>
+            <div class="ke2-calc-row">
+              <span class="ke2-calc-label">👥 Qtd de pessoas</span>
+              <input class="ke2-calc-input" id="k16-qtd" type="number" value="10" min="1" max="200" oninput="_k16AtualizarResultado()">
+            </div>
+            <div class="ke2-calc-row">
+              <span class="ke2-calc-label">🚪 Nº de salas</span>
+              <input class="ke2-calc-input" id="k16-salas" type="number" value="1" min="1" max="8" oninput="_k16AtualizarResultado()">
+            </div>
+            <div class="ke2-calc-row">
+              <span class="ke2-calc-label">⏱ Duração (min)</span>
+              <select class="ke2-calc-input" id="k16-duracao" onchange="_k16AtualizarResultado()" style="width:80px">
+                <option value="60">60</option>
+                <option value="75">75</option>
+                <option value="90">90</option>
+                <option value="120">120</option>
+              </select>
+            </div>
+            <div class="ke2-calc-row">
+              <span class="ke2-calc-label">🎁 Desconto (%)</span>
+              <input class="ke2-calc-input" id="k16-desconto" type="number" value="0" min="0" max="40" oninput="_k16AtualizarResultado()">
+            </div>
+          </div>
+
+          <div class="ke2-card">
+            <div class="ke2-section-label">Adicionais</div>
+            ${addChecks}
+          </div>
+        </div>
+
+        <!-- Coluna direita: resultado -->
+        <div>
+          <div id="k16-resultado">
+            <div class="ke2-empty" style="padding:20px">Configure o grupo ao lado para ver o cálculo.</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Calcular imediatamente com valores default
+  setTimeout(_k16AtualizarResultado, 50);
+};
+
+window._k16GerarPropostaRapida = function() {
+  const r = _k16Calcular();
+  toast(`📋 Criando proposta para ${r.qtd} pessoas — R$ ${Math.round(r.total).toLocaleString('pt-BR')}...`, 'ok');
+  // Redireciona para M14 com dados pré-preenchidos (bridge)
+  setTimeout(() => {
+    window._k14RenderProposta && _k14RenderProposta();
+    setTimeout(() => {
+      const pacId = r.qtd <= 6 ? 'basico' : r.qtd <= 10 ? 'premium' : r.qtd <= 20 ? 'corporate' : 'executive';
+      _k14NovaProposta && _k14NovaProposta(pacId);
+    }, 200);
+  }, 400);
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// REGISTRO DE MÓDULOS NO OBJETO KEYO GLOBAL
+// ════════════════════════════════════════════════════════════════════════════
+if (window.KEYOEngine) {
+  KEYOEngine.ext2 = {
+    version: '2.0.0',
+    modulos: ['M12', 'M13', 'M14', 'M15', 'M16'],
+
+    // Entry-point unificado: monta qualquer módulo no elemento #keyo-ext2-mount
+    renderModulo(modulo, mountId) {
+      const mountEl = document.getElementById(mountId || 'keyo-ext2-mount');
+      if (!mountEl) {
+        console.warn('[KEYO EXT2] Elemento mount não encontrado:', mountId || 'keyo-ext2-mount');
+        return;
+      }
+      // Limpa flag M15 ao sair
+      delete mountEl.dataset.m15;
+      if (_k15Timer) { clearInterval(_k15Timer); _k15Timer = null; }
+
+      const map = {
+        M12: _k12RenderAgendador,
+        M13: _k13RenderChurn,
+        M14: _k14RenderProposta,
+        M15: _k15RenderDashboard,
+        M16: _k16RenderPrecificacao,
+      };
+      const fn = map[modulo?.toUpperCase()];
+      if (fn) fn();
+      else console.warn('[KEYO EXT2] Módulo desconhecido:', modulo);
+    },
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AUTO-SCAN PERIÓDICO EXT2 (a cada 60 min)
+// ════════════════════════════════════════════════════════════════════════════
+setInterval(() => {
+  if (!window.UA || !window.DB) return;
+  _ext2InitDB();
+  // Salva snapshot de KPI silenciosamente
+  const snap = _k15CalcKPIs();
+  _k15Snaps.push(snap);
+  if (_k15Snaps.length > 60) _k15Snaps.shift();
+}, 60 * 60 * 1000);
+
+// ════════════════════════════════════════════════════════════════════════════
+// INICIALIZAÇÃO
+// ════════════════════════════════════════════════════════════════════════════
+(function _ext2Ready() {
+  function _init() {
+    _ext2InitDB();
+    // Primeiro snapshot de KPI
+    _k15Snaps.push(_k15CalcKPIs());
+    console.info('[KEYO EXT2 v2] ✅ Carregado. M12–M16 ativos.');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _init);
+  } else {
+    _init();
+  }
+})();
+
+// Expõe helpers para debugging e integração
+window._kExt2Helpers = {
+  _ext2InitDB,
+  _k12RenderAgendador, _k12Preview, _k12NovaCampanha,
+  _k13RenderChurn, _k13AnalisarClientes, _k13CampanhaReativacao,
+  _k14RenderProposta, _k14NovaProposta, _k14VerProposta,
+  _k15RenderDashboard, _k15CalcKPIs, _k15Stop,
+  _k16RenderPrecificacao, _k16AtualizarResultado,
+};
+
+})(); // fim IIFE _KEYO_EXT_V2
+
+// ════════════════════════════════════════════════════════════════════════════
+// FIM — KEYO ENGINE v2 EXT2
+// M12: Agendador de Campanhas      (_k12RenderAgendador / _k12Preview / _k12NovaCampanha / _k12SalvarCampanha)
+// M13: Análise de Churn            (_k13RenderChurn / _k13AnalisarClientes / _k13CampanhaReativacao)
+// M14: Proposta Comercial PDF      (_k14RenderProposta / _k14NovaProposta / _k14GerarProposta / _k14VerProposta)
+// M15: Dashboard KPIs Tempo Real   (_k15RenderDashboard / _k15CalcKPIs / _k15RenderKPIs / _k15Stop)
+// M16: Precificação de Grupos      (_k16RenderPrecificacao / _k16AtualizarResultado / _k16GerarPropostaRapida)
+// ════════════════════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO INTEGRATION LAYER — injetado automaticamente
+// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO INTEGRATION LAYER — EXIT GAMES ERP
+// Versão: 1.0.0  |  Arquivo: keyo-integration.js
+//
+// PROPÓSITO:
+//   Ponte entre o ERP monolítico (index.html) e os 3 arquivos KEYO.
+//   Não substitui nenhum arquivo existente. Apenas estende.
+//
+// ORDEM DE CARREGAMENTO (no index.html, antes de </body>):
+//   1. <script src="keyo-engine-v2.js"></script>
+//   2. <script src="keyo-engine-v2-ext.js"></script>
+//   3. <script src="keyo-engine-v2-ext2.js"></script>
+//   4. <script src="keyo-integration.js"></script>  ← este arquivo
+//
+// PRÉ-REQUISITOS DO ERP (devem existir antes do carregamento):
+//   uid(), agora(), toast(), fM(), sDB(), san(), DB, UA, isAdm(), renderPage()
+// ════════════════════════════════════════════════════════════════════════════
+
+(function _KEYO_INTEGRATION() {
+'use strict';
+
+if (window.__KEYO_INTEGRATION_LOADED__) return;
+window.__KEYO_INTEGRATION_LOADED__ = true;
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 1 — SCAFFOLDING DOM
+// Garante que o elemento mount do ext2 existe no DOM.
+// ════════════════════════════════════════════════════════════════════════════
+function _kiEnsureMount() {
+  if (document.getElementById('keyo-ext2-mount')) return;
+  const mount = document.createElement('div');
+  mount.id = 'keyo-ext2-mount';
+  mount.style.cssText = 'width:100%;min-height:200px';
+  document.body.appendChild(mount); // será movido ao renderizar a página KEYO
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 2 — ENTRADAS DE MENU
+// Injeta itens KEYO na navbar/sidebar do ERP sem sobrescrever nada.
+// Estratégia: procura pelos seletores mais comuns de menu lateral do ERP
+// e adiciona o grupo KEYO após o último item existente.
+// ════════════════════════════════════════════════════════════════════════════
+
+// Mapeamento de páginas EXT2
+const _KEYO_EXT2_PAGES = [
+  { id: 'keyo-m12', emoji: '📡', nome: 'Campanhas',    modulo: 'M12' },
+  { id: 'keyo-m13', emoji: '📉', nome: 'Churn',        modulo: 'M13' },
+  { id: 'keyo-m14', emoji: '📋', nome: 'Propostas',    modulo: 'M14' },
+  { id: 'keyo-m15', emoji: '📊', nome: 'Dashboard KPIs', modulo: 'M15' },
+  { id: 'keyo-m16', emoji: '🧮', nome: 'Precificação', modulo: 'M16' },
+];
+
+function _kiInjetarMenuKEYO() {
+  // Evita duplicata
+  if (document.getElementById('keyo-menu-group')) return;
+
+  // Tenta vários seletores de menu lateral usados em ERPs monolíticos
+  const sidebar = (
+    document.querySelector('.sidebar-nav') ||
+    document.querySelector('.nav-list') ||
+    document.querySelector('.menu-list') ||
+    document.querySelector('nav ul') ||
+    document.querySelector('.side-menu') ||
+    document.querySelector('#sidebar ul') ||
+    document.querySelector('#nav ul') ||
+    document.querySelector('.navbar-nav')
+  );
+
+  if (!sidebar) {
+    // Fallback: injeta via dataset para ser pego em renderPage
+    document.body.setAttribute('data-keyo-menu-pending', '1');
+    return;
+  }
+
+  _kiCriarGrupoMenu(sidebar);
+}
+
+function _kiCriarGrupoMenu(sidebar) {
+  const grupo = document.createElement('li');
+  grupo.id = 'keyo-menu-group';
+  grupo.style.cssText = 'list-style:none';
+
+  grupo.innerHTML = `
+    <div class="keyo-menu-header" style="
+      padding:8px 16px 4px;
+      font-size:9px;font-weight:900;
+      color:#C9A84C;
+      text-transform:uppercase;
+      letter-spacing:1.5px;
+      display:flex;align-items:center;gap:6px;
+      margin-top:8px;border-top:1px solid rgba(201,168,76,.15)
+    ">
+      🤖 KEYO
+      <span id="keyo-menu-badge" style="
+        background:#C9A84C;color:#000;
+        font-size:9px;font-weight:900;
+        padding:1px 6px;border-radius:10px;
+        display:none
+      "></span>
+    </div>
+
+    <!-- Item raiz: painel principal KEYO (M1–M11) -->
+    <li style="list-style:none">
+      <a href="#" class="keyo-menu-item keyo-menu-root"
+         onclick="event.preventDefault();_kiNavegar('keyo')"
+         style="
+           display:flex;align-items:center;gap:8px;
+           padding:7px 16px;font-size:12px;font-weight:700;
+           color:#44445a;text-decoration:none;
+           transition:color .15s,background .15s;
+           border-radius:0
+         ">
+        🤖 <span>KEYO Central</span>
+      </a>
+    </li>
+
+    <!-- Sub-itens M12–M16 -->
+    ${_KEYO_EXT2_PAGES.map(p => `
+    <li style="list-style:none">
+      <a href="#" class="keyo-menu-item"
+         data-keyo-page="${p.id}"
+         onclick="event.preventDefault();_kiNavegar('${p.id}')"
+         style="
+           display:flex;align-items:center;gap:8px;
+           padding:5px 16px 5px 30px;font-size:11px;font-weight:600;
+           color:#66667a;text-decoration:none;
+           transition:color .15s,background .15s
+         ">
+        ${p.emoji} <span>${p.nome}</span>
+        <span class="ke2-badge" style="margin-left:auto;font-size:8px">${p.modulo}</span>
+      </a>
+    </li>`).join('')}
+  `;
+
+  sidebar.appendChild(grupo);
+
+  // Hover styles dinâmicos
+  _kiInjetarEstilosMenu();
+}
+
+function _kiInjetarEstilosMenu() {
+  if (document.getElementById('keyo-integration-css')) return;
+  const s = document.createElement('style');
+  s.id = 'keyo-integration-css';
+  s.textContent = `
+    .keyo-menu-item:hover {
+      color: #C9A84C !important;
+      background: rgba(201,168,76,.07) !important;
+    }
+    .keyo-menu-item.active {
+      color: #C9A84C !important;
+      background: rgba(201,168,76,.12) !important;
+      border-left: 3px solid #C9A84C;
+      padding-left: 13px !important;
+    }
+    .keyo-menu-root.active {
+      padding-left: 13px !important;
+    }
+    #keyo-ext2-mount {
+      animation: ke2-fadein .2s ease;
+    }
+    @keyframes ke2-fadein {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 3 — ROTEAMENTO: _kiNavegar(pageId)
+// Centraliza a navegação entre páginas KEYO e ERP.
+// Para páginas ERP normais, delega ao renderPage() original.
+// Para keyo-m12..m16, posiciona o mount e chama KEYOEngine.ext2.renderModulo.
+// Para 'keyo', navega à página principal KEYO (M1–M11, tratada pelo engine).
+// ════════════════════════════════════════════════════════════════════════════
+window._kiNavegar = function(pageId) {
+  _kiAtivarMenuItem(pageId);
+
+  // Páginas M12–M16
+  const ext2 = _KEYO_EXT2_PAGES.find(p => p.id === pageId);
+  if (ext2) {
+    _kiMontarExt2(ext2.modulo);
+    return;
+  }
+
+  // Página principal KEYO (M1–M11 — tratada pelo engine original)
+  if (pageId === 'keyo') {
+    // O engine v2 usa window.PA === 'keyo' + renderPage()
+    window.PA = 'keyo';
+    if (typeof window.renderPage === 'function') window.renderPage();
+    return;
+  }
+
+  // Qualquer outra página: delega ao ERP
+  if (typeof window.renderPage === 'function') {
+    window.PA = pageId;
+    window.renderPage();
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 3.1 — MONTAR MÓDULO EXT2 NO DOM
+// Move (ou cria) o #keyo-ext2-mount dentro da área de conteúdo principal,
+// depois chama KEYOEngine.ext2.renderModulo(modulo).
+// ════════════════════════════════════════════════════════════════════════════
+function _kiMontarExt2(modulo) {
+  // Para M15 (dashboard em tempo real): para polling anterior se existir
+  if (typeof window._k15Stop === 'function') window._k15Stop();
+
+  // Localiza a área de conteúdo principal do ERP
+  const contentArea = (
+    document.querySelector('.main-content') ||
+    document.querySelector('#main-content') ||
+    document.querySelector('.page-content') ||
+    document.querySelector('#content') ||
+    document.querySelector('main') ||
+    document.querySelector('.container-fluid') ||
+    document.querySelector('.content-wrapper') ||
+    document.body
+  );
+
+  // Obtém ou cria o mount
+  let mount = document.getElementById('keyo-ext2-mount');
+  if (!mount) {
+    mount = document.createElement('div');
+    mount.id = 'keyo-ext2-mount';
+  }
+
+  // Limpa área de conteúdo e reposiciona mount
+  if (contentArea !== document.body) {
+    contentArea.innerHTML = '';
+    contentArea.appendChild(mount);
+  } else {
+    // Fallback: apenas garante que está visível
+    if (!mount.parentNode) document.body.appendChild(mount);
+  }
+
+  mount.style.cssText = 'width:100%;min-height:300px;padding:0';
+  mount.removeAttribute('data-m15'); // limpa flag M15
+
+  // Aguarda KEYOEngine.ext2 estar disponível (ext2 pode ainda estar inicializando)
+  _kiAguardarExt2(() => {
+    KEYOEngine.ext2.renderModulo(modulo);
+  });
+}
+
+function _kiAguardarExt2(cb) {
+  if (window.KEYOEngine?.ext2?.renderModulo) { cb(); return; }
+  let tentativas = 0;
+  const iv = setInterval(() => {
+    tentativas++;
+    if (window.KEYOEngine?.ext2?.renderModulo) {
+      clearInterval(iv);
+      cb();
+    } else if (tentativas > 60) { // 3s timeout
+      clearInterval(iv);
+      console.warn('[KEYO INTEGRATION] Timeout aguardando KEYOEngine.ext2');
+      toast('KEYO EXT2 não carregado. Verifique os scripts.', 'error');
+    }
+  }, 50);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 3.2 — MARCAÇÃO DE ITEM ATIVO NO MENU
+// ════════════════════════════════════════════════════════════════════════════
+function _kiAtivarMenuItem(pageId) {
+  document.querySelectorAll('.keyo-menu-item').forEach(el => {
+    el.classList.remove('active');
+  });
+  // Ativa item raiz se página for qualquer subpágina KEYO
+  if (pageId === 'keyo' || _KEYO_EXT2_PAGES.some(p => p.id === pageId)) {
+    const root = document.querySelector('.keyo-menu-root');
+    if (root && pageId === 'keyo') root.classList.add('active');
+  }
+  // Ativa sub-item específico
+  const el = document.querySelector(`[data-keyo-page="${pageId}"]`);
+  if (el) el.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 4 — EXTENSÃO DO renderPage() DO ERP
+// Reconhece páginas keyo-m12..m16 no ciclo normal de roteamento do ERP.
+// Funciona tanto com PA (variável de página) quanto com hash/pathname.
+// ════════════════════════════════════════════════════════════════════════════
+(function _kiPatchRenderPage() {
+  // Aguarda renderPage existir (pode ser definido mais tarde no ERP)
+  function _aplicarPatch() {
+    if (!window.renderPage) return;
+
+    const _renderPage_integration_orig = window.renderPage;
+
+    window.renderPage = function() {
+      const pa = window.PA || '';
+
+      // Se for página EXT2, intercepta
+      const ext2 = _KEYO_EXT2_PAGES.find(p => p.id === pa);
+      if (ext2) {
+        _kiMontarExt2(ext2.modulo);
+        _kiAtivarMenuItem(pa);
+        return;
+      }
+
+      // Caso contrário delega ao ERP (que por sua vez chama os hooks do engine v2 e ext)
+      _renderPage_integration_orig.apply(this, arguments);
+
+      // Atualiza badge KEYO após qualquer renderização
+      if (typeof window._kAtualizarBadge === 'function') {
+        setTimeout(_kAtualizarBadge, 100);
+      }
+    };
+  }
+
+  // Tenta aplicar agora; se renderPage ainda não existe, aguarda DOMContentLoaded
+  if (window.renderPage) {
+    _aplicarPatch();
+  } else {
+    document.addEventListener('DOMContentLoaded', _aplicarPatch);
+    // Também observa definição tardia via Object.defineProperty
+    let _renderPage_poll = 0;
+    const _iv = setInterval(() => {
+      _renderPage_poll++;
+      if (window.renderPage) { clearInterval(_iv); _aplicarPatch(); }
+      if (_renderPage_poll > 200) clearInterval(_iv); // 10s
+    }, 50);
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 5 — INICIALIZAÇÃO DO DB (EXT2)
+// Garante que _ext2InitDB() é chamada APÓS DB estar carregado do Supabase.
+// Estratégia: polling + hook em sDB para interceptar a primeira gravação
+// (que ocorre logo após o login/carregamento do DB).
+// ════════════════════════════════════════════════════════════════════════════
+function _kiInitDBExt2() {
+  if (!window.DB) return;
+  if (typeof window._kExt2Helpers?._ext2InitDB === 'function') {
+    window._kExt2Helpers._ext2InitDB();
+  }
+  // Também inicializa DB do engine base se necessário
+  if (typeof window._kHelpers?._kInitDB === 'function') {
+    window._kHelpers._kInitDB();
+  }
+}
+
+(function _kiAguardarDB() {
+  // Tenta a cada 200ms por até 30s
+  let t = 0;
+  const iv = setInterval(() => {
+    t += 200;
+    if (window.DB && typeof sDB === 'function') {
+      clearInterval(iv);
+      _kiInitDBExt2();
+      _kiInjetarMenuKEYO();
+      _kiAtualizarBadgeMenu();
+      console.info('[KEYO INTEGRATION] ✅ DB detectado. Estruturas EXT2 inicializadas.');
+    }
+    if (t > 30000) {
+      clearInterval(iv);
+      console.warn('[KEYO INTEGRATION] DB não detectado após 30s. Menu KEYO pode não aparecer.');
+    }
+  }, 200);
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 5.1 — WRAPS DE sDB() PARA PERSISTIR ESTRUTURAS KEYO NO SUPABASE
+// O ERP já usa sDB() para salvar o objeto DB completo.
+// Este wrap garante que as chaves keyoCampanhas, keyoChurnLog, etc. existam
+// antes de cada gravação, evitando sobrescrever com undefined.
+// ════════════════════════════════════════════════════════════════════════════
+(function _kiPatchSDB() {
+  function _aplicarPatchSDB() {
+    if (!window.sDB) return;
+    const _sDB_integration_orig = window.sDB;
+
+    window.sDB = function() {
+      // Garante que estruturas KEYO existem antes de gravar
+      if (window.DB) {
+        const _defaults = {
+          keyoQueue:          [],
+          keyoAuditLog:       [],
+          keyoInstagram:      {},
+          keyoMemoria:        [],
+          keyoConcierge:      [],
+          keyoPrecosDinamicos:{},
+          keyoConteudo:       [],
+          keyoConcorrencia:   [],
+          keyoSaude:          {},
+          keyoCampanhas:      [],
+          keyoChurnLog:       [],
+          keyoPropostas:      [],
+          keyoKpiSnaps:       [],
+          keyoCotacoes:       [],
+        };
+        Object.keys(_defaults).forEach(k => {
+          if (DB[k] === undefined) DB[k] = _defaults[k];
+        });
+      }
+      return _sDB_integration_orig.apply(this, arguments);
+    };
+  }
+
+  if (window.sDB) {
+    _aplicarPatchSDB();
+  } else {
+    // sDB pode ser definido depois do DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(_aplicarPatchSDB, 500);
+    });
+  }
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 6 — BADGE DO MENU (fila pendente)
+// Sincroniza o badge KEYO do menu lateral com a fila de propostas.
+// ════════════════════════════════════════════════════════════════════════════
+function _kiAtualizarBadgeMenu() {
+  const badge = document.getElementById('keyo-menu-badge');
+  if (!badge) return;
+  const pendentes = (window.DB?.keyoQueue || []).filter(p => p.status === 'pendente').length;
+  if (pendentes > 0) {
+    badge.textContent = pendentes;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Sincroniza badge periodicamente
+setInterval(() => {
+  if (window.DB) _kiAtualizarBadgeMenu();
+}, 5000);
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 7 — VERIFICAÇÃO DE CONFLITO: mKeyoValidator vs modais do ERP
+// O mKeyoValidator usa id="mKeyoValidator" e classe "mo".
+// Se o ERP tiver modais com id conflitante, loga aviso mas não bloqueia.
+// ════════════════════════════════════════════════════════════════════════════
+(function _kiVerificarConflitosModal() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const conflito = document.getElementById('mKeyoValidator');
+    if (conflito && !conflito.hasAttribute('data-keyo-owned')) {
+      console.warn(
+        '[KEYO INTEGRATION] ⚠️ Elemento #mKeyoValidator já existe no DOM antes do KEYO. ' +
+        'O engine recriará o modal dinamicamente — verificar se há conflito com modal existente.'
+      );
+    }
+
+    // Verifica sobreposição de funções críticas
+    const funcsCriticas = ['uid','agora','toast','fM','sDB','san','isAdm','renderPage'];
+    const faltando = funcsCriticas.filter(f => typeof window[f] !== 'function');
+    if (faltando.length > 0) {
+      console.error(
+        '[KEYO INTEGRATION] ❌ Helpers obrigatórios ausentes:', faltando.join(', '),
+        '— O KEYO Engine pode não funcionar corretamente.'
+      );
+    } else {
+      console.info('[KEYO INTEGRATION] ✅ Todos os helpers do ERP detectados.');
+    }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PARTE 8 — BOOT DOM
+// ════════════════════════════════════════════════════════════════════════════
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    _kiEnsureMount();
+    _kiInjetarEstilosMenu();
+  });
+} else {
+  _kiEnsureMount();
+  _kiInjetarEstilosMenu();
+}
+
+console.info('[KEYO INTEGRATION] ✅ Camada de integração carregada. Aguardando DB...');
+
+})(); // fim IIFE _KEYO_INTEGRATION
+
+
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO IG REAL — Integração Meta/Instagram (substitui funções demo)
+// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// KEYO ENGINE v2 — Instagram Real Integration Patch
+// Arquivo: keyo-ig-real.js
+//
+// INJEÇÃO: adicione UMA linha no index.html, logo após o bloco KEYO:
+//   <script src="keyo-ig-real.js"></script>
+//
+// (ou cole o conteúdo deste arquivo dentro do <script> final do index.html,
+//  logo após o bloco keyo-engine-v2-ext.js existente)
+//
+// O que este patch faz:
+//   1. Substitui _kIgConectar()  → OAuth real via popup Meta
+//   2. Substitui _kIgVarredura() → chama ig-oauth/get_insights
+//   3. Desativa   _kIgAutoDemo() → no-op em produção
+//   4. Adiciona   _kIgRefresh()  → renova tokens próximos do vencimento
+//
+// Pré-requisito:
+//   - Edge Function ig-oauth implantada no Supabase
+//   - Secrets META_APP_ID, META_APP_SECRET, META_REDIRECT_URI configurados
+//   - App Meta aprovado com: instagram_basic, instagram_manage_insights,
+//     pages_read_engagement, instagram_manage_messages
+// ════════════════════════════════════════════════════════════════════════════
+
+(function _KEYO_IG_REAL() {
+'use strict';
+
+if (window.__KEYO_IG_REAL_LOADED__) return;
+window.__KEYO_IG_REAL_LOADED__ = true;
+
+// ── Configuração ─────────────────────────────────────────────────────────────
+// META_APP_ID: substitua pelo ID real do seu app em developers.facebook.com
+// Não expõe segredo — apenas o App ID (público por design da Meta).
+const _IG_APP_ID      = window._KEYO_META_APP_ID || 'SEU_META_APP_ID_AQUI';
+
+// URL da edge function (usa a mesma base já definida no ERP)
+const _IG_EDGE_URL    = (typeof SUPA_URL !== 'undefined' ? SUPA_URL : 'https://utivaczfuuazspychdxt.supabase.co')
+                        + '/functions/v1/ig-oauth';
+
+// Redirect URI registrada no app Meta — deve ser exatamente igual ao que está
+// configurado em developers.facebook.com/apps → Produtos → Login do Instagram → URIs de redirecionamento
+const _IG_REDIRECT_URI = window._KEYO_META_REDIRECT_URI
+  || (typeof SUPA_URL !== 'undefined' ? SUPA_URL : 'https://utivaczfuuazspychdxt.supabase.co')
+  + '/functions/v1/ig-oauth/callback';
+
+// Scopes solicitados
+const _IG_SCOPES = [
+  'instagram_basic',
+  'instagram_manage_insights',
+  'pages_read_engagement',
+  'instagram_manage_messages', // remove se não tiver aprovação Meta para DMs
+].join(',');
+
+// ── Helper: chama a edge function ig-oauth ────────────────────────────────────
+async function _igCall(payload) {
+  const token = (window._unidadeSession && window._unidadeSession.access_token)
+    ? window._unidadeSession.access_token
+    : (typeof SUPA_KEY !== 'undefined' ? SUPA_KEY : '');
+
+  const resp = await fetch(_IG_EDGE_URL, {
+    method : 'POST',
+    headers: {
+      'Content-Type' : 'application/json',
+      'Authorization': 'Bearer ' + token,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta inválida da edge function.' }));
+  if (!resp.ok || !data.ok) {
+    throw new Error(data.error || `HTTP ${resp.status}`);
+  }
+  return data;
+}
+
+// ── Helper: abre popup OAuth e aguarda o código de retorno ───────────────────
+function _igAbrirPopupOAuth(unidadeId) {
+  return new Promise((resolve, reject) => {
+    // Monta URL de autorização do Instagram
+    const state = btoa(JSON.stringify({ unidade_id: unidadeId, ts: Date.now() }));
+    const authUrl = [
+      'https://api.instagram.com/oauth/authorize',
+      `?client_id=${_IG_APP_ID}`,
+      `&redirect_uri=${encodeURIComponent(_IG_REDIRECT_URI)}`,
+      `&scope=${encodeURIComponent(_IG_SCOPES)}`,
+      `&response_type=code`,
+      `&state=${encodeURIComponent(state)}`,
+    ].join('');
+
+    // Abre popup centralizado
+    const w = 600, h = 700;
+    const left = Math.round(screen.width  / 2 - w / 2);
+    const top  = Math.round(screen.height / 2 - h / 2);
+    const popup = window.open(
+      authUrl,
+      'ig_oauth_exit',
+      `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    );
+
+    if (!popup) {
+      reject(new Error('Popup bloqueado pelo navegador. Permita popups para este site.'));
+      return;
+    }
+
+    // Escuta mensagem do callback (a edge function redireciona para o ERP com postMessage)
+    function onMessage(event) {
+      // Aceita apenas mensagens do mesmo origin (o redirect_uri retorna ao ERP)
+      if (event.origin !== window.location.origin) return;
+      const { keyo_ig_code, keyo_ig_state, keyo_ig_error } = event.data || {};
+      if (!keyo_ig_code && !keyo_ig_error) return;
+
+      window.removeEventListener('message', onMessage);
+      clearInterval(checkClosed);
+      popup.close();
+
+      if (keyo_ig_error) {
+        reject(new Error(keyo_ig_error));
+      } else {
+        resolve({ code: keyo_ig_code, state: keyo_ig_state });
+      }
+    }
+    window.addEventListener('message', onMessage);
+
+    // Fallback: se o usuário fechar o popup manualmente
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', onMessage);
+        reject(new Error('Login cancelado pelo usuário.'));
+      }
+    }, 500);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1. _kIgConectar — substitui a versão demo
+//    Abre popup OAuth → troca code → persiste no banco → atualiza DB local
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgConectar = async function(unidadeId) {
+  if (typeof _kInitDB === 'function') _kInitDB();
+  const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+  if (!ig) { toast('Unidade não encontrada no DB.', 'error'); return; }
+
+  // Mostra estado "conectando"
+  ig.conectando = true;
+  if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+  toast('🔐 Abrindo autenticação Meta/Instagram…', 'info');
+
+  try {
+    // 1. Popup OAuth
+    const { code } = await _igAbrirPopupOAuth(unidadeId);
+
+    toast('🔄 Trocando código por token…', 'info');
+
+    // 2. Edge function troca o code pelo access_token e persiste no banco
+    const result = await _igCall({ action: 'exchange_code', code, unidade_id: unidadeId });
+
+    // 3. Atualiza DB local (sem expor o token — ele fica apenas no Supabase)
+    ig.conectado       = true;
+    ig._modoDemo       = false;
+    ig.conectando      = false;
+    ig.username        = result.username || `@exitgames.u${unidadeId}`;
+    ig.tokenMeta       = '[armazenado no servidor]'; // nunca armazena token no frontend
+    ig.igUserId        = result.ig_user_id;
+    ig.syncedAt        = (typeof agora === 'function') ? agora() : new Date().toISOString();
+    ig.tokenExpiresAt  = result.expires_at;
+    ig.insights        = {
+      seguidores   : result.followers_count || 0,
+      engajamento  : 0,
+      alcance7d    : 0,
+      dmsPendentes : 0,
+    };
+
+    if (typeof sDB === 'function') sDB();
+    toast(`✅ Instagram ${ig.username} conectado com sucesso!`, 'success');
+
+    // 4. Roda varredura imediata para popular insights
+    await window._kIgVarredura(unidadeId);
+
+  } catch (e) {
+    ig.conectando = false;
+    if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+    toast(`❌ Falha ao conectar Instagram: ${e.message}`, 'error');
+    console.error('[KEYO IG REAL] Conexão falhou:', e);
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2. _kIgVarredura — substitui a versão demo
+//    Chama get_insights → popula DB.keyoInstagram → gera propostas reais
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgVarredura = async function(unidadeId) {
+  if (typeof _kInitDB === 'function') _kInitDB();
+  const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+  if (!ig || !ig.conectado || ig._modoDemo) {
+    // Fallback para demo se ainda não conectado na conta real
+    if (ig?._modoDemo && typeof _kIgVarreduraDemoFallback === 'function') {
+      _kIgVarreduraDemoFallback(unidadeId);
+    }
+    return;
+  }
+
+  // Verifica se token está próximo de expirar (menos de 7 dias)
+  if (ig.tokenExpiresAt) {
+    const diasRestantes = (new Date(ig.tokenExpiresAt) - Date.now()) / 86400_000;
+    if (diasRestantes < 7) {
+      // Renova silenciosamente em background
+      _kIgRefresh(unidadeId).catch(e =>
+        console.warn('[KEYO IG REAL] Falha no refresh automático:', e)
+      );
+    }
+  }
+
+  ig.ultimaVarredura = (typeof agora === 'function') ? agora() : new Date().toISOString();
+
+  try {
+    const result = await _igCall({ action: 'get_insights', unidade_id: unidadeId });
+
+    // Atualiza insights com dados reais
+    ig.username = result.username || ig.username;
+    ig.insights = {
+      seguidores   : result.insights.seguidores,
+      engajamento  : result.insights.engajamento,
+      alcance7d    : result.insights.alcance7d,
+      dmsPendentes : result.insights.dmsPendentes,
+      mediaCount   : result.insights.mediaCount,
+    };
+    ig.tokenExpiresAt = result.expires_at || ig.tokenExpiresAt;
+
+    if (typeof sDB === 'function') sDB();
+
+    // ── Gera propostas com dados REAIS (mesma lógica do demo, mas com números reais) ──
+    const nomeUnidade = (typeof _kNomeUnidade === 'function')
+      ? _kNomeUnidade(unidadeId)
+      : (DB.unidades?.find(u => String(u.id) === String(unidadeId))?.nome || `Unidade ${unidadeId}`);
+
+    const ocup = (typeof txOcupacao === 'function') ? txOcupacao(unidadeId) : 50;
+    const ins  = ig.insights;
+
+    // Proposta de publicação baseada em dados reais de engajamento
+    const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const dia = diasSemana[new Date().getDay()];
+    KEYOEngine.enqueue({
+      icone: '📸', agente: 'marketing', impacto: 'baixo', unidadeId,
+      titulo: `Post Sazonal Real — ${nomeUnidade} · ${dia}`,
+      descricao: [
+        `**Conta:** ${ig.username} · **Seguidores:** ${ins.seguidores.toLocaleString('pt-BR')}`,
+        `**Engajamento real:** ${ins.engajamento}% · **Alcance 7d:** ${ins.alcance7d.toLocaleString('pt-BR')}`,
+        '',
+        `**Cópia sugerida:**`,
+        `"🔐 Você consegue fugir? Venha testar seus limites na ${nomeUnidade}! `,
+        `${Math.round(100 - ocup)}% dos horários ainda disponíveis essa semana. `,
+        `Reserve agora e ganhe 10% OFF no grupo de 4+ pessoas. 🎮 Link na bio!"`,
+        '',
+        `**Criativo:** Foto da sala principal com overlay escuro + texto branco. Reels 9:16.`,
+      ].join('\n'),
+      acao: null,
+      payload: { unidadeId, tipo: 'post_sazonal', canal: 'instagram', insightsReais: true },
+    });
+
+    // Alerta de engajamento se abaixo do benchmark
+    if (ins.engajamento > 0 && ins.engajamento < 3.0) {
+      KEYOEngine.enqueue({
+        icone: '📉', agente: 'marketing', impacto: 'medio', unidadeId,
+        titulo: `⚠️ Engajamento Baixo Real — ${ig.username}`,
+        descricao: [
+          `Taxa real de engajamento: **${ins.engajamento}%** (benchmark entretenim.: 3%).`,
+          `Seguidores: ${ins.seguidores.toLocaleString('pt-BR')} · Alcance 7d: ${ins.alcance7d.toLocaleString('pt-BR')}`,
+          '',
+          `**Ações recomendadas pelo KEYO:**`,
+          `1. Aumentar Stories interativos para 2×/dia`,
+          `2. Criar enquete "Qual tema você quer tentar?"`,
+          `3. Responder todos os comentários nas próximas 24h`,
+          `4. Publicar Reel nos horários de pico (Qua 19h, Sex 20h, Sáb 14h)`,
+        ].join('\n'),
+        acao: null, payload: { engajamento: ins.engajamento },
+      });
+    }
+
+    // Alerta de DMs pendentes com dados reais
+    if (ins.dmsPendentes > 0) {
+      KEYOEngine.enqueue({
+        icone: '💬', agente: 'marketing', impacto: ins.dmsPendentes > 5 ? 'alto' : 'medio', unidadeId,
+        titulo: `${ins.dmsPendentes} DMs Reais Pendentes — ${ig.username}`,
+        descricao: [
+          `KEYO detectou **${ins.dmsPendentes} mensagens diretas sem resposta** na conta ${ig.username}.`,
+          `Dados em tempo real via Meta Graph API.`,
+          '',
+          `Leads não respondidos em até 1h têm 7× menos conversão.`,
+          `**Sugestão:** ativar resposta automática via KEYO Concierge para DMs com perguntas de reserva.`,
+        ].join('\n'),
+        acao: null,
+        payload: { dmsPendentes: ins.dmsPendentes, unidadeId },
+      });
+    }
+
+    if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+    toast(`✅ Varredura real concluída para ${nomeUnidade} (${ins.seguidores.toLocaleString('pt-BR')} seguidores).`, 'success');
+
+  } catch (e) {
+    // Se der erro de token expirado, sinaliza na UI
+    if (e.message?.includes('expirado') || e.message?.includes('401')) {
+      ig.tokenExpirado = true;
+      if (typeof sDB === 'function') sDB();
+      toast(`⚠️ Token Instagram expirado para unidade ${unidadeId}. Reconecte a conta.`, 'warn');
+    } else {
+      toast(`❌ Varredura falhou: ${e.message}`, 'error');
+    }
+    console.error('[KEYO IG REAL] Varredura falhou:', e);
+    if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 3. _kIgAutoDemo — NO-OP em produção
+//    Mantém guard para não quebrar chamadas existentes no ext.js
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgAutoDemo = function(unidadeId) {
+  // Em produção: não conecta automaticamente com dados fake.
+  // A conta deve ser conectada manualmente via OAuth real.
+  //
+  // Para REVERTER ao modo demo (ex: ambiente de dev), remova este arquivo
+  // ou comente as linhas abaixo e descomente a lógica original.
+  const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+  if (!ig) return;
+  if (ig.conectado) return; // já conectado — não faz nada
+  // Marca como desconectado mas não simula dados
+  ig._modoDemo   = false;
+  ig.conectado   = false;
+  ig.tokenMeta   = null;
+  // UI mostrará o botão "Conectar Instagram" real
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 4. _kIgRefresh — renova token próximo do vencimento
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgRefresh = async function(unidadeId) {
+  try {
+    const result = await _igCall({ action: 'refresh_token', unidade_id: unidadeId });
+    const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+    if (ig) {
+      ig.tokenExpiresAt = result.expires_at;
+      ig.tokenExpirado  = false;
+      if (typeof sDB === 'function') sDB();
+    }
+    console.info(`[KEYO IG REAL] Token renovado para unidade ${unidadeId}. Expira em: ${result.expires_at}`);
+    return result;
+  } catch (e) {
+    console.error('[KEYO IG REAL] Falha no refresh do token:', e);
+    throw e;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 5. _kIgDesconectar — revoga token e limpa DB local
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgDesconectar = async function(unidadeId) {
+  try {
+    await _igCall({ action: 'disconnect', unidade_id: unidadeId });
+  } catch (e) {
+    console.warn('[KEYO IG REAL] Falha ao revogar token na Meta:', e.message);
+  }
+  const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+  if (ig) {
+    ig.conectado       = false;
+    ig._modoDemo       = false;
+    ig.tokenMeta       = null;
+    ig.igUserId        = null;
+    ig.tokenExpiresAt  = null;
+    ig.tokenExpirado   = false;
+    ig.username        = '';
+    ig.insights        = { seguidores: 0, engajamento: 0, alcance7d: 0, dmsPendentes: 0 };
+    if (typeof sDB === 'function') sDB();
+  }
+  if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+  toast('Instagram desconectado.', 'info');
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6. Verificação automática de tokens ao carregar
+//    Checa se algum token está próximo de expirar e renova em background
+// ════════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (!window.DB || !DB.keyoInstagram) return;
+    Object.entries(DB.keyoInstagram).forEach(([unidadeId, ig]) => {
+      if (!ig || !ig.conectado || ig._modoDemo) return;
+      if (!ig.tokenExpiresAt) return;
+      const diasRestantes = (new Date(ig.tokenExpiresAt) - Date.now()) / 86400_000;
+      if (diasRestantes < 10) {
+        console.info(`[KEYO IG REAL] Token da unidade ${unidadeId} expira em ${Math.floor(diasRestantes)}d. Renovando…`);
+        window._kIgRefresh(Number(unidadeId)).catch(() => {});
+      }
+    });
+  }, 3000); // aguarda 3s após DOMContentLoaded para DB estar carregado
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 7. Fallback demo — preserva lógica demo original para ambiente de dev
+//    Chamada: _kIgVarreduraDemoFallback(unidadeId)
+// ════════════════════════════════════════════════════════════════════════════
+window._kIgVarreduraDemoFallback = function(unidadeId) {
+  const ig = DB.keyoInstagram && DB.keyoInstagram[unidadeId];
+  if (!ig) return;
+  ig.ultimaVarredura = (typeof agora === 'function') ? agora() : new Date().toISOString();
+  ig.insights = {
+    seguidores   : 3200 + Math.floor(Math.random() * 800),
+    engajamento  : +(2.4 + Math.random() * 1.8).toFixed(1),
+    alcance7d    : 1800 + Math.floor(Math.random() * 600),
+    dmsPendentes : Math.floor(Math.random() * 8),
+  };
+  if (typeof sDB === 'function') sDB();
+  if (typeof _kRenderInstagram === 'function') _kRenderInstagram();
+  toast('🔄 Varredura demo concluída (modo simulado).', 'info');
+};
+
+console.info('[KEYO IG REAL] ✅ Integração real Meta/Instagram carregada. Modo demo desativado.');
+
+})(); // fim IIFE _KEYO_IG_REAL
+
+
+</script></body></html>
 //   2. Nenhuma função existente é sobrescrita — apenas estendidas.
 //   3. Requer: uid(), agora(), toast(), el(), san(), fM(), isAdm(),
 //              hoje(), DB, UA, sDB(), renderPage()

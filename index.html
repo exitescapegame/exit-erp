@@ -2887,7 +2887,7 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     // com defaults do DBD. Usar dados diretamente, com fallback seletivo apenas para
     // campos que não existem no banco (campos novos adicionados em versões futuras).
     DB = dados;
-    // Garante campos obrigatórios ausentes (novos campos de versões futuras)
+    window.DB = DB; // [KEYO-FIX] mantém window.DB sincronizado após carga do Supabase
     if (!DB.jogosTabuleiro) DB.jogosTabuleiro = [];
     if (!DB.sessoesTabuleiro) DB.sessoesTabuleiro = [];
     if (!DB.sessoesSenior) DB.sessoesSenior = [];
@@ -3915,6 +3915,7 @@ const DBD={
 };
 
 let DB=dc(DBD); // será preenchido pelo Supabase em carregarDBSeguro()
+window.DB=DB; // [KEYO-FIX] expõe no window para que módulos externos (KEYO INTEGRATION) possam detectar
 DB.colaboradores.forEach(c=>{
   c.id=String(c.id);c.unidadeId=String(c.unidadeId);
   // [B2-FIX] Removido: if(!c.pinHash)c.pinHash=hp('0000')

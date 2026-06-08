@@ -25902,7 +25902,7 @@ document.addEventListener('DOMContentLoaded',function(){
 // Módulos M12–M16 para EXIT GAMES ERP
 //
 // PROTOCOLO DE INJEÇÃO:
-//   Cole APÓS keyo-engine-v2-ext.js, imediatamente antes de </script></body>
+//   Cole APÓS keyo-engine-v2-ext.js, imediatamente antes de <\/script></body>
 //   Dependências: keyo-engine-v2.js + keyo-engine-v2-ext.js já carregados
 //   Requer: uid(), agora(), toast(), fM(), sDB(), san(), DB, UA,
 //           isAdm(), renderPage(), KEYOEngine.enqueue()
@@ -27246,10 +27246,10 @@ window._kExt2Helpers = {
 //   Não substitui nenhum arquivo existente. Apenas estende.
 //
 // ORDEM DE CARREGAMENTO (no index.html, antes de </body>):
-//   1. <script src="keyo-engine-v2.js"></script>
-//   2. <script src="keyo-engine-v2-ext.js"></script>
-//   3. <script src="keyo-engine-v2-ext2.js"></script>
-//   4. <script src="keyo-integration.js"></script>  ← este arquivo
+//   1. <script src="keyo-engine-v2.js"><\/script>
+//   2. <script src="keyo-engine-v2-ext.js"><\/script>
+//   3. <script src="keyo-engine-v2-ext2.js"><\/script>
+//   4. <script src="keyo-integration.js"><\/script>  ← este arquivo
 //
 // PRÉ-REQUISITOS DO ERP (devem existir antes do carregamento):
 //   uid(), agora(), toast(), fM(), sDB(), san(), DB, UA, isAdm(), renderPage()
@@ -27727,7 +27727,7 @@ console.info('[KEYO INTEGRATION] ✅ Camada de integração carregada. Aguardand
 // Arquivo: keyo-ig-real.js
 //
 // INJEÇÃO: adicione UMA linha no index.html, logo após o bloco KEYO:
-//   <script src="keyo-ig-real.js"></script>
+//   <script src="keyo-ig-real.js"><\/script>
 //
 // (ou cole o conteúdo deste arquivo dentro do <script> final do index.html,
 //  logo após o bloco keyo-engine-v2-ext.js existente)

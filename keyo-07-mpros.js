@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.3 (Etapa 7.2 — fix scoring super-action + PNCP modalidade)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.6 (Cientista: Projeção + Criação de salas)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -82,6 +82,17 @@ function _initDB() {
 
   // Relatório semanal acumulado
   if (!window.DB.keyoMprosRelatorio) window.DB.keyoMprosRelatorio = [];
+
+  // Salas de escape criadas pelo Cientista (função Criação)
+  if (!window.DB.keyoSalas) window.DB.keyoSalas = [];
+  /*
+    Sala: {
+      id, titulo, tema, tempoMin, jogadores, dificuldade,
+      instrucoes,        // pedido extra do ADM
+      projeto,           // texto completo do projeto (markdown-ish)
+      criadoEm, criadoPor
+    }
+  */
   /*
     Semana: {
       semana, buscados, descartados, aprovados, enviados,
@@ -262,6 +273,38 @@ function _jwt() {
 /* ══ MPROS: barra de progresso da rodada ══ */
 #mpros-progress-bar{height:3px;background:#e8e8f0;border-radius:2px;overflow:hidden;margin-bottom:16px}
 #mpros-progress-fill{height:100%;background:#C9A84C;border-radius:2px;transition:width .5s ease;width:0%}
+
+/* ══ CIENTISTA: aba Criação ══ */
+.cri-painel{background:#fff;border:1px solid #e8e8f0;border-radius:14px;padding:20px;margin-bottom:16px}
+.cri-titulo{font-size:14px;font-weight:700;color:#111118;margin:0 0 4px}
+.cri-sub{font-size:12px;color:#888899;margin:0 0 16px}
+.cri-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cri-campo{display:flex;flex-direction:column;gap:4px}
+.cri-campo.full{grid-column:1 / -1}
+.cri-campo label{font-size:11px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px}
+.cri-campo select,.cri-campo input,.cri-campo textarea{font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #d8d8e8;border-radius:8px;color:#111118;background:#fff}
+.cri-campo textarea{resize:vertical;min-height:60px}
+.cri-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.cri-loading{text-align:center;color:#888899;font-size:13px;padding:30px}
+.cri-dots span{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:#C9A84C;animation:cri-bounce 1.2s infinite}
+.cri-dots span:nth-child(2){animation-delay:.2s}
+.cri-dots span:nth-child(3){animation-delay:.4s}
+@keyframes cri-bounce{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-5px)}}
+.cri-projeto{background:#fff;border:1px solid #e8e8f0;border-radius:14px;padding:24px 26px;margin-bottom:16px;line-height:1.65;color:#222}
+.cri-projeto h1{font-size:19px;color:#111118;margin:0 0 12px;border-bottom:2px solid #C9A84C;padding-bottom:8px}
+.cri-projeto h2{font-size:15px;color:#7c3aed;margin:20px 0 8px}
+.cri-projeto h3{font-size:13px;color:#111118;margin:14px 0 4px;font-weight:700}
+.cri-projeto p{font-size:13px;margin:0 0 8px}
+.cri-projeto ul{margin:4px 0 10px;padding-left:20px}
+.cri-projeto li{font-size:13px;margin-bottom:3px}
+.cri-projeto strong{color:#111118}
+.cri-projeto-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.cri-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.cri-tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f3eeff;color:#7c3aed}
+.cri-lista-item{background:#fff;border:1px solid #e8e8f0;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.cri-lista-nome{font-size:13px;font-weight:700;color:#111118}
+.cri-lista-meta{font-size:11px;color:#888899;margin-top:2px}
+.cri-lista-acoes{display:flex;gap:6px;flex-wrap:wrap}
 `;
   document.head.appendChild(s);
 })();
@@ -308,7 +351,7 @@ function _htmlPrincipal() {
   <!-- TOP BAR -->
   <div id="mpros-topbar">
     <div id="mpros-topbar-left">
-      <h2>🎯 MPROS — Prospecção Ativa</h2>
+      <h2>🔬 Cientista — Prospecção</h2>
       <div id="mpros-motor-badge" class="${motorAtivo ? 'ativo' : 'pausado'}">
         ${motorAtivo ? '● Motor ativo' : '● Motor pausado'}
       </div>
@@ -343,6 +386,9 @@ function _htmlPrincipal() {
     <button class="mpros-tab ${_abaAtiva==='config'?'active':''}" onclick="window.mpros_aba('config')">
       ⚙️ Config
     </button>
+    <button class="mpros-tab ${_abaAtiva==='criacao'?'active':''}" onclick="window.mpros_aba('criacao')" style="margin-left:auto">
+      🧪 Criação
+    </button>
   </div>
 
   <!-- BARRA DE PROGRESSO DA RODADA -->
@@ -373,6 +419,7 @@ function _renderAba(id) {
   else if (id === 'pipeline')  { content.innerHTML = _htmlPipeline(); }
   else if (id === 'relatorio') { content.innerHTML = _htmlRelatorio(); }
   else if (id === 'config')    { content.innerHTML = _htmlConfig(); }
+  else if (id === 'criacao')   { content.innerHTML = _htmlCriacao(); }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1421,24 +1468,447 @@ async function _rodarAgora(silencioso = false) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// FUNÇÃO CRIAÇÃO — O CIENTISTA PROJETA SALAS DE ESCAPE
+// (cérebro embutido no navegador; usa o mesmo canal de IA do scoring)
+// ════════════════════════════════════════════════════════════════
+let _salaAtual = null;       // projeto em exibição (transitório)
+let _criandoSala = false;
+
+function _salas() { return Array.isArray(window.DB?.keyoSalas) ? window.DB.keyoSalas : []; }
+
+const TEMAS_CRIACAO = [
+  'Terror', 'Suspense / Mistério', 'Ação / Espionagem', 'Aventura / Tesouro',
+  'Ficção científica', 'Fantasia / Medieval', 'Crime / Investigação', 'Histórico',
+];
+
+// ── Escape de HTML ───────────────────────────────────────────────
+function _esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Conversor markdown-simples → HTML (robusto a texto cortado) ──
+function _md2html(txt) {
+  const linhas = _esc(txt).split('\n');
+  let html = '', emLista = false;
+  const fecharLista = () => { if (emLista) { html += '</ul>'; emLista = false; } };
+  for (let linha of linhas) {
+    let l = linha.trim();
+    if (!l) { fecharLista(); continue; }
+    l = l.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    if (l.startsWith('### '))      { fecharLista(); html += `<h3>${l.slice(4)}</h3>`; }
+    else if (l.startsWith('## '))  { fecharLista(); html += `<h2>${l.slice(3)}</h2>`; }
+    else if (l.startsWith('# '))   { fecharLista(); html += `<h1>${l.slice(2)}</h1>`; }
+    else if (l.startsWith('- ') || l.startsWith('* ')) {
+      if (!emLista) { html += '<ul>'; emLista = true; }
+      html += `<li>${l.slice(2)}</li>`;
+    } else { fecharLista(); html += `<p>${l}</p>`; }
+  }
+  fecharLista();
+  return html;
+}
+
+// ── HTML da aba Criação ──────────────────────────────────────────
+function _htmlCriacao() {
+  const salas = _salas();
+  const opTemas = TEMAS_CRIACAO.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('');
+
+  let listaHtml = '';
+  if (salas.length) {
+    listaHtml = '<h3 class="cri-titulo" style="margin-top:8px">📁 Salas criadas</h3>' +
+      salas.slice().reverse().map(s => `
+        <div class="cri-lista-item">
+          <div>
+            <div class="cri-lista-nome">${_esc(s.titulo)}</div>
+            <div class="cri-lista-meta">${_esc(s.tema)} · ${s.tempoMin} min · ${_esc(s.jogadores)} jogadores · ${_esc(s.dificuldade)}</div>
+          </div>
+          <div class="cri-lista-acoes">
+            <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_verSala('${s.id}')">👁 Ver</button>
+            <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_imprimirSala('${s.id}')">🖨️ Imprimir</button>
+            <button class="mpros-btn mpros-btn-danger" onclick="window.mpros_excluirSala('${s.id}')">🗑</button>
+          </div>
+        </div>`).join('');
+  }
+
+  return `
+<div class="cri-painel">
+  <h3 class="cri-titulo">🔬 Criar projeto de sala de escape</h3>
+  <p class="cri-sub">Escolha o tema e os parâmetros. O Cientista monta o projeto completo (história, decoração, puzzles, som e objetivo). Sem pressa — ele é caprichoso.</p>
+  <div class="cri-form">
+    <div class="cri-campo">
+      <label>Tema</label>
+      <select id="cri-tema">${opTemas}</select>
+    </div>
+    <div class="cri-campo">
+      <label>Duração do jogo</label>
+      <select id="cri-tempo">
+        <option value="45">45 minutos</option>
+        <option value="60" selected>60 minutos</option>
+        <option value="75">75 minutos</option>
+        <option value="90">90 minutos</option>
+      </select>
+    </div>
+    <div class="cri-campo">
+      <label>Jogadores</label>
+      <select id="cri-jogadores">
+        <option value="2 a 4">2 a 4</option>
+        <option value="3 a 6" selected>3 a 6</option>
+        <option value="4 a 8">4 a 8</option>
+      </select>
+    </div>
+    <div class="cri-campo">
+      <label>Dificuldade</label>
+      <select id="cri-dificuldade">
+        <option value="Fácil">Fácil</option>
+        <option value="Média" selected>Média</option>
+        <option value="Difícil">Difícil</option>
+        <option value="Elite">Elite</option>
+      </select>
+    </div>
+    <div class="cri-campo full">
+      <label>Pedido especial (opcional)</label>
+      <textarea id="cri-instrucoes" placeholder="Ex: usar um cofre de verdade, incluir um momento de susto, tema baseado em um hospital abandonado..."></textarea>
+    </div>
+  </div>
+  <div class="cri-actions">
+    <button class="mpros-btn mpros-btn-primary" id="cri-btn-criar" onclick="window.mpros_criarSala()">🔬 Criar projeto da sala</button>
+  </div>
+</div>
+
+<div id="cri-resultado">${_salaAtual ? _renderProjeto(_salaAtual) : ''}</div>
+
+${listaHtml}
+`;
+}
+
+// ── O "cérebro" do Cientista (instruções) ────────────────────────
+function _promptCientista(dados, projetoAnterior, pedidoAjuste) {
+  const sistema = `Você é o "Cientista" da EXIT GAMES — um projetista sênior de salas de escape (escape rooms) físicas e reais, para a rede EXIT GAMES (Aracaju/SE e Salvador/BA). Sua função é entregar o projeto COMPLETO de uma sala, pronto para ser montado no mundo real.
+
+REGRAS OBRIGATÓRIAS:
+1. Todo puzzle deve ter LÓGICA clara e dedutível pelos jogadores. NUNCA use charadas, adivinhas ou trocadilhos.
+2. Cada puzzle deve se RELACIONAR com o tema e com a história da sala.
+3. Mantenha tudo REALISTA e montável: nada de obras impossíveis (não "construir um prédio de verdade"). Use props, móveis, cenografia, fechaduras, cadeados e eletrônicos simples.
+4. MISTURE puzzles MECÂNICOS (cadeados numéricos/direcionais/de chave, gavetas, encaixes, ímãs) e ELETRÔNICOS (luz UV, painel/teclado, sensores, áudio, fechadura eletrônica).
+5. Os puzzles podem ser ADAPTAÇÕES de mecânicas conhecidas de escape room, ajustadas ao tema — não copie textos de terceiros.
+6. Seja CIRÚRGICO e PRECISO: cada puzzle precisa ter solução EXATA e lista de materiais.
+7. Quantidade: aproximadamente 1 puzzle a cada 8–10 minutos de jogo.
+
+Responda em PORTUGUÊS, em texto estruturado EXATAMENTE neste formato (use os títulos com # e ##; NÃO use blocos de código):
+
+# [Título da sala]
+
+## Sinopse
+(1–2 frases)
+
+## História / Ambientação
+(parágrafo de imersão: onde os jogadores estão, por quê, o que aconteceu)
+
+## Objetivo final
+(o que precisam fazer para escapar/vencer)
+
+## Decoração e cenário
+(o que montar fisicamente no espaço)
+
+## Puzzles
+### 1. [Nome] — (mecânico OU eletrônico)
+- O que o jogador encontra: ...
+- Lógica de resolução: ...
+- Ligação com o tema: ...
+- Solução exata: ...
+- Materiais: ...
+(repita, em ordem de resolução)
+
+## Trilha sonora e ambiente sonoro
+(estilo de som e momentos-chave; sugira tipos de faixa, sem citar músicas protegidas)
+
+## Fluxo da sala
+(sequência: puzzle 1 libera X → puzzle 2 ... até o objetivo)
+
+## Lista de materiais
+- (itens consolidados)
+
+## Observações de montagem
+(dicas práticas)`;
+
+  let usuario;
+  if (projetoAnterior) {
+    usuario = `Projeto atual da sala:\n\n${projetoAnterior}\n\n---\nO ADM pediu este ajuste: ${pedidoAjuste}\n\nReescreva o PROJETO COMPLETO no mesmo formato, aplicando o ajuste.`;
+  } else {
+    usuario = `Crie o projeto de uma sala de escape com:
+- Tema: ${dados.tema}
+- Duração do jogo: ${dados.tempoMin} minutos
+- Jogadores: ${dados.jogadores}
+- Dificuldade: ${dados.dificuldade}` +
+      (dados.instrucoes ? `\n- Pedido especial do ADM: ${dados.instrucoes}` : '');
+  }
+  return { sistema, usuario };
+}
+
+// ── Chamada à IA (mesmo canal/formato do scoring que funciona) ──
+async function _chamarCientista(sistema, usuario) {
+  const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/super-action';
+  const token    = _jwt();
+  const unidade  = (window.UA && (window.UA.unidade || window.UA.unidadeId)) || 1;
+
+  const resp = await fetch(SUPA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      agente:     'mkt',                       // canal existente; o cérebro vai na mensagem
+      mensagem:   `${sistema}\n\n${usuario}`,
+      historico:  [],
+      unidade_id: unidade,
+    }),
+  });
+  if (!resp.ok) throw new Error(`Supabase HTTP ${resp.status}`);
+  const data = await resp.json();
+  let texto = (data && data.resposta) ? data.resposta : '';
+  if (!texto && Array.isArray(data?.content)) texto = data.content.map(c => c.text || '').join('');
+  return (texto || '').trim();
+}
+
+// ── Extrai título do projeto (primeira linha com #) ──────────────
+function _tituloDoProjeto(txt, temaFallback) {
+  const m = (txt || '').match(/^#\s+(.+)$/m);
+  return (m && m[1].trim()) || ('Sala — ' + temaFallback);
+}
+
+// ── Ação: criar sala ─────────────────────────────────────────────
+async function _criarSala() {
+  if (_criandoSala) return;
+
+  const dados = {
+    tema:       document.getElementById('cri-tema')?.value       || 'Terror',
+    tempoMin:   document.getElementById('cri-tempo')?.value      || '60',
+    jogadores:  document.getElementById('cri-jogadores')?.value  || '3 a 6',
+    dificuldade:document.getElementById('cri-dificuldade')?.value || 'Média',
+    instrucoes: (document.getElementById('cri-instrucoes')?.value || '').trim(),
+  };
+
+  _criandoSala = true;
+  const btn = document.getElementById('cri-btn-criar');
+  if (btn) { btn.disabled = true; btn.textContent = '🔬 Projetando...'; }
+  const res = document.getElementById('cri-resultado');
+  if (res) res.innerHTML = `<div class="cri-painel cri-loading">🔬 O Cientista está projetando a sala com calma...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
+
+  try {
+    const { sistema, usuario } = _promptCientista(dados);
+    const texto = await _chamarCientista(sistema, usuario);
+    if (!texto) throw new Error('Resposta vazia');
+
+    const sala = {
+      id:        window.uid ? window.uid() : ('sala_' + Date.now()),
+      titulo:    _tituloDoProjeto(texto, dados.tema),
+      tema:      dados.tema,
+      tempoMin:  dados.tempoMin,
+      jogadores: dados.jogadores,
+      dificuldade: dados.dificuldade,
+      instrucoes: dados.instrucoes,
+      projeto:   texto,
+      criadoEm:  new Date().toISOString(),
+      criadoPor: (window.UA && window.UA.nome) ? window.UA.nome : 'ADM',
+    };
+    window.DB.keyoSalas.push(sala);
+    if (typeof window.sDB === 'function') window.sDB();
+
+    _salaAtual = sala;
+    if (res) res.innerHTML = _renderProjeto(sala);
+    window.toast('✅ Projeto da sala criado!', 'ok');
+  } catch (err) {
+    console.error('[KEYO-07] Erro ao criar sala:', err);
+    if (res) res.innerHTML = `<div class="cri-painel" style="color:#dc2626">⚠️ Não consegui criar a sala agora (${_esc(err.message)}). Tente novamente em alguns segundos.</div>`;
+    window.toast('⚠️ Erro ao criar a sala. Tente de novo.', 'error');
+  } finally {
+    _criandoSala = false;
+    const b = document.getElementById('cri-btn-criar');
+    if (b) { b.disabled = false; b.textContent = '🔬 Criar projeto da sala'; }
+  }
+}
+
+// ── Render do projeto (com ações) ────────────────────────────────
+function _renderProjeto(sala) {
+  return `
+<div class="cri-projeto" id="cri-projeto-${sala.id}">
+  <div class="cri-projeto-top">
+    <div class="cri-tags">
+      <span class="cri-tag">${_esc(sala.tema)}</span>
+      <span class="cri-tag">${sala.tempoMin} min</span>
+      <span class="cri-tag">${_esc(sala.jogadores)} jogadores</span>
+      <span class="cri-tag">${_esc(sala.dificuldade)}</span>
+    </div>
+    <div class="cri-lista-acoes">
+      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_imprimirSala('${sala.id}')">🖨️ Imprimir</button>
+      <button class="mpros-btn mpros-btn-success" onclick="window.mpros_enviarSala('${sala.id}')">📲 Enviar</button>
+    </div>
+  </div>
+  ${_md2html(sala.projeto)}
+  <div class="cri-painel" style="margin-top:18px;margin-bottom:0">
+    <label style="font-size:11px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px">Pedir um ajuste ao Cientista</label>
+    <textarea id="cri-ajuste-${sala.id}" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #d8d8e8;border-radius:8px;min-height:50px" placeholder="Ex: deixe o puzzle 3 mais difícil, troque o cadeado por um cofre, adicione um susto no final..."></textarea>
+    <div class="cri-actions">
+      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_refinarSala('${sala.id}')">🔁 Aplicar ajuste</button>
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Ação: refinar (conversa de ajuste) ───────────────────────────
+async function _refinarSala(id) {
+  if (_criandoSala) return;
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const pedido = (document.getElementById('cri-ajuste-' + id)?.value || '').trim();
+  if (!pedido) { window.toast('Escreva o ajuste que você quer.', 'warn'); return; }
+
+  _criandoSala = true;
+  const res = document.getElementById('cri-resultado');
+  if (res) res.innerHTML = `<div class="cri-painel cri-loading">🔁 Aplicando seu ajuste...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
+
+  try {
+    const { sistema, usuario } = _promptCientista(sala, sala.projeto, pedido);
+    const texto = await _chamarCientista(sistema, usuario);
+    if (!texto) throw new Error('Resposta vazia');
+    sala.projeto = texto;
+    sala.titulo  = _tituloDoProjeto(texto, sala.tema);
+    if (typeof window.sDB === 'function') window.sDB();
+    _salaAtual = sala;
+    if (res) res.innerHTML = _renderProjeto(sala);
+    window.toast('✅ Ajuste aplicado!', 'ok');
+  } catch (err) {
+    console.error('[KEYO-07] Erro ao refinar sala:', err);
+    if (res) res.innerHTML = _renderProjeto(sala);
+    window.toast('⚠️ Não consegui aplicar o ajuste. Tente de novo.', 'error');
+  } finally {
+    _criandoSala = false;
+  }
+}
+
+// ── Ações de lista ───────────────────────────────────────────────
+function _verSala(id) {
+  const sala = _salas().find(s => s.id === id);
+  if (!sala) return;
+  _salaAtual = sala;
+  _renderAba('criacao');
+  const res = document.getElementById('cri-resultado');
+  if (res) res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _excluirSala(id) {
+  if (!confirm('Excluir esta sala? Não dá pra desfazer.')) return;
+  const arr = window.DB.keyoSalas || [];
+  const i = arr.findIndex(s => s.id === id);
+  if (i >= 0) arr.splice(i, 1);
+  if (_salaAtual && _salaAtual.id === id) _salaAtual = null;
+  if (typeof window.sDB === 'function') window.sDB();
+  _renderAba('criacao');
+  window.toast('Sala excluída.', 'info');
+}
+
+function _imprimirSala(id) {
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const w = window.open('', '_blank');
+  if (!w) { window.toast('Permita pop-ups para imprimir.', 'warn'); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${_esc(sala.titulo)}</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;color:#222;line-height:1.6;max-width:760px;margin:24px auto;padding:0 22px}
+  h1{font-size:22px;border-bottom:2px solid #C9A84C;padding-bottom:8px}
+  h2{font-size:16px;color:#7c3aed;margin-top:22px}
+  h3{font-size:14px;margin:14px 0 4px}
+  ul{padding-left:20px} li{margin-bottom:3px}
+  .meta{font-size:12px;color:#777;margin-bottom:16px}
+</style></head><body>
+<div class="meta">EXIT GAMES — Projeto de Sala · Tema: ${_esc(sala.tema)} · ${sala.tempoMin} min · ${_esc(sala.jogadores)} jogadores · ${_esc(sala.dificuldade)}</div>
+${_md2html(sala.projeto)}
+</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
+}
+
+function _enviarSala(id) {
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const texto = `🔬 PROJETO DE SALA — ${sala.titulo}\nTema: ${sala.tema} · ${sala.tempoMin}min · ${sala.jogadores} jogadores · ${sala.dificuldade}\n\n${sala.projeto}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(
+      () => window.toast('📋 Projeto copiado! Cole no WhatsApp ou e-mail.', 'ok'),
+      () => _enviarWhatsFallback(texto)
+    );
+  } else {
+    _enviarWhatsFallback(texto);
+  }
+}
+function _enviarWhatsFallback(texto) {
+  const url = 'https://wa.me/?text=' + encodeURIComponent(texto.slice(0, 1500));
+  window.open(url, '_blank');
+}
+
+// ════════════════════════════════════════════════════════════════
 // INTEGRAÇÃO COM keyo-01-ui.js (abrirModulo)
 // ════════════════════════════════════════════════════════════════
-// Injeta botão "Prospecção" no painel lateral de módulos
+// [v1.5] Abre a tela do Cientista. O roteador do KEYO (keyo_abrirModulo) não
+// conhece este módulo, então fazemos a abertura aqui, no MESMO padrão usado
+// pelos outros módulos (marca ativo + atualiza header + renderiza).
+function _abrirMpros() {
+  document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('keyo-mod-mpros');
+  if (btn) btn.classList.add('active');
+
+  const emoji = document.getElementById('keyo-header-emoji');
+  const nome  = document.getElementById('keyo-header-nome');
+  const desc  = document.getElementById('keyo-header-desc');
+  if (emoji) emoji.textContent = '🔬';
+  if (nome)  nome.textContent  = 'Cientista';
+  if (desc)  desc.textContent  = 'Prospecção de leads e criação de salas de escape';
+
+  _renderInline();
+}
+
+// Injeta e mantém o botão no menu, e limpa a tela ao sair do módulo.
+// [v1.4] Reencaixa o botão sempre que o KEYO redesenha o menu (antes ele sumia).
 (function _injetarBotaoMenu() {
-  function _tentar() {
+  function _ensureBotao() {
     const modulosDiv = document.getElementById('keyo-agents-modulos');
-    if (!modulosDiv) { setTimeout(_tentar, 600); return; }
-    if (document.getElementById('keyo-mod-mpros')) return;
+    if (!modulosDiv) return false;                         // menu ainda não existe
+    if (document.getElementById('keyo-mod-mpros')) return true; // já está lá
     const btn = document.createElement('button');
     btn.className = 'keyo-mod-btn';
     btn.id        = 'keyo-mod-mpros';
-    btn.innerHTML = '<span class="keyo-mod-emoji">🎯</span><span>Prospecção</span>';
-    btn.onclick   = () => window.keyo_abrirModulo('mpros');
+    btn.innerHTML = '<span class="keyo-mod-emoji">🔬</span><span>Cientista</span>';
+    btn.onclick   = _abrirMpros;          // abre direto, sem depender do roteador do KEYO
     modulosDiv.appendChild(btn);
+    return true;
+  }
+
+  // Remove a tela do Cientista quando o usuário navegou pra fora dele
+  // (clicou num agente ou em outro módulo → botão deixa de estar 'active').
+  function _limparSeForaDoMpros() {
+    const div = document.getElementById('keyo-mpros-inline');
+    const mb  = document.getElementById('keyo-mod-mpros');
+    if (div && mb && !mb.classList.contains('active')) div.remove();
+  }
+
+  // Tenta na carga e re-tenta enquanto o container não existir
+  function _tentar() {
+    if (!_ensureBotao()) setTimeout(_tentar, 600);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _tentar);
   else _tentar();
+
+  // Mantém o botão presente e a tela coerente mesmo após re-renderizações do KEYO
+  try {
+    const _obs = new MutationObserver(() => { _ensureBotao(); _limparSeForaDoMpros(); });
+    _obs.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {
+    setInterval(() => { _ensureBotao(); _limparSeForaDoMpros(); }, 1500); // fallback
+  }
 })();
+
+// Disponível também para teste manual no console
+window.mpros_abrir = _abrirMpros;
 
 // ════════════════════════════════════════════════════════════════
 // EXPÕE GLOBALMENTE
@@ -1456,6 +1926,14 @@ window.mpros_gerarProposta  = _gerarProposta;
 window.mpros_enviarWpp      = _enviarWpp;
 window.mpros_marcarGanho    = _marcarGanho;
 
+// Função Criação (Cientista)
+window.mpros_criarSala      = _criarSala;
+window.mpros_refinarSala    = _refinarSala;
+window.mpros_verSala        = _verSala;
+window.mpros_excluirSala    = _excluirSala;
+window.mpros_imprimirSala   = _imprimirSala;
+window.mpros_enviarSala     = _enviarSala;
+
 // Registra como módulo abrível pelo keyo-01-ui
 if (!window._keyoModulos) window._keyoModulos = {};
 window._keyoModulos['mpros'] = _renderInline;
@@ -1465,7 +1943,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ MPROS Prospecção Ativa v1.3 — Etapa 7.2 (fix scoring + PNCP) carregada.');
+console.info('[KEYO-07] ✅ Cientista v1.6 — Projeção + Criação de salas carregada.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

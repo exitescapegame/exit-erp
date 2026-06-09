@@ -54,41 +54,9 @@ function _injetarMenu() {
 }
 
 function _injetarMenuDOM() {
-  function _fazerInjecao() {
-    const sbNav = document.getElementById('sbNav');
-    if (!sbNav) return false;
-    if (document.getElementById('keyo-menu-item')) return true;
-
-    const secao = document.createElement('div');
-    secao.className = 'sb-section';
-    secao.textContent = 'Inteligência';
-
-    const item = document.createElement('div');
-    item.id = 'keyo-menu-item';
-    item.className = 'sb-item';
-    item.innerHTML = '🧠 <span>KEYO · IA</span>';
-    item.style.cssText = 'cursor:pointer';
-    item.onclick = function() { window.keyo_renderTela(); };
-
-    const itens = sbNav.querySelectorAll('.sb-item');
-    const ultimo = itens[itens.length - 1];
-    if (ultimo) {
-      sbNav.insertBefore(item, ultimo);
-      sbNav.insertBefore(secao, item);
-    } else {
-      sbNav.appendChild(secao);
-      sbNav.appendChild(item);
-    }
-    console.info('[KEYO-01] ✅ Item KEYO injetado no DOM (fallback).');
-    return true;
-  }
-
-  _fazerInjecao();
-
-  const obs = new MutationObserver(function() {
-    if (!document.getElementById('keyo-menu-item')) _fazerInjecao();
-  });
-  obs.observe(document.body, { childList: true, subtree: true });
+  // MutationObserver removido — causava corrupção do sidebar do ERP ao interceptar
+  // redesenhos do rSb(). Sem MENUS[], a injeção é abortada para preservar o ERP.
+  console.warn('[KEYO-01] MENUS[] não disponível — injeção DOM abortada para preservar sidebar do ERP.');
 }
 
 // ════════════════════════════════════════════════════════════════

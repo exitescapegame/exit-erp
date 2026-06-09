@@ -12,6 +12,31 @@ if (window.__KEYO_M16_LOADED__) { console.warn('[KEYO-M16] Já carregado.'); ret
 if (!window.__KEYO_00_LOADED__) { console.error('[KEYO-M16] Core não carregado. Abortando.'); return; }
 window.__KEYO_M16_LOADED__ = true;
 
+// ── VERIFICAÇÃO DE DEPENDÊNCIAS ─────────────────────────────────
+const _DEPS = ['DB', 'UA', 'toast', 'sDB', 'uid', 'hoje', 'fM', 'san', 'isAdm'];
+const _depsFaltando = _DEPS.filter(d => typeof window[d] === 'undefined');
+if (_depsFaltando.length > 0) {
+  console.error('[KEYO-M16] Dependências ausentes:', _depsFaltando, '— módulo abortado.');
+  window.__KEYO_M16_LOADED__ = false;
+  return;
+}
+
+// ── FREEZE DE FUNÇÕES CRÍTICAS DO ERP ──────────────────────────
+const _ERP_ORIGINALS = {
+  goTo:        window.goTo,
+  renderPage:  window.renderPage,
+  rSb:         window.rSb,
+  toast:       window.toast,
+  sDB:         window.sDB,
+};
+window.addEventListener('load', function() {
+  Object.keys(_ERP_ORIGINALS).forEach(fn => {
+    if (window[fn] !== _ERP_ORIGINALS[fn]) {
+      console.error('[KEYO-M16] ⚠️ Função ERP sobrescrita indevidamente:', fn);
+    }
+  });
+}, { once: true });
+
 // ════════════════════════════════════════════════════════════════
 // CSS
 // ════════════════════════════════════════════════════════════════

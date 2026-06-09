@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v1.7
+// EXIT GAMES — KEYO UI v1.9
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v1.8: adiciona módulos Churn (M13), Propostas (M14) e KPIs (M15)
+// v1.9: FIX — _trocarAgente() agora remove inline de TODOS os módulos
+//        (m12 a m16) e para o timer M15. _abrirModulo() também limpa
+//        módulos anteriores antes de montar o novo.
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -226,6 +228,16 @@ function _keyoHTML() {
 function _abrirModulo(modulo) {
   _kAba = modulo;
 
+  // Remove inline de TODOS os módulos antes de montar o novo
+  ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
+   'keyo-m15-inline','keyo-m16-inline'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+
+  // Para o timer do M15 se estiver rodando e não for kpis
+  if (modulo !== 'kpis' && typeof window._k15Stop === 'function') window._k15Stop();
+
   // Desmarca agentes, marca módulo
   document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
@@ -374,10 +386,18 @@ function _trocarAgente(id) {
     _kAba = 'chat';
     const inputArea = document.getElementById('keyo-input-area');
     const msgs      = document.getElementById('keyo-msgs');
-    const m12area   = document.getElementById('keyo-m12-inline');
     if (inputArea) inputArea.style.display = '';
     if (msgs)      msgs.style.display      = '';
-    if (m12area)   m12area.remove();
+
+    // Remove inline de TODOS os módulos (m12 a m16)
+    ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
+     'keyo-m15-inline','keyo-m16-inline'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+
+    // Para o timer do M15 se estiver rodando
+    if (typeof window._k15Stop === 'function') window._k15Stop();
   }
 
   _kAgente = id;
@@ -634,6 +654,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.8 carregada — módulos Campanhas, Precificação, Churn, Propostas e KPIs.');
+console.info('[KEYO-01] ✅ UI v1.9 carregada — fix: módulos inline limpam corretamente ao trocar agente/módulo.');
 
 })();

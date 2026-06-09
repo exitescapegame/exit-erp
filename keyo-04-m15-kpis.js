@@ -1,22 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M15: DASHBOARD KPIs v1.4
+// EXIT GAMES — KEYO M15: DASHBOARD KPIs v1.5
 // Arquivo: keyo-04-m15-kpis.js
 // Depende de: ERP base (_setTimerSeguro, _limparTimerSeguro, san)
 // Acessa: DB.vendas, DB.clientes, DB.unidades
 // NUNCA modificar funções do ERP base. (Lei #2)
 // ───────────────────────────────────────────────────────────────
-// MUDANÇAS v1.3 → v1.4:
-//   [v1.4-A] FIX: Dashboard só aparece na tela de KPIs.
-//            3 mecanismos combinados (sem depender de variável interna):
-//            1. _k15Start() verifica o DOM — só monta se o título/item
-//               ativo do sidebar for "KPIs".
-//            2. MutationObserver em keyo-main — detecta troca de agente
-//               e chama _k15Stop() automaticamente.
-//            3. Event delegation no sidebar KEYO — ao clicar em qualquer
-//               agente diferente de KPIs, para o módulo.
-//   [v1.4-B] _k15Stop() agora remove o DOM #keyo-m15-inline e restaura
-//            keyo-msgs + keyo-input-area (reversão limpa).
-//   Toda a lógica de IA, KPIs, chat e timer permanece intacta (v1.3).
+// MUDANÇAS v1.4 → v1.5:
+//   Removidos os 3 mecanismos de guard (desnecessários).
+//   O fix correto está no keyo-01-ui.js v1.9 — _trocarAgente()
+//   e _abrirModulo() agora removem keyo-m15-inline e chamam
+//   _k15Stop() ao sair do módulo KPIs.
+//   _k15Stop() restaurado ao comportamento original limpo.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_M15() {
 'use strict';
@@ -656,19 +650,15 @@ function _k15RenderKPIs() {
   const area = document.getElementById('keyo-m15-inline');
   if (!area) return;
 
-  // [v1.3-C] não re-renderiza no meio de uma chamada nem enquanto o usuário
-  // digita no chat — senão o refresh de 60s apagaria o texto em digitação.
   const _input = document.getElementById('m15-ia-chat-input');
   const _digitando = _input && (document.activeElement === _input || (_input.value && _input.value.trim()));
   if (_iaLoading || _digitando) return;
 
-  // preserva o estado do card IA antes do re-render
   const iaResumoAntes    = _iaResumo;
   const iaHistAntes      = _iaChatHistorico.slice();
 
   area.innerHTML = _html();
 
-  // restaura o card IA se havia análise ativa
   if (iaResumoAntes) {
     _iaResumo        = iaResumoAntes;
     _iaChatHistorico = iaHistAntes;
@@ -678,193 +668,37 @@ function _k15RenderKPIs() {
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// [v1.4-A] HELPER — detecta se KPIs é o agente/módulo atualmente ativo
-// Verifica o DOM diretamente, sem depender de variável interna do core.
-// ════════════════════════════════════════════════════════════════
-function _k15EhAgenteAtivo() {
-  // Estratégia 1: item "KPIs" no sidebar com classe que indica seleção
-  // (o core geralmente aplica 'active', 'selected', 'ativo' ou similar)
-  const sidebarItems = document.querySelectorAll(
-    '[data-agent], [data-modulo], [data-id], .keyo-agent-item, .keyo-nav-item, .k-agent'
-  );
-  for (const el of sidebarItems) {
-    const id = el.dataset.agent || el.dataset.modulo || el.dataset.id || '';
-    if (id === 'kpis' && (el.classList.contains('active') || el.classList.contains('ativo') || el.classList.contains('selected'))) {
-      return true;
-    }
-  }
-
-  // Estratégia 2: procurar qualquer elemento com texto "KPIs" que esteja ativo
-  const todosNavItems = document.querySelectorAll('.keyo-nav li, .keyo-sidebar li, #keyo-nav li, #keyo-agents li, .agent-list li, .k-nav-item');
-  for (const el of todosNavItems) {
-    if (/^kpis$/i.test((el.textContent || '').trim()) || /^kpis$/i.test((el.dataset.id || ''))) {
-      if (el.classList.contains('active') || el.classList.contains('ativo') || el.classList.contains('selected') || el.getAttribute('aria-selected') === 'true') {
-        return true;
-      }
-    }
-  }
-
-  // Estratégia 3: verificar o heading/título da área de conteúdo keyo
-  const heading = document.querySelector('#keyo-main h2, #keyo-content h2, .keyo-header h2, #keyo-agent-title');
-  if (heading && /kpis/i.test(heading.textContent)) return true;
-
-  // Estratégia 4: verificar variáveis comuns que o core pode usar
-  const vars = ['_kAgent', '_keyoAgent', '_agenteAtivo', '_currentAgent', 'KEYO_AGENT_ATIVO'];
-  for (const v of vars) {
-    const val = window[v];
-    if (typeof val === 'string' && val.toLowerCase() === 'kpis') return true;
-    if (typeof val === 'object' && val && val.id && val.id.toLowerCase() === 'kpis') return true;
-  }
-
-  // Estratégia 5: o próprio painel inline ainda existe e está visível
-  const inline = document.getElementById('keyo-m15-inline');
-  if (inline && inline.offsetParent !== null) return true;
-
-  return false;
-}
-
-// [v1.4-A] _k15Start — só monta se KPIs for o agente ativo
 function _k15Start() {
-  // Guard DOM: só monta se o agente ativo for KPIs
-  // (pequeno delay para o core terminar de marcar o item como ativo)
-  const montar = function() {
-    const anterior = document.getElementById('keyo-m15-inline');
-    if (anterior) anterior.remove();
+  const anterior = document.getElementById('keyo-m15-inline');
+  if (anterior) anterior.remove();
 
-    const msgs      = document.getElementById('keyo-msgs');
-    const inputArea = document.getElementById('keyo-input-area');
-    if (msgs)      msgs.style.display      = 'none';
-    if (inputArea) inputArea.style.display = 'none';
-
-    const main = document.getElementById('keyo-main');
-    if (!main) return;
-
-    const area = document.createElement('div');
-    area.id = 'keyo-m15-inline';
-    area.style.cssText = 'flex:1;overflow-y:auto';
-    area.innerHTML = _html();
-    main.appendChild(area);
-
-    window._setTimerSeguro('m15-refresh', _k15RenderKPIs, 60000, true);
-    console.info('[KEYO-M15] Dashboard KPIs montado.');
-  };
-
-  // Executa imediatamente (chamada direta pelo core/sidebar)
-  montar();
-}
-
-// [v1.4-B] _k15Stop — para timer E limpa DOM completamente
-function _k15Stop() {
-  window._limparTimerSeguro('m15-refresh');
-
-  // Remove painel do DOM
-  const area = document.getElementById('keyo-m15-inline');
-  if (area) area.remove();
-
-  // Restaura chat padrão do core
   const msgs      = document.getElementById('keyo-msgs');
   const inputArea = document.getElementById('keyo-input-area');
-  if (msgs)      msgs.style.display      = '';
-  if (inputArea) inputArea.style.display = '';
+  if (msgs)      msgs.style.display      = 'none';
+  if (inputArea) inputArea.style.display = 'none';
 
-  console.info('[KEYO-M15] Dashboard KPIs desmontado.');
+  const main = document.getElementById('keyo-main');
+  if (!main) return;
+
+  const area = document.createElement('div');
+  area.id = 'keyo-m15-inline';
+  area.style.cssText = 'flex:1;overflow-y:auto';
+  area.innerHTML = _html();
+  main.appendChild(area);
+
+  window._setTimerSeguro('m15-refresh', _k15RenderKPIs, 60000, true);
 }
 
-// ════════════════════════════════════════════════════════════════
-// [v1.4-A] MECANISMO 2: MutationObserver em keyo-main
-// Detecta quando o core troca o conteúdo (renderiza outro agente)
-// e garante que o M15 seja removido se não for mais o agente ativo.
-// ════════════════════════════════════════════════════════════════
-(function _instalarObserver() {
-  let _obs = null;
-
-  function _iniciarObserver() {
-    const main = document.getElementById('keyo-main');
-    if (!main || _obs) return;
-
-    _obs = new MutationObserver(function() {
-      // Se o painel existe mas KPIs não é mais o agente ativo → parar
-      const inline = document.getElementById('keyo-m15-inline');
-      if (inline && !_k15EhAgenteAtivo()) {
-        console.info('[KEYO-M15] MutationObserver: agente trocado → _k15Stop()');
-        _k15Stop();
-      }
-    });
-
-    _obs.observe(main, { childList: true, subtree: false });
-    console.info('[KEYO-M15] MutationObserver instalado em #keyo-main.');
-  }
-
-  // Tenta instalar agora; se keyo-main não existe ainda, aguarda
-  _iniciarObserver();
-  if (!_obs) {
-    window.addEventListener('load', _iniciarObserver, { once: true });
-    setTimeout(_iniciarObserver, 800);
-  }
-})();
-
-// ════════════════════════════════════════════════════════════════
-// [v1.4-A] MECANISMO 3: Event delegation no sidebar KEYO
-// Ao clicar em qualquer item de agente que NÃO seja KPIs,
-// para o módulo imediatamente — sem depender de variável interna.
-// ════════════════════════════════════════════════════════════════
-(function _instalarEventDelegation() {
-  function _handler(e) {
-    const inline = document.getElementById('keyo-m15-inline');
-    if (!inline) return; // M15 não está montado, nada a fazer
-
-    // Encontra o item clicado mais próximo que seja um item de navegação
-    const alvo = e.target.closest(
-      '[data-agent], [data-modulo], [data-id], .keyo-agent-item, .keyo-nav-item, .k-agent, .k-nav-item, #keyo-nav li, #keyo-agents li, .agent-list li'
-    );
-    if (!alvo) return;
-
-    const id = (alvo.dataset.agent || alvo.dataset.modulo || alvo.dataset.id || alvo.textContent || '').trim().toLowerCase();
-
-    // Se clicou em algo que não é kpis → para o M15
-    if (id && id !== 'kpis' && !id.includes('kpis')) {
-      console.info('[KEYO-M15] Clique em "' + id + '" detectado → _k15Stop()');
-      _k15Stop();
-    }
-  }
-
-  function _instalar() {
-    // Instala no container keyo se existir, senão no document
-    const container = document.getElementById('keyo-sidebar') ||
-                      document.getElementById('keyo-nav') ||
-                      document.getElementById('keyo-agents') ||
-                      document.querySelector('.keyo-sidebar, .k-sidebar, #keyo-wrap');
-
-    if (container && !container.__m15delegation__) {
-      container.addEventListener('click', _handler, true); // capture para pegar antes do core
-      container.__m15delegation__ = true;
-      console.info('[KEYO-M15] Event delegation instalado em', container.id || container.className);
-    } else if (!container) {
-      // Fallback: instala no document com filtro por área keyo
-      if (!document.__m15delegation__) {
-        document.addEventListener('click', function(e) {
-          // Só age se o clique for dentro da área keyo
-          const keyoArea = e.target.closest('#keyo-wrap, #keyo-sidebar, .keyo-container, [id^="keyo"]');
-          if (keyoArea) _handler(e);
-        }, true);
-        document.__m15delegation__ = true;
-        console.info('[KEYO-M15] Event delegation instalado no document (fallback).');
-      }
-    }
-  }
-
-  _instalar();
-  window.addEventListener('load', _instalar, { once: true });
-  setTimeout(_instalar, 800);
-})();
+function _k15Stop() {
+  window._limparTimerSeguro('m15-refresh');
+}
 
 // ════════════════════════════════════════════════════════════════
 // AÇÕES DE PERÍODO
 // ════════════════════════════════════════════════════════════════
 function _setPeriodo(p) {
   _periodo  = p;
-  _iaResumo = null;          // novo período invalida análise anterior
+  _iaResumo = null;
   _iaChatHistorico = [];
   _k15RenderKPIs();
 }
@@ -872,7 +706,7 @@ function _setPeriodo(p) {
 // ════════════════════════════════════════════════════════════════
 // EXPÕE GLOBALMENTE
 // ════════════════════════════════════════════════════════════════
-window._m15RenderInline  = _k15Start;       // compatibilidade
+window._m15RenderInline  = _k15Start;
 window._k15Start         = _k15Start;
 window._k15Stop          = _k15Stop;
 window._k15CalcKPIs      = _k15CalcKPIs;
@@ -882,6 +716,6 @@ window.m15_analisar      = _k15AnalisarIA;
 window.m15_chat_enviar   = _k15ChatEnviar;
 window.m15_chat_keydown  = _k15ChatKeydown;
 
-console.info('[KEYO-M15] ✅ M15 Dashboard KPIs v1.4 carregado (3 mecanismos de guard ativos).');
+console.info('[KEYO-M15] ✅ M15 Dashboard KPIs v1.5 carregado.');
 
 })();

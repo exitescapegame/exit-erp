@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.6 (Cientista: Projeção + Criação de salas)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.7 (Cientista: fix HTTP 400 apikey + campos dinâmicos)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -148,6 +148,26 @@ function _jwt() {
     return JSON.parse(localStorage.getItem('exit_unidade_session') || '{}')?.access_token
       || window._keyoToken || window.SUPA_KEY || window.KEYO_ANON_KEY || '';
   } catch (e) { return window.KEYO_ANON_KEY || ''; }
+}
+
+// ── Cabeçalhos da chamada à IA ──────────────────────────────────
+// Espelha EXATAMENTE o que o chat do KEYO (_enviar) envia, incluindo o
+// cabeçalho 'apikey' — sem ele o super-action recusa com HTTP 400.
+function _keyoHeaders() {
+  let jwt = '';
+  try {
+    const erpSession = JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
+    jwt = erpSession?.access_token || '';
+    if (!jwt && window._keyoToken) jwt = window._keyoToken;
+    if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+  } catch (e) {
+    jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+  }
+  return {
+    'Content-Type':  'application/json',
+    'Authorization': 'Bearer ' + jwt,
+    'apikey':        window.KEYO_ANON_KEY || '',
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1067,10 +1087,7 @@ Critérios de baixo (0-39): sem relevância óbvia para escape room, sem dados d
   try {
     const resp = await fetch(SUPA_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: _keyoHeaders(),
       body: JSON.stringify({
         agente:     'mkt',                          // agente comercial (mesmo do m14)
         mensagem:   `${promptSistema}\n\n${promptUsuario}`,
@@ -1540,21 +1557,12 @@ function _htmlCriacao() {
       <select id="cri-tema">${opTemas}</select>
     </div>
     <div class="cri-campo">
-      <label>Duração do jogo</label>
-      <select id="cri-tempo">
-        <option value="45">45 minutos</option>
-        <option value="60" selected>60 minutos</option>
-        <option value="75">75 minutos</option>
-        <option value="90">90 minutos</option>
-      </select>
+      <label>Duração do jogo (minutos)</label>
+      <input type="number" id="cri-tempo" value="60" min="15" max="240" step="5" placeholder="Ex: 60">
     </div>
     <div class="cri-campo">
       <label>Jogadores</label>
-      <select id="cri-jogadores">
-        <option value="2 a 4">2 a 4</option>
-        <option value="3 a 6" selected>3 a 6</option>
-        <option value="4 a 8">4 a 8</option>
-      </select>
+      <input type="text" id="cri-jogadores" value="3 a 6" placeholder="Ex: 2 a 6, ou 4 pessoas">
     </div>
     <div class="cri-campo">
       <label>Dificuldade</label>
@@ -1648,12 +1656,11 @@ Responda em PORTUGUÊS, em texto estruturado EXATAMENTE neste formato (use os t�
 // ── Chamada à IA (mesmo canal/formato do scoring que funciona) ──
 async function _chamarCientista(sistema, usuario) {
   const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/super-action';
-  const token    = _jwt();
   const unidade  = (window.UA && (window.UA.unidade || window.UA.unidadeId)) || 1;
 
   const resp = await fetch(SUPA_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    headers: _keyoHeaders(),
     body: JSON.stringify({
       agente:     'mkt',                       // canal existente; o cérebro vai na mensagem
       mensagem:   `${sistema}\n\n${usuario}`,
@@ -1943,7 +1950,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v1.6 — Projeção + Criação de salas carregada.');
+console.info('[KEYO-07] ✅ Cientista v1.7 — fix HTTP 400 (apikey) + campos dinâmicos carregada.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

@@ -3,7 +3,7 @@
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v1.7: adiciona módulo Precificação na seção Módulos
+// v1.8: adiciona módulos Churn (M13), Propostas (M14) e KPIs (M15)
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -634,6 +634,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.7 carregada — módulos Campanhas e Precificação.');
+console.info('[KEYO-01] ✅ UI v1.8 carregada — módulos Campanhas, Precificação, Churn, Propostas e KPIs.');
 
 })();

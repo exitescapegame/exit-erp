@@ -323,8 +323,8 @@ Regras:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (window.SUPA_KEY || ''),
-        'apikey': window.SUPA_KEY || '',
+        'Authorization': 'Bearer ' + (SUPA_KEY || ''),
+        'apikey': SUPA_KEY || '',
       },
       body: JSON.stringify({
         agente: 'fin',
@@ -489,8 +489,8 @@ Você é o analista financeiro da EXIT GAMES. Responda de forma direta e objetiv
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (window.SUPA_KEY || ''),
-        'apikey': window.SUPA_KEY || '',
+        'Authorization': 'Bearer ' + (SUPA_KEY || ''),
+        'apikey': SUPA_KEY || '',
       },
       body: JSON.stringify({
         agente: 'fin',

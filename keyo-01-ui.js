@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v1.6
+// EXIT GAMES — KEYO UI v1.7
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v1.6: aba Campanhas abaixo dos agentes no painel lateral
+// v1.7: adiciona módulo Precificação na seção Módulos
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -160,6 +160,11 @@ function _keyoHTML() {
         <span class="keyo-mod-emoji">📅</span>
         <span>Campanhas</span>
       </button>
+      <button class="keyo-mod-btn" id="keyo-mod-precos"
+              onclick="window.keyo_abrirModulo('precos')">
+        <span class="keyo-mod-emoji">💰</span>
+        <span>Precificação</span>
+      </button>
     </div>
   </div>
 
@@ -220,8 +225,7 @@ function _abrirModulo(modulo) {
     // Renderiza M12 se disponível
     if (typeof window._k12RenderAgendadorInline === 'function') {
       window._k12RenderAgendadorInline();
-    } else if (typeof window.__KEYO_M12_LOADED__ !== 'undefined') {
-      // M12 carregado mas sem função inline — fallback
+    } else if (typeof window.__KEYO_M12_LOADED__ !== 'undefined') {      // M12 carregado mas sem função inline — fallback
       const main = document.getElementById('keyo-msgs');
       if (main) {
         main.style.display = 'block';
@@ -232,6 +236,30 @@ function _abrirModulo(modulo) {
       if (main) {
         main.style.display = 'block';
         main.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de campanhas não encontrado.</div>';
+      }
+    }
+  }
+
+  if (modulo === 'precos') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '💰';
+    if (nome)  nome.textContent  = 'Precificação';
+    if (desc)  desc.textContent  = 'Calculadora de preços para grupos';
+
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+
+    if (typeof window._m16RenderInline === 'function') {
+      window._m16RenderInline();
+    } else {
+      const main = document.getElementById('keyo-msgs');
+      if (main) {
+        main.style.display = 'block';
+        main.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de precificação não encontrado.</div>';
       }
     }
   }
@@ -530,6 +558,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.6 carregada — aba Campanhas no painel lateral.');
+console.info('[KEYO-01] ✅ UI v1.7 carregada — módulos Campanhas e Precificação.');
 
 })();

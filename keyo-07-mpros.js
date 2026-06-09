@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.0
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.1 (Etapa 7.2)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -916,10 +916,15 @@ function _gerarProposta(id) {
   }, 1500);
 }
 
+
+
 // ════════════════════════════════════════════════════════════════
-// MOTOR DE BUSCA — agendamento diário (meia-noite)
-// Implementação real das buscas nas Etapas 7.2, 7.3 e 7.4
+// ETAPA 7.2 — MOTOR DE BUSCA REAL
+// Fontes: Nominatim/OSM · Google Places (opcional) · PNCP (licitações)
+// Scoring: via Supabase Edge Function (super-action) com IA
 // ════════════════════════════════════════════════════════════════
+
+// ── Agendamento diário (meia-noite) ─────────────────────────────
 let _motorTimer = null;
 
 function _agendarMotor() {
@@ -928,21 +933,383 @@ function _agendarMotor() {
 
   const agora     = new Date();
   const meianoite = new Date(agora);
-  meianoite.setHours(24, 0, 0, 0); // próxima meia-noite
+  meianoite.setHours(24, 0, 0, 0);
 
   const ms = meianoite - agora;
   _motorTimer = setTimeout(async function () {
     if (_config().ativo !== false) {
       console.info('[KEYO-07] 🌙 Motor noturno iniciando rodada automática...');
-      await window.mpros_rodarAgora(true); // silencioso
+      await _rodarAgora(true);
     }
-    _agendarMotor(); // reagenda para o próximo dia
+    _agendarMotor();
   }, ms);
 
-  console.info(`[KEYO-07] ⏰ Próxima rodada automática em ${Math.round(ms/3600000)}h`);
+  console.info(`[KEYO-07] ⏰ Próxima rodada automática em ${Math.round(ms / 3600000)}h`);
 }
 
-// Stub do motor — implementação real nas Etapas 7.2/7.3/7.4
+// ── Helpers de progresso ─────────────────────────────────────────
+function _setProgress(pct) {
+  const fill = document.getElementById('mpros-progress-fill');
+  if (fill) fill.style.width = pct + '%';
+}
+function _showProgress() {
+  const bar = document.getElementById('mpros-progress-bar');
+  if (bar) { bar.style.display = 'block'; _setProgress(5); }
+}
+function _hideProgress() {
+  const bar = document.getElementById('mpros-progress-bar');
+  _setProgress(100);
+  setTimeout(() => { if (bar) bar.style.display = 'none'; _setProgress(0); }, 700);
+}
+
+// ── Deduplicação ─────────────────────────────────────────────────
+// Evita inserir leads com mesmo nome/CNPJ já existentes em DB.keyoLeads
+function _isDuplicado(lead) {
+  const existentes = _leads();
+  const nome = (lead.titulo || lead.nome || '').toLowerCase().trim();
+  const cnpj = (lead.cnpj || '').replace(/\D/g, '');
+  return existentes.some(e => {
+    const eNome = (e.titulo || e.nome || '').toLowerCase().trim();
+    const eCnpj = (e.cnpj || '').replace(/\D/g, '');
+    if (cnpj && eCnpj && cnpj === eCnpj) return true;
+    if (nome && eNome && eNome === nome) return true;
+    return false;
+  });
+}
+
+// ── Scoring com IA (Supabase Edge Function) ──────────────────────
+// Envia lote de leads brutos e recebe score/potencial/justificativa
+async function _scorarLote(leadesBrutos) {
+  if (!leadesBrutos.length) return [];
+
+  const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/super-action';
+  const token    = _jwt();
+
+  const promptSistema = `Você é o agente de scoring do KEYO, sistema de prospecção da EXIT GAMES (rede de escape rooms em Aracaju/SE e Salvador/BA).
+Para cada lead recebido, avalie o potencial comercial para venda de experiências de escape room (team building, confraternização, eventos corporativos, escolas, competições).
+
+Responda SOMENTE com um array JSON válido, sem markdown, sem texto fora do JSON.
+Cada item do array deve ter exatamente estes campos:
+  "idx": número do índice (0-based, igual ao recebido),
+  "score": número de 0 a 100 (quanto maior, maior potencial),
+  "potencial": "alto" | "medio" | "baixo",
+  "justificativa": string curta (até 100 caracteres) explicando o score.
+
+Critérios de alto potencial (score 70-100):
+- Empresas com 50+ funcionários (team building)
+- Escolas / colégios / faculdades (grupos)
+- Prefeituras / órgãos públicos com licitações abertas
+- Federações, sindicatos, associações (eventos)
+- SEBRAE, SENAC, SESC (cursos + eventos)
+
+Critérios de médio (40-69): empresas menores, eventos genéricos, sem dados claros de tamanho.
+Critérios de baixo (0-39): sem relevância óbvia para escape room, sem dados de contato, muito distante.`;
+
+  const promptUsuario = `Avalie estes leads e retorne SOMENTE o array JSON:\n${JSON.stringify(
+    leadesBrutos.map((l, i) => ({
+      idx: i,
+      titulo: l.titulo || l.nome,
+      categoria: l.categoria,
+      descricao: l.descricao,
+      localizacao: l.localizacao || l.municipio,
+      uf: l.uf,
+      contato: l.contato,
+    }))
+  )}`;
+
+  try {
+    const resp = await fetch(SUPA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action: 'chat',
+        messages: [{ role: 'user', content: promptUsuario }],
+        system: promptSistema,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!resp.ok) throw new Error(`Supabase HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // Extrai texto da resposta (compatível com formato super-action)
+    let texto = '';
+    if (typeof data.response === 'string') texto = data.response;
+    else if (Array.isArray(data.content))  texto = data.content.map(c => c.text || '').join('');
+    else if (data.message)                 texto = data.message;
+    else                                   texto = JSON.stringify(data);
+
+    // Remove possíveis blocos markdown
+    texto = texto.replace(/```json|```/gi, '').trim();
+
+    const scores = JSON.parse(texto);
+    if (!Array.isArray(scores)) throw new Error('Resposta não é array');
+
+    // Mescla de volta nos leads brutos
+    return leadesBrutos.map((lead, i) => {
+      const s = scores.find(x => x.idx === i) || {};
+      return Object.assign({}, lead, {
+        score:        Number(s.score)      || 30,
+        potencial:    ['alto','medio','baixo'].includes(s.potencial) ? s.potencial : 'baixo',
+        justificativa: s.justificativa     || '',
+      });
+    });
+  } catch (err) {
+    console.warn('[KEYO-07] ⚠️ Scoring IA falhou, usando padrão baixo:', err.message);
+    // Fallback: scoring básico local
+    return leadesBrutos.map(lead => Object.assign({}, lead, {
+      score:        lead.categoria === 'licitacao' ? 65 : 30,
+      potencial:    lead.categoria === 'licitacao' ? 'medio' : 'baixo',
+      justificativa: 'Scoring automático (IA indisponível)',
+    }));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// FONTE 1: NOMINATIM / OpenStreetMap
+// Busca negócios relevantes próximos a Aracaju e Salvador
+// ════════════════════════════════════════════════════════════════
+async function _buscarNominatim() {
+  const leads = [];
+
+  // Termos de busca relevantes para EXIT GAMES
+  const TERMOS = [
+    'escola', 'colegio', 'faculdade', 'universidade',
+    'empresa', 'escritorio', 'sindicato', 'associação',
+    'federação', 'clube', 'sebrae', 'senac', 'sesc',
+  ];
+  // Cidades alvo (lat, lon, label)
+  const CIDADES = [
+    { lat: -10.9472, lon: -37.0731, label: 'Aracaju', uf: 'SE', unidadeId: '1' },
+    { lat: -12.9714, lon: -38.5014, label: 'Salvador', uf: 'BA', unidadeId: '2' },
+  ];
+
+  // Pega 2 termos aleatórios por rodada para variar
+  const termosSelecionados = TERMOS.sort(() => Math.random() - 0.5).slice(0, 2);
+
+  for (const cidade of CIDADES) {
+    for (const termo of termosSelecionados) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(termo + ' ' + cidade.label)}&` +
+          `format=json&limit=5&addressdetails=1&extratags=1&` +
+          `countrycodes=br&bounded=1&` +
+          `viewbox=${cidade.lon - 0.3},${cidade.lat + 0.3},${cidade.lon + 0.3},${cidade.lat - 0.3}`;
+
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'KEYO-MPROS/1.1 EXIT-GAMES (contato@exitgames.com.br)' }
+        });
+        if (!resp.ok) continue;
+        const items = await resp.json();
+
+        for (const item of items) {
+          if (!item.display_name) continue;
+          const nome = item.namedetails?.name || item.display_name.split(',')[0];
+          // Infere categoria pelo tipo OSM
+          let categoria = 'empresa_regional';
+          const tipo = (item.type || '') + ' ' + (item.class || '');
+          if (/school|college|university|educação/i.test(tipo)) categoria = 'escola';
+          else if (/association|club|federation/i.test(tipo))   categoria = 'federacao';
+
+          leads.push({
+            id:          window.uid ? window.uid() : ('nom_' + Math.random().toString(36).slice(2)),
+            titulo:      nome,
+            tipo:        item.type || 'place',
+            categoria,
+            descricao:   item.display_name,
+            fonte:       'Nominatim/OSM',
+            contato:     {
+              site:      item.extratags?.website || '',
+              whatsapp:  item.extratags?.phone   || '',
+              email:     item.extratags?.email   || '',
+            },
+            localizacao: cidade.label,
+            uf:          cidade.uf,
+            municipio:   cidade.label,
+            unidadeId:   cidade.unidadeId,
+            semana:      _semanaISO(),
+            rodada:      (_config().rodadaNumero || 0) + 1,
+            status:      'fila',
+            criadoEm:    new Date().toISOString(),
+          });
+        }
+
+        // Respeita rate limit do Nominatim (1 req/s)
+        await new Promise(r => setTimeout(r, 1100));
+      } catch (err) {
+        console.warn(`[KEYO-07] Nominatim falhou (${termo}/${cidade.label}):`, err.message);
+      }
+    }
+  }
+
+  console.info(`[KEYO-07] 📍 Nominatim: ${leads.length} resultados brutos`);
+  return leads;
+}
+
+// ════════════════════════════════════════════════════════════════
+// FONTE 2: GOOGLE PLACES (opcional — só se chave configurada)
+// ════════════════════════════════════════════════════════════════
+async function _buscarGooglePlaces() {
+  const cfg = _config();
+  if (!cfg.googlePlacesKey) return [];
+
+  const leads = [];
+  const KEY   = cfg.googlePlacesKey;
+  const TIPOS = ['school', 'university', 'corporate_office', 'association_or_organization'];
+  const CIDADES = [
+    { lat: -10.9472, lon: -37.0731, label: 'Aracaju', uf: 'SE', unidadeId: '1' },
+    { lat: -12.9714, lon: -38.5014, label: 'Salvador', uf: 'BA', unidadeId: '2' },
+  ];
+
+  for (const cidade of CIDADES) {
+    for (const tipo of TIPOS.slice(0, 2)) { // máx 2 por rodada
+      try {
+        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?` +
+          `location=${cidade.lat},${cidade.lon}&radius=8000&type=${tipo}&language=pt-BR&key=${KEY}`;
+
+        const resp = await fetch(url);
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+          console.warn('[KEYO-07] Google Places status:', data.status);
+          continue;
+        }
+
+        for (const place of (data.results || []).slice(0, 4)) {
+          // Busca detalhes (telefone, site)
+          let contato = { site: '', whatsapp: '', email: '' };
+          try {
+            const det = await fetch(
+              `https://maps.googleapis.com/maps/api/place/details/json?` +
+              `place_id=${place.place_id}&fields=name,formatted_phone_number,website&key=${KEY}`
+            );
+            if (det.ok) {
+              const detData = await det.json();
+              contato.whatsapp = detData.result?.formatted_phone_number || '';
+              contato.site     = detData.result?.website || '';
+            }
+          } catch (_) { /* ignora */ }
+
+          let categoria = 'empresa_regional';
+          if (/school|university/i.test(tipo))   categoria = 'escola';
+          if (/association/i.test(tipo))          categoria = 'federacao';
+
+          leads.push({
+            id:          window.uid ? window.uid() : ('gpl_' + Math.random().toString(36).slice(2)),
+            titulo:      place.name,
+            tipo,
+            categoria,
+            descricao:   place.vicinity || place.formatted_address || '',
+            fonte:       'Google Places',
+            contato,
+            localizacao: cidade.label,
+            uf:          cidade.uf,
+            municipio:   cidade.label,
+            unidadeId:   cidade.unidadeId,
+            semana:      _semanaISO(),
+            rodada:      (_config().rodadaNumero || 0) + 1,
+            status:      'fila',
+            criadoEm:    new Date().toISOString(),
+          });
+
+          await new Promise(r => setTimeout(r, 300));
+        }
+      } catch (err) {
+        console.warn(`[KEYO-07] Google Places falhou (${tipo}/${cidade.label}):`, err.message);
+      }
+    }
+  }
+
+  console.info(`[KEYO-07] 🗺️ Google Places: ${leads.length} resultados brutos`);
+  return leads;
+}
+
+// ════════════════════════════════════════════════════════════════
+// FONTE 3: PNCP — Portal Nacional de Contratações Públicas
+// Licitações abertas com objeto relacionado a eventos/serviços
+// ════════════════════════════════════════════════════════════════
+async function _buscarPNCP() {
+  const leads = [];
+
+  // Termos de busca no objeto da licitação
+  const TERMOS_PNCP = ['evento', 'confraternização', 'capacitação', 'treinamento', 'lazer'];
+  // UFs alvo
+  const UFS = ['SE', 'BA'];
+
+  for (const uf of UFS) {
+    for (const termo of TERMOS_PNCP.slice(0, 2)) {
+      try {
+        const hoje     = new Date();
+        const dataFim  = hoje.toISOString().slice(0, 10).replace(/-/g, '');
+        const dataIni  = new Date(hoje - 30 * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+
+        const url = `https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?` +
+          `dataInicial=${dataIni}&dataFinal=${dataFim}` +
+          `&uf=${uf}&pagina=1&tamanhoPagina=10`;
+
+        const resp = await fetch(url, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!resp.ok) {
+          console.warn('[KEYO-07] PNCP HTTP', resp.status, 'para', uf);
+          continue;
+        }
+        const data = await resp.json();
+        const itens = data.data || data.content || data || [];
+
+        for (const item of (Array.isArray(itens) ? itens : []).slice(0, 5)) {
+          const objeto = (item.objetoCompra || item.descricao || '').toLowerCase();
+          // Filtra só os relevantes para EXIT GAMES
+          const relevante = TERMOS_PNCP.some(t => objeto.includes(t));
+          if (!relevante) continue;
+
+          const orgao   = item.orgaoEntidade?.razaoSocial || item.nomeUnidadeOrgao || 'Órgão Público';
+          const municipio = item.municipioNome || item.municipio || (uf === 'SE' ? 'Aracaju' : 'Salvador');
+
+          leads.push({
+            id:          window.uid ? window.uid() : ('pncp_' + Math.random().toString(36).slice(2)),
+            titulo:      `[Licitação] ${orgao}`,
+            tipo:        'licitacao',
+            categoria:   'licitacao',
+            descricao:   item.objetoCompra || item.descricao || '',
+            fonte:       'PNCP',
+            cnpj:        item.orgaoEntidade?.cnpj || '',
+            contato:     {
+              site:      item.linkSistemaOrigem || `https://pncp.gov.br`,
+              whatsapp:  '',
+              email:     '',
+            },
+            localizacao: municipio,
+            uf,
+            municipio,
+            unidadeId:   uf === 'SE' ? '1' : '2',
+            semana:      _semanaISO(),
+            rodada:      (_config().rodadaNumero || 0) + 1,
+            status:      'fila',
+            criadoEm:    new Date().toISOString(),
+            // Dados extras da licitação
+            pncpNumero:  item.numeroControlePNCP || '',
+            valorEstimado: item.valorTotalEstimado || 0,
+          });
+        }
+
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.warn(`[KEYO-07] PNCP falhou (${uf}/${termo}):`, err.message);
+      }
+    }
+  }
+
+  console.info(`[KEYO-07] 🏛️ PNCP: ${leads.length} licitações relevantes`);
+  return leads;
+}
+
+// ════════════════════════════════════════════════════════════════
+// MOTOR PRINCIPAL — _rodarAgora
+// ════════════════════════════════════════════════════════════════
 async function _rodarAgora(silencioso = false) {
   const cfg = _config();
   if (cfg.ativo === false && !silencioso) {
@@ -953,35 +1320,105 @@ async function _rodarAgora(silencioso = false) {
   const btnRodar = document.getElementById('mpros-btn-rodar');
   if (btnRodar) { btnRodar.disabled = true; btnRodar.textContent = '⏳ Buscando...'; }
 
-  // Mostra barra de progresso
-  const bar  = document.getElementById('mpros-progress-bar');
-  const fill = document.getElementById('mpros-progress-fill');
-  if (bar)  bar.style.display  = 'block';
-  if (fill) fill.style.width   = '10%';
-
+  _showProgress();
   if (!silencioso) window.toast('🔍 Iniciando rodada de prospecção...', 'info');
 
   try {
-    // Etapas 7.2/7.3/7.4 implementarão as buscas reais aqui
-    // Por ora registra a rodada
-    cfg.ultimaRodada  = new Date().toISOString();
-    cfg.rodadaNumero  = (cfg.rodadaNumero || 0) + 1;
+    // ── FASE 1: Buscas em paralelo (Nominatim + Google + PNCP) ───
+    _setProgress(15);
+    if (!silencioso) window.toast('📡 Buscando em Nominatim, Google Places e PNCP...', 'info');
+
+    const [leadsNominatim, leadsGoogle, leadsPNCP] = await Promise.all([
+      _buscarNominatim(),
+      _buscarGooglePlaces(),
+      _buscarPNCP(),
+    ]);
+
+    _setProgress(50);
+
+    // ── FASE 2: Mescla e deduplicação ────────────────────────────
+    let todosBrutos = [...leadsNominatim, ...leadsGoogle, ...leadsPNCP];
+
+    // Remove duplicatas entre si (pelo título)
+    const vistos = new Set();
+    todosBrutos = todosBrutos.filter(l => {
+      const chave = (l.titulo || l.nome || '').toLowerCase().trim();
+      if (!chave || vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+
+    // Remove leads já existentes no DB
+    todosBrutos = todosBrutos.filter(l => !_isDuplicado(l));
+
+    // Respeita limite da rodada
+    const max = cfg.maxLeadsPorRodada || 10;
+    todosBrutos = todosBrutos.slice(0, max);
+
+    console.info(`[KEYO-07] 🔎 ${todosBrutos.length} leads únicos após deduplicação`);
+
+    if (!todosBrutos.length) {
+      if (!silencioso) window.toast('ℹ️ Nenhum lead novo encontrado nesta rodada.', 'info');
+      cfg.ultimaRodada = new Date().toISOString();
+      cfg.rodadaNumero = (cfg.rodadaNumero || 0) + 1;
+      if (typeof window.sDB === 'function') window.sDB();
+      _hideProgress();
+      if (document.getElementById('mpros-wrap')) { _atualizarAbas(); _renderAba(_abaAtiva); }
+      return;
+    }
+
+    // ── FASE 3: Scoring com IA ───────────────────────────────────
+    _setProgress(65);
+    if (!silencioso) window.toast('🤖 Avaliando potencial dos leads com IA...', 'info');
+
+    const leadsComScore = await _scorarLote(todosBrutos);
+
+    // ── FASE 4: Filtra só médio e alto (descarta baixo automaticamente) ──
+    _setProgress(85);
+    const leadsFiltrados = leadsComScore.filter(l => l.potencial !== 'baixo');
+    const descartadosAuto = leadsComScore.length - leadsFiltrados.length;
+
+    // ── FASE 5: Salva no DB ──────────────────────────────────────
+    for (const lead of leadsFiltrados) {
+      window.DB.keyoLeads.push(lead);
+    }
+
+    cfg.ultimaRodada = new Date().toISOString();
+    cfg.rodadaNumero = (cfg.rodadaNumero || 0) + 1;
+    cfg.leadsHoje    = (cfg.leadsHoje || 0) + leadsFiltrados.length;
+
     if (typeof window.sDB === 'function') window.sDB();
 
-    if (fill) fill.style.width = '100%';
-    setTimeout(() => { if (bar) bar.style.display = 'none'; }, 800);
+    _hideProgress();
 
-    if (!silencioso) window.toast('✅ Estrutura do motor pronta — buscas reais na próxima etapa!', 'ok');
+    const altos  = leadsFiltrados.filter(l => l.potencial === 'alto').length;
+    const medios = leadsFiltrados.filter(l => l.potencial === 'medio').length;
 
-    // Atualiza UI se estiver na tela
+    if (!silencioso) {
+      window.toast(
+        `✅ Rodada #${cfg.rodadaNumero} concluída! ` +
+        `${leadsFiltrados.length} leads: 🔴${altos} altos · 🟡${medios} médios · ` +
+        `${descartadosAuto} descartados automaticamente.`,
+        'ok'
+      );
+    }
+
+    console.info(
+      `[KEYO-07] ✅ Rodada #${cfg.rodadaNumero}: ` +
+      `${leadsComScore.length} avaliados → ${leadsFiltrados.length} salvos ` +
+      `(${altos} alto / ${medios} medio / ${descartadosAuto} descartados auto)`
+    );
+
+    // Atualiza UI se estiver visível
     if (document.getElementById('mpros-wrap')) {
       _atualizarAbas();
       _renderAba(_abaAtiva);
     }
+
   } catch (err) {
-    console.error('[KEYO-07] ❌ Erro no motor:', err);
+    console.error('[KEYO-07] ❌ Erro crítico no motor:', err);
     if (!silencioso) window.toast('❌ Erro na rodada. Verifique o console.', 'error');
-    if (bar) bar.style.display = 'none';
+    _hideProgress();
   } finally {
     if (btnRodar) { btnRodar.disabled = false; btnRodar.textContent = '🔍 Buscar agora'; }
   }
@@ -1032,7 +1469,8 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ MPROS Prospecção Ativa v1.0 — Etapa 7.1 carregada.');
+console.info('[KEYO-07] ✅ MPROS Prospecção Ativa v1.1 — Etapa 7.2 carregada.');
+console.info('[KEYO-07] Motor real ativo: Nominatim · Google Places (opcional) · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 
 })();

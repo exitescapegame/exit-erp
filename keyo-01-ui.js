@@ -96,13 +96,20 @@ function _injetarItemDOM() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ETAPA 1.2 — MONKEY-PATCH SEGURO DO renderPage()
+// ETAPA 1.2 — PATCH SEGURO DO goTo()
+// PA é let local do ERP — não acessível via window.PA.
+// Solução: interceptar goTo('keyo') antes do ERP processar.
 // ════════════════════════════════════════════════════════════════
-(function _patchRenderPage() {
-  if (!window.renderPage) return;
-  const _orig = window.renderPage;
-  window.renderPage = function() {
-    if (window.PA === 'keyo') {
+(function _patchGoTo() {
+  if (!window.goTo) return;
+  const _orig = window.goTo;
+  window.goTo = function(pg) {
+    if (pg === 'keyo') {
+      // Atualiza estado visual do sidebar
+      document.querySelectorAll('#sbNav .sb-item').forEach(el => el.classList.remove('active'));
+      const keyoItem = document.getElementById('keyo-sb-item');
+      if (keyoItem) keyoItem.classList.add('active');
+      // Renderiza tela do KEYO
       const e = document.getElementById('pc');
       if (e) {
         e.innerHTML = _keyoHTML();
@@ -110,10 +117,9 @@ function _injetarItemDOM() {
       }
       return;
     }
-    // M12 agora é renderizado dentro do KEYO — não intercepta PA='keyo-m12' aqui
     return _orig.apply(this, arguments);
   };
-  console.info('[KEYO-01] ✅ renderPage() interceptado com segurança.');
+  console.info('[KEYO-01] ✅ goTo() interceptado com segurança.');
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -535,11 +541,8 @@ function _renderTela() {
 
 // ════════════════════════════════════════════════════════════════
 // VERIFICAÇÃO DE INTEGRIDADE
+// rSb e goTo são patchados intencionalmente pelo KEYO — não alertar.
 // ════════════════════════════════════════════════════════════════
-window.addEventListener('load', function() {
-  if (window.rSb  && window.rSb  !== _ERP_ORIG_RSB)  console.error('[KEYO-01] ⚠️ rSb() foi sobrescrito!');
-  if (window.goTo && window.goTo !== _ERP_ORIG_GOTO) console.error('[KEYO-01] ⚠️ goTo() foi sobrescrito!');
-}, { once: true });
 
 // ════════════════════════════════════════════════════════════════
 // EXPÕE GLOBALMENTE

@@ -320,12 +320,9 @@ async function _enviar() {
         // Tenta pegar JWT da sessão ativa do ERP (várias fontes)
         let jwt = '';
         try {
-          // Fonte 1: sessão Supabase no localStorage
-          const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-          if (sbKey) {
-            const session = JSON.parse(localStorage.getItem(sbKey) || '{}');
-            jwt = session?.access_token || session?.data?.session?.access_token || '';
-          }
+          // Fonte 1: sessão do ERP (exit_unidade_session)
+          const erpSession = JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
+          jwt = erpSession?.access_token || '';
           // Fonte 2: window._keyoToken (injetado pelo ERP)
           if (!jwt && window._keyoToken) jwt = window._keyoToken;
           // Fonte 3: anon key como fallback

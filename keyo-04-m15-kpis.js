@@ -23,6 +23,10 @@ if (window.__KEYO_M15_LOADED__) { console.warn('[KEYO-M15] Já carregado.'); ret
 if (!window.__KEYO_00_LOADED__) { console.error('[KEYO-M15] Core não carregado. Abortando.'); return; }
 window.__KEYO_M15_LOADED__ = true;
 
+// ── CHAVE SUPABASE (resolve const do ERP sem depender de window) ─
+const _SUPA_KEY = (typeof SUPA_KEY !== 'undefined' && SUPA_KEY) ? SUPA_KEY : '';
+if (!_SUPA_KEY) console.warn('[KEYO-M15] SUPA_KEY não encontrada — chamadas à Edge podem falhar.');
+
 // ── VERIFICAÇÃO DE DEPENDÊNCIAS ─────────────────────────────────
 const _DEPS = ['toast', 'uid', 'hoje', 'fM', 'san', '_setTimerSeguro', '_limparTimerSeguro'];
 const _depsFaltando = _DEPS.filter(d => typeof window[d] === 'undefined');
@@ -323,8 +327,8 @@ Regras:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (SUPA_KEY || ''),
-        'apikey': SUPA_KEY || '',
+        'Authorization': 'Bearer ' + (_SUPA_KEY),
+        'apikey': _SUPA_KEY,
       },
       body: JSON.stringify({
         agente: 'fin',
@@ -489,8 +493,8 @@ Você é o analista financeiro da EXIT GAMES. Responda de forma direta e objetiv
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (SUPA_KEY || ''),
-        'apikey': SUPA_KEY || '',
+        'Authorization': 'Bearer ' + (_SUPA_KEY),
+        'apikey': _SUPA_KEY,
       },
       body: JSON.stringify({
         agente: 'fin',

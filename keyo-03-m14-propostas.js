@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M14: PROPOSTAS COMERCIAIS v1.0
+// EXIT GAMES — KEYO M14: PROPOSTAS COMERCIAIS v2.0
 // Arquivo: keyo-03-m14-propostas.js
 // Depende de: keyo-00-core.js e keyo-01-ui.js
 // Acessa: DB.unidades, rlsSalas()
@@ -72,6 +72,19 @@ window.addEventListener('load', function() {
 .m14-tipo-btn.selected{border-color:#C9A84C;background:rgba(201,168,76,.1);font-weight:600}
 .m14-tipo-emoji{font-size:22px;display:block;margin-bottom:4px}
 .m14-tipo-nome{font-size:12px;color:#111118}
+.m14-tipo-desc{font-size:10px;color:#888899;margin-top:2px;display:block}
+.m14-subtipo-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.m14-subtipo-btn{border:1px solid #d8d8e8;border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;background:#f9f9fc;font-family:inherit;transition:all .15s;color:#333344}
+.m14-subtipo-btn:hover{border-color:#C9A84C;color:#C9A84C}
+.m14-subtipo-btn.selected{border-color:#C9A84C;background:rgba(201,168,76,.12);font-weight:600;color:#111118}
+.m14-local-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.m14-local-btn{border:1px solid #d8d8e8;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;background:#f9f9fc;font-family:inherit;transition:all .15s;color:#333344}
+.m14-local-btn:hover{border-color:#7C6FCD;color:#7C6FCD}
+.m14-local-btn.selected{border-color:#7C6FCD;background:rgba(124,111,205,.1);font-weight:600;color:#111118}
+.m14-status-bar{background:#f0f0fa;border:1px solid #e0e0f0;border-radius:8px;padding:10px 14px;font-size:12px;color:#555566;margin-bottom:12px;display:none;align-items:center;gap:8px}
+.m14-status-bar.visible{display:flex}
+.m14-status-dot{width:8px;height:8px;border-radius:50%;background:#C9A84C;animation:m14pulse 1s infinite}
+@keyframes m14pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .m14-historico{margin-top:6px}
 .m14-hist-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f4f4fa;font-size:12px}
 .m14-hist-item:last-child{border-bottom:none}
@@ -87,16 +100,78 @@ window.addEventListener('load', function() {
 // ESTADO
 // ════════════════════════════════════════════════════════════════
 let _tipo       = 'corporativo';
+let _subtipo    = 'incompany';
+let _local      = 'sede';
 let _proposta   = '';
 let _historico  = JSON.parse(localStorage.getItem('keyo_m14_historico') || '[]');
+let _mercado    = '';
 
 const TIPOS = [
-  { id: 'corporativo', emoji: '🏢', nome: 'Corporativo'  },
-  { id: 'aniversario', emoji: '🎂', nome: 'Aniversário'  },
-  { id: 'escolar',     emoji: '🎓', nome: 'Escolar'      },
-  { id: 'grupo',       emoji: '👥', nome: 'Grupo'        },
-  { id: 'incentivo',   emoji: '🏆', nome: 'Incentivo'    },
-  { id: 'confratern',  emoji: '🥂', nome: 'Confratern.'  },
+  {
+    id: 'corporativo', emoji: '🏢', nome: 'Corporativo',
+    subtipos: [
+      { id: 'incompany',    nome: 'In Company'    },
+      { id: 'teambuilding', nome: 'Team Building' },
+    ],
+    locais: [
+      { id: 'sede',    nome: 'Sede Exit'        },
+      { id: 'hotel',   nome: 'Hotel'            },
+      { id: 'empresa', nome: 'Empresa do Cliente' },
+    ],
+    desc: 'Integração e performance de equipes',
+  },
+  {
+    id: 'escolar', emoji: '🎓', nome: 'Escolar',
+    subtipos: [
+      { id: 'fundamental', nome: 'Ensino Fundamental' },
+      { id: 'medio',       nome: 'Ensino Médio'       },
+      { id: 'superior',    nome: 'Faculdade'          },
+    ],
+    locais: [
+      { id: 'sede',   nome: 'Sede Exit'  },
+      { id: 'escola', nome: 'Na Escola'  },
+    ],
+    desc: 'Raciocínio lógico e trabalho em equipe',
+  },
+  {
+    id: 'aniversario', emoji: '🎂', nome: 'Aniversário',
+    subtipos: [
+      { id: 'infantil',    nome: 'Infantil'              },
+      { id: 'adulto',      nome: 'Adulto'                },
+      { id: 'corporativo', nome: 'Aniversário da Empresa' },
+    ],
+    locais: [
+      { id: 'sede', nome: 'Sede Exit' },
+    ],
+    desc: 'Celebração inesquecível com experiência única',
+  },
+  {
+    id: 'eventos', emoji: '🎪', nome: 'Eventos e Feiras',
+    subtipos: [
+      { id: 'feira',      nome: 'Feira'              },
+      { id: 'congresso',  nome: 'Congresso'          },
+      { id: 'marcaevento',nome: 'Evento de Marca'    },
+    ],
+    locais: [
+      { id: 'hotel',      nome: 'Hotel'               },
+      { id: 'convencoes', nome: 'Centro de Convenções' },
+      { id: 'externo',    nome: 'Espaço do Evento'    },
+    ],
+    desc: 'Ativação de marca e atração de público',
+  },
+  {
+    id: 'confraternizacao', emoji: '🥂', nome: 'Confraternização',
+    subtipos: [
+      { id: 'fimano',    nome: 'Final de Ano'  },
+      { id: 'conquista', nome: 'Conquista'     },
+      { id: 'integracao',nome: 'Integração'   },
+    ],
+    locais: [
+      { id: 'sede',  nome: 'Sede Exit' },
+      { id: 'hotel', nome: 'Hotel'     },
+    ],
+    desc: 'Celebração, descontração e memória afetiva',
+  },
 ];
 
 // ════════════════════════════════════════════════════════════════
@@ -106,7 +181,12 @@ function _salas() {
   try { return window.rlsSalas ? window.rlsSalas() : []; } catch(e) { return []; }
 }
 function _unidades() {
-  return (window.DB && window.DB.unidades) ? window.DB.unidades : [];
+  return (window.DB && window.DB.unidades && window.DB.unidades.length)
+    ? window.DB.unidades
+    : [
+        { id: '1', nome: 'EXIT ARACAJU — Shopping Jardins',  precoSemana: 35, precoFimSemana: 45 },
+        { id: '2', nome: 'EXIT SALVADOR — Shopping Barra',   precoSemana: 35, precoFimSemana: 45 },
+      ];
 }
 function _fmtDataHoje() {
   return new Date().toLocaleDateString('pt-BR');
@@ -115,6 +195,37 @@ function _salvarHistorico(nome, texto) {
   _historico.unshift({ id: Date.now(), nome, texto, data: new Date().toISOString() });
   _historico = _historico.slice(0, 10);
   try { localStorage.setItem('keyo_m14_historico', JSON.stringify(_historico)); } catch(e) {}
+}
+
+// Pesquisa o mercado via Edge Function antes de gerar a proposta
+async function _pesquisarMercado(tipoObj, subtipoObj, localObj, pessoas) {
+  const query = `preço proposta comercial ${tipoObj.nome} ${subtipoObj?.nome || ''} escape room Brasil ${new Date().getFullYear()} concorrentes`;
+  try {
+    const resp = await fetch(window.KEYO_EDGE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + _token(),
+        'apikey': window.KEYO_ANON_KEY,
+      },
+      body: JSON.stringify({
+        agente: 'pesquisa',
+        mensagem: `Pesquise no mercado brasileiro: quais são os preços praticados por empresas de escape room para eventos do tipo "${tipoObj.nome} — ${subtipoObj?.nome || ''}" com ${pessoas} pessoas, realizados em ${localObj?.nome || 'local do cliente'}? Quais são os diferenciais e estrutura de proposta que as melhores empresas do setor usam? Cite valores reais se possível. Responda em até 200 palavras de forma objetiva.`,
+        historico: [],
+        unidade_id: 1,
+      })
+    });
+    const data = await resp.json();
+    return data.resposta || data.reply || data.message || data.text || '';
+  } catch(e) {
+    console.warn('[KEYO-M14] Pesquisa de mercado falhou:', e);
+    return '';
+  }
+}
+
+function _token() {
+  try { return JSON.parse(localStorage.getItem('exit_unidade_session') || '{}')?.access_token || window.KEYO_ANON_KEY; }
+  catch(e) { return window.KEYO_ANON_KEY; }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -143,21 +254,39 @@ function _renderInline() {
 // HTML
 // ════════════════════════════════════════════════════════════════
 function _html() {
-  const uns   = _unidades();
-  const salas = _salas();
+  const uns    = _unidades();
+  const salas  = _salas();
+  const tipoAt = TIPOS.find(t => t.id === _tipo) || TIPOS[0];
 
   return `
 <div id="m14-wrap">
   <h2>📄 Propostas Comerciais</h2>
 
   <div class="m14-card">
-    <div class="m14-card-title">1 · Tipo de proposta</div>
+    <div class="m14-card-title">1 · Tipo de evento</div>
     <div class="m14-tipo-grid">
       ${TIPOS.map(t => `
       <button class="m14-tipo-btn${_tipo===t.id?' selected':''}" onclick="window.m14_tipo('${t.id}')">
         <span class="m14-tipo-emoji">${t.emoji}</span>
         <span class="m14-tipo-nome">${t.nome}</span>
+        <span class="m14-tipo-desc">${t.desc}</span>
       </button>`).join('')}
+    </div>
+
+    <div style="margin-bottom:8px">
+      <div class="m14-card-title" style="margin-bottom:8px">Modalidade</div>
+      <div class="m14-subtipo-row" id="m14-subtipo-row">
+        ${tipoAt.subtipos.map(s => `
+        <button class="m14-subtipo-btn${_subtipo===s.id?' selected':''}" onclick="window.m14_subtipo('${s.id}')">${s.nome}</button>`).join('')}
+      </div>
+    </div>
+
+    <div>
+      <div class="m14-card-title" style="margin-bottom:8px">Local</div>
+      <div class="m14-local-row" id="m14-local-row">
+        ${tipoAt.locais.map(l => `
+        <button class="m14-local-btn${_local===l.id?' selected':''}" onclick="window.m14_local('${l.id}')">${l.nome}</button>`).join('')}
+      </div>
     </div>
   </div>
 
@@ -179,6 +308,11 @@ function _html() {
     <div class="m14-campo"><label>Observações / Pedidos especiais</label>
       <textarea id="m14-obs" placeholder="Ex: decoração temática, bolo, data flexível..."></textarea>
     </div>
+  </div>
+
+  <div class="m14-status-bar" id="m14-status-bar">
+    <div class="m14-status-dot"></div>
+    <span id="m14-status-txt">Pesquisando mercado...</span>
   </div>
 
   <button class="m14-btn-gerar" id="m14-btn-gerar" onclick="window.m14_gerar()">
@@ -218,16 +352,51 @@ function _html() {
 // ════════════════════════════════════════════════════════════════
 function _setTipo(t) {
   _tipo = t;
+  const tipoAt = TIPOS.find(x => x.id === t) || TIPOS[0];
+  // reset subtipo e local para o primeiro disponível
+  _subtipo = tipoAt.subtipos[0]?.id || '';
+  _local   = tipoAt.locais[0]?.id   || '';
+
   document.querySelectorAll('.m14-tipo-btn').forEach(b => {
     b.classList.toggle('selected', b.getAttribute('onclick').includes(`'${t}'`));
   });
+
+  // re-renderiza subtipo e local inline sem redesenhar tudo
+  const sr = document.getElementById('m14-subtipo-row');
+  const lr = document.getElementById('m14-local-row');
+  if (sr) sr.innerHTML = tipoAt.subtipos.map(s => `
+    <button class="m14-subtipo-btn${_subtipo===s.id?' selected':''}" onclick="window.m14_subtipo('${s.id}')">${s.nome}</button>`).join('');
+  if (lr) lr.innerHTML = tipoAt.locais.map(l => `
+    <button class="m14-local-btn${_local===l.id?' selected':''}" onclick="window.m14_local('${l.id}')">${l.nome}</button>`).join('');
+}
+
+function _setSubtipo(s) {
+  _subtipo = s;
+  document.querySelectorAll('.m14-subtipo-btn').forEach(b => {
+    b.classList.toggle('selected', b.getAttribute('onclick').includes(`'${s}'`));
+  });
+}
+
+function _setLocal(l) {
+  _local = l;
+  document.querySelectorAll('.m14-local-btn').forEach(b => {
+    b.classList.toggle('selected', b.getAttribute('onclick').includes(`'${l}'`));
+  });
+}
+
+function _statusBar(txt) {
+  const bar = document.getElementById('m14-status-bar');
+  const lbl = document.getElementById('m14-status-txt');
+  if (!bar) return;
+  if (txt) { bar.classList.add('visible'); if (lbl) lbl.textContent = txt; }
+  else      { bar.classList.remove('visible'); }
 }
 
 async function _gerar() {
   const cliente     = document.getElementById('m14-cliente')?.value.trim();
   const responsavel = document.getElementById('m14-responsavel')?.value.trim();
   const pessoas     = document.getElementById('m14-pessoas')?.value || '10';
-  const data        = document.getElementById('m14-data')?.value || '';
+  const dataVal     = document.getElementById('m14-data')?.value || '';
   const obs         = document.getElementById('m14-obs')?.value.trim() || '';
   const unidadeId   = document.getElementById('m14-unidade')?.value;
 
@@ -236,46 +405,64 @@ async function _gerar() {
     return;
   }
 
-  const unidade = _unidades().find(u => String(u.id) === String(unidadeId));
-  const salas   = _salas().filter(s => String(s.unidadeId) === String(unidadeId));
-  const tipoObj = TIPOS.find(t => t.id === _tipo);
+  const unidade  = _unidades().find(u => String(u.id) === String(unidadeId));
+  const salas    = _salas().filter(s => String(s.unidadeId) === String(unidadeId));
+  const tipoObj  = TIPOS.find(t => t.id === _tipo);
+  const subObj   = tipoObj?.subtipos.find(s => s.id === _subtipo);
+  const localObj = tipoObj?.locais.find(l => l.id === _local);
 
-  const [y, m, d] = (data || new Date().toISOString().slice(0,10)).split('-');
-  const dataFmt = `${d}/${m}/${y}`;
+  const [y, m, d] = (dataVal || new Date().toISOString().slice(0,10)).split('-');
+  const dataFmt   = `${d}/${m}/${y}`;
 
-  const prompt = `Você é um consultor comercial da EXIT GAMES, empresa de escape room.
-Crie uma proposta comercial profissional e persuasiva para o seguinte cliente:
-
-Tipo: ${tipoObj?.nome || _tipo}
-Cliente/Empresa: ${cliente}
-${responsavel ? `Responsável: ${responsavel}` : ''}
-Número de pessoas: ${pessoas}
-Data sugerida: ${dataFmt}
-Unidade: ${unidade?.nome || 'EXIT GAMES'}
-${obs ? `Observações: ${obs}` : ''}
-Salas disponíveis: ${salas.slice(0,4).map(s => `${s.emoji || ''} ${s.nome} (${s.minJog}-${s.maxJog} pessoas, ${s.tempo}min, ${s.dificuldade})`).join(', ')}
-Preço semana: R$ ${unidade?.precoSemana || 35}/pessoa | Fim de semana: R$ ${unidade?.precoFimSemana || 45}/pessoa
-
-Estruture a proposta com: saudação, apresentação da experiência, sugestão de salas, preço estimado, diferenciais, próximos passos.
-Tom: profissional mas caloroso. Máximo 400 palavras.`;
-
-  const btn = document.getElementById('m14-btn-gerar');
-  const box = document.getElementById('m14-proposta-box');
+  const btn       = document.getElementById('m14-btn-gerar');
+  const box       = document.getElementById('m14-proposta-box');
   const resultado = document.getElementById('m14-resultado');
 
   if (btn) btn.disabled = true;
   resultado.style.display = 'block';
-  box.innerHTML = '<div class="m14-proposta-loading">🧠 Gerando proposta...</div>';
+  box.innerHTML = '<div class="m14-proposta-loading">🔍 Pesquisando mercado...</div>';
+
+  // ── FASE 1: pesquisa de mercado ──────────────────────────────
+  _statusBar(`🔍 Pesquisando mercado para ${tipoObj?.nome} — ${subObj?.nome || ''}...`);
+  _mercado = await _pesquisarMercado(tipoObj, subObj, localObj, pessoas);
+
+  // ── FASE 2: gerar proposta com inteligência de mercado ──────
+  _statusBar('🧠 Gerando proposta com dados do mercado...');
+  box.innerHTML = '<div class="m14-proposta-loading">🧠 Gerando proposta personalizada...</div>';
+
+  const promptMercado = _mercado
+    ? `\n\nINTELIGÊNCIA DE MERCADO (use obrigatoriamente para embasar preços e diferenciais):\n${_mercado}`
+    : '';
+
+  const prompt = `Você é o consultor comercial sênior da EXIT GAMES, empresa de escape room com unidades em Aracaju e Salvador.
+
+EVENTO SOLICITADO:
+- Tipo: ${tipoObj?.nome || _tipo}
+- Modalidade: ${subObj?.nome || ''}
+- Local de realização: ${localObj?.nome || ''}
+- Cliente/Empresa: ${cliente}
+${responsavel ? `- Responsável: ${responsavel}` : ''}
+- Número de pessoas: ${pessoas}
+- Data sugerida: ${dataFmt}
+- Unidade EXIT responsável: ${unidade?.nome || 'EXIT GAMES'}
+${obs ? `- Observações: ${obs}` : ''}
+- Salas disponíveis: ${salas.slice(0,4).map(s => `${s.emoji||''} ${s.nome} (${s.minJog}-${s.maxJog} pessoas, ${s.tempo}min, ${s.dificuldade})`).join(', ') || 'Diversas salas temáticas disponíveis'}
+- Preço base: semana R$${unidade?.precoSemana||35}/pessoa | fim de semana R$${unidade?.precoFimSemana||45}/pessoa
+${promptMercado}
+
+INSTRUÇÕES OBRIGATÓRIAS:
+- NUNCA faça uma proposta genérica. Use os dados de mercado acima para ancoragem de preço.
+- Cite valores realistas e competitivos com base no mercado pesquisado.
+- Estruture: saudação personalizada → experiência exit games → proposta específica para ${subObj?.nome||tipoObj?.nome} → salas sugeridas → investimento detalhado → diferenciais exclusivos → próximos passos com CTA claro.
+- Tom: profissional e caloroso, nunca burocrático. Máximo 450 palavras.
+- Se o local for fora da sede (hotel/empresa/evento), mencione a logística de deslocamento como diferencial.`;
 
   try {
     const resp = await fetch(window.KEYO_EDGE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (function() {
-          try { return JSON.parse(localStorage.getItem('exit_unidade_session') || '{}')?.access_token || window.KEYO_ANON_KEY; }
-          catch(e) { return window.KEYO_ANON_KEY; }
-        })(),
+        'Authorization': 'Bearer ' + _token(),
         'apikey': window.KEYO_ANON_KEY,
       },
       body: JSON.stringify({
@@ -296,6 +483,7 @@ Tom: profissional mas caloroso. Máximo 400 palavras.`;
     box.textContent = '⚠️ Erro ao conectar com a IA. Verifique sua conexão.';
   }
 
+  _statusBar('');
   if (btn) btn.disabled = false;
   resultado.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

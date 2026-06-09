@@ -1072,7 +1072,7 @@ Critérios de baixo (0-39): sem relevância óbvia para escape room, sem dados d
 // PROXY — todas as chamadas externas passam pela Edge Function
 // keyo-proxy para evitar bloqueio de CSP do exitsystem.net
 // ════════════════════════════════════════════════════════════════
-const PROXY_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/keyo-proxy';
+const PROXY_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/dynamic-api';
 
 async function _proxy(source, params) {
   const token = _jwt();

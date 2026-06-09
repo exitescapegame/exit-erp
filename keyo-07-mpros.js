@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.7 (Cientista: fix HTTP 400 apikey + campos dinâmicos)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.8 (remove apikey CORS + não derruba tela na busca)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -151,8 +151,8 @@ function _jwt() {
 }
 
 // ── Cabeçalhos da chamada à IA ──────────────────────────────────
-// Espelha EXATAMENTE o que o chat do KEYO (_enviar) envia, incluindo o
-// cabeçalho 'apikey' — sem ele o super-action recusa com HTTP 400.
+// IMPORTANTE: o super-action NÃO permite o cabeçalho 'apikey' (bloqueia por CORS).
+// Por isso enviamos só Content-Type + Authorization (o mesmo que passa no preflight).
 function _keyoHeaders() {
   let jwt = '';
   try {
@@ -166,7 +166,6 @@ function _keyoHeaders() {
   return {
     'Content-Type':  'application/json',
     'Authorization': 'Bearer ' + jwt,
-    'apikey':        window.KEYO_ANON_KEY || '',
   };
 }
 
@@ -1880,13 +1879,19 @@ function _abrirMpros() {
   function _ensureBotao() {
     const modulosDiv = document.getElementById('keyo-agents-modulos');
     if (!modulosDiv) return false;                         // menu ainda não existe
-    if (document.getElementById('keyo-mod-mpros')) return true; // já está lá
-    const btn = document.createElement('button');
-    btn.className = 'keyo-mod-btn';
-    btn.id        = 'keyo-mod-mpros';
-    btn.innerHTML = '<span class="keyo-mod-emoji">🔬</span><span>Cientista</span>';
-    btn.onclick   = _abrirMpros;          // abre direto, sem depender do roteador do KEYO
-    modulosDiv.appendChild(btn);
+    let btn = document.getElementById('keyo-mod-mpros');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'keyo-mod-btn';
+      btn.id        = 'keyo-mod-mpros';
+      btn.innerHTML = '<span class="keyo-mod-emoji">🔬</span><span>Cientista</span>';
+      btn.onclick   = _abrirMpros;        // abre direto, sem depender do roteador do KEYO
+      modulosDiv.appendChild(btn);
+    }
+    // Se a tela do Cientista está aberta, mantém o botão marcado como ATIVO.
+    // Isso evita que a limpeza (abaixo) derrube a tela quando o menu é
+    // redesenhado durante uma busca/pausa.
+    if (document.getElementById('keyo-mpros-inline')) btn.classList.add('active');
     return true;
   }
 
@@ -1950,7 +1955,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v1.7 — fix HTTP 400 (apikey) + campos dinâmicos carregada.');
+console.info('[KEYO-07] ✅ Cientista v1.8 — remove apikey (CORS) + tela estável na busca carregada.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

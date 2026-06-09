@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.2 (Etapa 7.2 — proxy CSP fix)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.3 (Etapa 7.2 — fix scoring super-action + PNCP modalidade)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -1025,22 +1025,19 @@ Critérios de baixo (0-39): sem relevância óbvia para escape room, sem dados d
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        action: 'chat',
-        messages: [{ role: 'user', content: promptUsuario }],
-        system: promptSistema,
-        max_tokens: 2000,
+        agente:     'mkt',                          // agente comercial (mesmo do m14)
+        mensagem:   `${promptSistema}\n\n${promptUsuario}`,
+        historico:  [],
+        unidade_id: window.UA?.unidadeId || 1,
       }),
     });
 
     if (!resp.ok) throw new Error(`Supabase HTTP ${resp.status}`);
     const data = await resp.json();
 
-    // Extrai texto da resposta (compatível com formato super-action)
-    let texto = '';
-    if (typeof data.response === 'string') texto = data.response;
-    else if (Array.isArray(data.content))  texto = data.content.map(c => c.text || '').join('');
-    else if (data.message)                 texto = data.message;
-    else                                   texto = JSON.stringify(data);
+    // super-action devolve o texto da IA em data.resposta
+    let texto = (data && data.resposta) ? data.resposta : '';
+    if (!texto && Array.isArray(data?.content)) texto = data.content.map(c => c.text || '').join('');
 
     // Remove possíveis blocos markdown
     texto = texto.replace(/```json|```/gi, '').trim();
@@ -1240,54 +1237,65 @@ async function _buscarPNCP() {
   const TERMOS_FILTRO = ['evento', 'confraterniza', 'capacita', 'treinamento', 'lazer', 'cultural'];
   const UFS = ['SE', 'BA'];
 
+  // PNCP exige codigoModalidadeContratacao (obrigatório, 1 por chamada)
+  // 6 = Pregão Eletrônico · 8 = Dispensa de Licitação
+  const MODALIDADES = [6, 8];
+
   for (const uf of UFS) {
-    try {
-      const hoje    = new Date();
-      const dataFim = hoje.toISOString().slice(0, 10).replace(/-/g, '');
-      const dataIni = new Date(hoje - 30 * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+    for (const modalidade of MODALIDADES) {
+      try {
+        const hoje    = new Date();
+        const dataFim = hoje.toISOString().slice(0, 10).replace(/-/g, '');
+        const dataIni = new Date(hoje - 30 * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
 
-      const data = await _proxy('pncp', {
-        uf, dataInicial: dataIni, dataFinal: dataFim,
-        pagina: '1', tamanhoPagina: '20',
-      });
-
-      // PNCP pode retornar { data: [...] } ou array direto
-      const itens = data.data || data.content || (Array.isArray(data) ? data : []);
-
-      for (const item of itens.slice(0, 10)) {
-        const objeto = (item.objetoCompra || item.descricao || '').toLowerCase();
-        if (!TERMOS_FILTRO.some(t => objeto.includes(t))) continue;
-
-        const orgao     = item.orgaoEntidade?.razaoSocial || item.nomeUnidadeOrgao || 'Órgão Público';
-        const municipio = item.municipioNome || item.municipio || (uf === 'SE' ? 'Aracaju' : 'Salvador');
-
-        leads.push({
-          id:          window.uid ? window.uid() : ('pncp_' + Math.random().toString(36).slice(2)),
-          titulo:      `[Licitação] ${orgao}`,
-          tipo:        'licitacao',
-          categoria:   'licitacao',
-          descricao:   item.objetoCompra || item.descricao || '',
-          fonte:       'PNCP',
-          cnpj:        item.orgaoEntidade?.cnpj || '',
-          contato: {
-            site:     item.linkSistemaOrigem || 'https://pncp.gov.br',
-            whatsapp: '',
-            email:    '',
-          },
-          localizacao:    municipio,
+        const data = await _proxy('pncp', {
           uf,
-          municipio,
-          unidadeId:      uf === 'SE' ? '1' : '2',
-          semana:         _semanaISO(),
-          rodada:         (_config().rodadaNumero || 0) + 1,
-          status:         'fila',
-          criadoEm:       new Date().toISOString(),
-          pncpNumero:     item.numeroControlePNCP || '',
-          valorEstimado:  item.valorTotalEstimado || 0,
+          dataInicial: dataIni,
+          dataFinal:   dataFim,
+          codigoModalidadeContratacao: modalidade,   // ← parâmetro obrigatório do PNCP
+          pagina: '1',
+          tamanhoPagina: '20',
         });
+
+        // PNCP pode retornar { data: [...] } ou array direto
+        const itens = data.data || data.content || (Array.isArray(data) ? data : []);
+
+        for (const item of itens.slice(0, 10)) {
+          const objeto = (item.objetoCompra || item.descricao || '').toLowerCase();
+          if (!TERMOS_FILTRO.some(t => objeto.includes(t))) continue;
+
+          const orgao     = item.orgaoEntidade?.razaoSocial || item.nomeUnidadeOrgao || 'Órgão Público';
+          const municipio = item.municipioNome || item.municipio || (uf === 'SE' ? 'Aracaju' : 'Salvador');
+
+          leads.push({
+            id:          window.uid ? window.uid() : ('pncp_' + Math.random().toString(36).slice(2)),
+            titulo:      `[Licitação] ${orgao}`,
+            tipo:        'licitacao',
+            categoria:   'licitacao',
+            descricao:   item.objetoCompra || item.descricao || '',
+            fonte:       'PNCP',
+            cnpj:        item.orgaoEntidade?.cnpj || '',
+            contato: {
+              site:     item.linkSistemaOrigem || 'https://pncp.gov.br',
+              whatsapp: '',
+              email:    '',
+            },
+            localizacao:    municipio,
+            uf,
+            municipio,
+            unidadeId:      uf === 'SE' ? '1' : '2',
+            semana:         _semanaISO(),
+            rodada:         (_config().rodadaNumero || 0) + 1,
+            status:         'fila',
+            criadoEm:       new Date().toISOString(),
+            pncpNumero:     item.numeroControlePNCP || '',
+            valorEstimado:  item.valorTotalEstimado || 0,
+          });
+        }
+        await new Promise(r => setTimeout(r, 300));
+      } catch (e) {
+        console.warn(`[KEYO-07] PNCP proxy falhou (${uf}/mod${modalidade}):`, e.message);
       }
-    } catch (e) {
-      console.warn(`[KEYO-07] PNCP proxy falhou (${uf}):`, e.message);
     }
   }
 
@@ -1457,7 +1465,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ MPROS Prospecção Ativa v1.2 — Etapa 7.2 (CSP proxy fix) carregada.');
+console.info('[KEYO-07] ✅ MPROS Prospecção Ativa v1.3 — Etapa 7.2 (fix scoring + PNCP) carregada.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

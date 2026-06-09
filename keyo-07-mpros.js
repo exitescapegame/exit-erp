@@ -293,6 +293,16 @@ function _keyoHeaders() {
 #mpros-progress-bar{height:3px;background:#e8e8f0;border-radius:2px;overflow:hidden;margin-bottom:16px}
 #mpros-progress-fill{height:100%;background:#C9A84C;border-radius:2px;transition:width .5s ease;width:0%}
 
+/* ══ MPROS: painel de filtros ══ */
+#mpros-filtros{background:#fff;border:1px solid #e8e8f0;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+#mpros-filtros label{font-size:10px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+#mpros-filtros select{background:#f4f4fa;border:1px solid #d8d8e8;border-radius:7px;padding:6px 10px;font-size:12px;font-family:inherit;color:#111118;outline:none;cursor:pointer}
+#mpros-filtros select:focus{border-color:#C9A84C}
+.mpros-filtro-grupo{display:flex;flex-direction:column}
+#mpros-btn-limpar-filtro{background:none;border:1px solid #d8d8e8;border-radius:7px;padding:6px 12px;font-size:11px;color:#888899;cursor:pointer;font-family:inherit;transition:all .15s;align-self:flex-end}
+#mpros-btn-limpar-filtro:hover{border-color:#C9A84C;color:#C9A84C}
+.mpros-filtro-contador{font-size:11px;color:#888899;align-self:flex-end;padding-bottom:4px}
+
 /* ══ CIENTISTA: aba Criação ══ */
 .cri-painel{background:#fff;border:1px solid #e8e8f0;border-radius:14px;padding:20px;margin-bottom:16px}
 .cri-titulo{font-size:14px;font-weight:700;color:#111118;margin:0 0 4px}
@@ -332,6 +342,9 @@ function _keyoHeaders() {
 // ETAPA 7.1 — RENDER PRINCIPAL (chamado por keyo_abrirModulo)
 // ════════════════════════════════════════════════════════════════
 let _abaAtiva = 'fila'; // 'fila' | 'aprovados' | 'pipeline' | 'relatorio' | 'config'
+
+// ── Estado dos filtros de prospecção ────────────────────────────
+let _filtros = { categoria: '', cidade: '', potencial: '', tamanho: '' };
 
 function _renderInline() {
   // Remove área anterior
@@ -486,9 +499,65 @@ function _htmlFila() {
     return html;
   }
 
+  // ── Painel de filtros ────────────────────────────────────────
+  const cidadesDisponiveis = [...new Set(fila.map(l => l.municipio || l.localizacao).filter(Boolean))].sort();
+  html += `
+<div id="mpros-filtros">
+  <div class="mpros-filtro-grupo">
+    <label>Ramo</label>
+    <select onchange="window.mpros_filtrar('categoria', this.value)">
+      <option value="">Todos os ramos</option>
+      ${CATEGORIAS.map(c => `<option value="${c.id}" ${_filtros.categoria===c.id?'selected':''}>${c.emoji} ${c.label}</option>`).join('')}
+    </select>
+  </div>
+  <div class="mpros-filtro-grupo">
+    <label>Cidade</label>
+    <select onchange="window.mpros_filtrar('cidade', this.value)">
+      <option value="">Todas as cidades</option>
+      ${cidadesDisponiveis.map(c => `<option value="${c}" ${_filtros.cidade===c?'selected':''}>${c}</option>`).join('')}
+    </select>
+  </div>
+  <div class="mpros-filtro-grupo">
+    <label>Potencial</label>
+    <select onchange="window.mpros_filtrar('potencial', this.value)">
+      <option value="">Todos</option>
+      <option value="alto"  ${_filtros.potencial==='alto'?'selected':''}>🔴 Alto</option>
+      <option value="medio" ${_filtros.potencial==='medio'?'selected':''}>🟡 Médio</option>
+    </select>
+  </div>
+  <div class="mpros-filtro-grupo">
+    <label>Tamanho estimado</label>
+    <select onchange="window.mpros_filtrar('tamanho', this.value)">
+      <option value="">Todos</option>
+      <option value="grande" ${_filtros.tamanho==='grande'?'selected':''}>🏢 Grande (50+ pessoas)</option>
+      <option value="medio"  ${_filtros.tamanho==='medio'?'selected':''}>🏬 Médio (20–49)</option>
+      <option value="pequeno"${_filtros.tamanho==='pequeno'?'selected':''}>🏠 Pequeno (até 19)</option>
+    </select>
+  </div>
+  <button id="mpros-btn-limpar-filtro" onclick="window.mpros_limparFiltros()">✕ Limpar filtros</button>
+</div>`;
+
+  // ── Aplica filtros ───────────────────────────────────────────
+  let filaFiltrada = fila;
+  if (_filtros.categoria) filaFiltrada = filaFiltrada.filter(l => l.categoria === _filtros.categoria);
+  if (_filtros.cidade)    filaFiltrada = filaFiltrada.filter(l => (l.municipio || l.localizacao) === _filtros.cidade);
+  if (_filtros.potencial) filaFiltrada = filaFiltrada.filter(l => l.potencial === _filtros.potencial);
+  if (_filtros.tamanho)   filaFiltrada = filaFiltrada.filter(l => (l.tamanhoEstimado || 'medio') === _filtros.tamanho);
+
+  const temFiltro = Object.values(_filtros).some(v => v !== '');
+  html += `<div class="mpros-filtro-contador">${temFiltro ? `${filaFiltrada.length} de ${fila.length} leads` : `${fila.length} leads na fila`}</div>`;
+
+  if (!filaFiltrada.length) {
+    html += `<div class="mpros-vazio">
+      <div class="mpros-vazio-icon">🔍</div>
+      <p>Nenhum lead encontrado com esses filtros.<br>Tente ampliar os critérios ou <strong>limpar os filtros</strong>.</p>
+    </div>`;
+    return html;
+  }
+
   // Agrupa por potencial: alto primeiro
   ['alto', 'medio'].forEach(pot => {
-    const grupo = fila.filter(l => l.potencial === pot);
+    const grupo = filaFiltrada.filter(l => l.potencial === pot);
     if (!grupo.length) return;
     const pc = POTENCIAL_CONFIG[pot];
     html += `
@@ -840,6 +909,17 @@ function _salvarMaxLeads(val) {
   window.toast(`✅ Máximo de ${val} leads por rodada salvo.`, 'ok');
 }
 
+// ── Filtros de prospecção ────────────────────────────────────────
+function _filtrar(campo, valor) {
+  _filtros[campo] = valor;
+  _renderAba('fila');
+}
+
+function _limparFiltros() {
+  _filtros = { categoria: '', cidade: '', potencial: '', tamanho: '' };
+  _renderAba('fila');
+}
+
 function _aprovar(id) {
   const lead = _leads().find(l => l.id === id);
   if (!lead) return;
@@ -1059,7 +1139,13 @@ Cada item do array deve ter exatamente estes campos:
   "idx": número do índice (0-based, igual ao recebido),
   "score": número de 0 a 100 (quanto maior, maior potencial),
   "potencial": "alto" | "medio" | "baixo",
+  "tamanhoEstimado": "grande" | "medio" | "pequeno",
   "justificativa": string curta (até 100 caracteres) explicando o score.
+
+Critérios de tamanho:
+  "grande": 50+ pessoas (empresas grandes, faculdades, órgãos públicos, federações)
+  "medio": 20–49 pessoas (empresas médias, colégios, associações)
+  "pequeno": até 19 pessoas (pequenas empresas, estúdios, etc.)
 
 Critérios de alto potencial (score 70-100):
 - Empresas com 50+ funcionários (team building)
@@ -1112,9 +1198,10 @@ Critérios de baixo (0-39): sem relevância óbvia para escape room, sem dados d
     return leadesBrutos.map((lead, i) => {
       const s = scores.find(x => x.idx === i) || {};
       return Object.assign({}, lead, {
-        score:        Number(s.score)      || 30,
-        potencial:    ['alto','medio','baixo'].includes(s.potencial) ? s.potencial : 'baixo',
-        justificativa: s.justificativa     || '',
+        score:           Number(s.score)      || 30,
+        potencial:       ['alto','medio','baixo'].includes(s.potencial) ? s.potencial : 'baixo',
+        tamanhoEstimado: ['grande','medio','pequeno'].includes(s.tamanhoEstimado) ? s.tamanhoEstimado : 'medio',
+        justificativa:   s.justificativa     || '',
       });
     });
   } catch (err) {
@@ -1549,7 +1636,7 @@ function _htmlCriacao() {
   return `
 <div class="cri-painel">
   <h3 class="cri-titulo">🔬 Criar projeto de sala de escape</h3>
-  <p class="cri-sub">Escolha o tema e os parâmetros. O Cientista monta o projeto completo (história, decoração, puzzles, som e objetivo). Sem pressa — ele é caprichoso.</p>
+  <p class="cri-sub">Escolha o tema e os parâmetros. O Cientista monta o projeto completo com pesquisa aprofundada, puzzles detalhados e fontes de referência.</p>
   <div class="cri-form">
     <div class="cri-campo">
       <label>Tema</label>
@@ -1572,6 +1659,11 @@ function _htmlCriacao() {
         <option value="Elite">Elite</option>
       </select>
     </div>
+    <div class="cri-campo">
+      <label>Quantidade de puzzles</label>
+      <input type="number" id="cri-puzzles" value="0" min="0" max="20" step="1" placeholder="0 = automático pela duração">
+      <span style="font-size:10px;color:#888899;margin-top:3px">0 = calculado pela duração (1 a cada 8–10 min)</span>
+    </div>
     <div class="cri-campo full">
       <label>Pedido especial (opcional)</label>
       <textarea id="cri-instrucoes" placeholder="Ex: usar um cofre de verdade, incluir um momento de susto, tema baseado em um hospital abandonado..."></textarea>
@@ -1590,64 +1682,128 @@ ${listaHtml}
 
 // ── O "cérebro" do Cientista (instruções) ────────────────────────
 function _promptCientista(dados, projetoAnterior, pedidoAjuste) {
-  const sistema = `Você é o "Cientista" da EXIT GAMES — um projetista sênior de salas de escape (escape rooms) físicas e reais, para a rede EXIT GAMES (Aracaju/SE e Salvador/BA). Sua função é entregar o projeto COMPLETO de uma sala, pronto para ser montado no mundo real.
+  const numPuzzles = dados && dados.numPuzzles && Number(dados.numPuzzles) > 0
+    ? `EXATAMENTE ${dados.numPuzzles} puzzles`
+    : `aproximadamente ${dados ? Math.max(3, Math.round(Number(dados.tempoMin || 60) / 9)) : 6} puzzles (1 a cada 8–10 minutos)`;
 
-REGRAS OBRIGATÓRIAS:
-1. Todo puzzle deve ter LÓGICA clara e dedutível pelos jogadores. NUNCA use charadas, adivinhas ou trocadilhos.
-2. Cada puzzle deve se RELACIONAR com o tema e com a história da sala.
-3. Mantenha tudo REALISTA e montável: nada de obras impossíveis (não "construir um prédio de verdade"). Use props, móveis, cenografia, fechaduras, cadeados e eletrônicos simples.
-4. MISTURE puzzles MECÂNICOS (cadeados numéricos/direcionais/de chave, gavetas, encaixes, ímãs) e ELETRÔNICOS (luz UV, painel/teclado, sensores, áudio, fechadura eletrônica).
-5. Os puzzles podem ser ADAPTAÇÕES de mecânicas conhecidas de escape room, ajustadas ao tema — não copie textos de terceiros.
-6. Seja CIRÚRGICO e PRECISO: cada puzzle precisa ter solução EXATA e lista de materiais.
-7. Quantidade: aproximadamente 1 puzzle a cada 8–10 minutos de jogo.
+  const sistema = `Você é o CIENTISTA da EXIT GAMES — o maior especialista em design de salas de escape físicas do Brasil. Você combina domínio de game design, psicologia da experiência, cenografia teatral, eletrônica aplicada e narrativa imersiva. Sua entrega não é um rascunho: é um PROJETO EXECUTIVO completo, rigoroso e pronto para produção — como um arquiteto entrega uma planta antes da obra.
 
-Responda em PORTUGUÊS, em texto estruturado EXATAMENTE neste formato (use os títulos com # e ##; NÃO use blocos de código):
+PRINCÍPIOS DO CIENTISTA:
+- Cada seção do projeto deve ser densa, específica e acionável. Nada vago. Nada genérico.
+- Você pesquisa referências reais do setor antes de criar: escape rooms premiados, tendências de game design, psicologia de grupo, técnicas de cenografia profissional.
+- Você pensa como jogador, como operador e como montador ao mesmo tempo.
+- Você justifica cada decisão criativa com lógica de design.
+- O documento final deve ser tão completo que alguém sem experiência em escape rooms consiga montar e operar a sala seguindo apenas este projeto.
 
-# [Título da sala]
+REGRAS INVIOLÁVEIS:
+1. Nenhum puzzle baseado em adivinha, sorte ou conhecimento cultural específico. Toda lógica deve ser dedutível dentro da sala.
+2. Cada puzzle nasce da história — não é colado sobre ela. O tema justifica cada mecanismo.
+3. Mix obrigatório: puzzles MECÂNICOS (cadeados, gavetas, encaixes, ímãs, fechaduras físicas) e ELETRÔNICOS (UV, painéis, sensores, áudio, LEDs, fechaduras eletromagnéticas).
+4. Solução exata de cada puzzle especificada: o número, a palavra, a sequência, o objeto — sem ambiguidade.
+5. Toda a experiência deve ser operável por 1 pessoa (o game master) via controle simples.
 
-## Sinopse
-(1–2 frases)
+Responda SOMENTE em PORTUGUÊS. Use o formato abaixo com exatidão (títulos com # e ##, sem blocos de código):
 
-## História / Ambientação
-(parágrafo de imersão: onde os jogadores estão, por quê, o que aconteceu)
+# [Título da sala — criativo, evocativo, memorável]
 
-## Objetivo final
-(o que precisam fazer para escapar/vencer)
+## 1. Conceito e Posicionamento
+Descreva o conceito central da sala em 3–4 frases: qual emoção ela vende, qual público-alvo atinge melhor, o que a diferencia de outras salas do mercado. Inclua o tom (terror psicológico / aventura leve / tensão policial etc.) e a curva emocional esperada do início ao fim da experiência.
 
-## Decoração e cenário
-(o que montar fisicamente no espaço)
+## 2. Sinopse (para divulgação)
+Texto pronto para usar no site ou redes sociais. 3–5 frases. Primeira pessoa do plural. Sem spoilers de puzzle. Tom de convite e urgência.
 
-## Puzzles
-### 1. [Nome] — (mecânico OU eletrônico)
-- O que o jogador encontra: ...
-- Lógica de resolução: ...
-- Ligação com o tema: ...
-- Solução exata: ...
-- Materiais: ...
-(repita, em ordem de resolução)
+## 3. Narrativa e Lore
+História completa da sala: o que aconteceu antes dos jogadores chegarem, quem são os personagens (vilão, vítima, aliado), qual o conflito central, qual o lore do universo. Escreva como um roteirista — com causa, consequência e clímax. Mínimo 150 palavras.
 
-## Trilha sonora e ambiente sonoro
-(estilo de som e momentos-chave; sugira tipos de faixa, sem citar músicas protegidas)
+## 4. Briefing inicial (fala do game master)
+O texto exato que o game master lê ou fala antes de os jogadores entrarem na sala. Tom imersivo, primeira pessoa do narrador. Inclui missão, regras do jogo e gancho emocional. Mínimo 80 palavras.
 
-## Fluxo da sala
-(sequência: puzzle 1 libera X → puzzle 2 ... até o objetivo)
+## 5. Cenografia e Ambiente
+Descreva o espaço como um diretor de arte:
+- Layout físico: disposição dos móveis, zonas da sala, pontos focais
+- Paleta de cores: paredes, objetos, iluminação (cor, intensidade, pontos de luz)
+- Materiais e texturas: madeira envelhecida, metal, tecido, papel, concreto
+- Olfato: aromatizador, cheiro específico que reforça o tema
+- Sonoplastia ambiente: som de fundo contínuo (descrição detalhada — sem citar músicas protegidas)
+- Temperatura e sensação: frio, abafado, úmido — como criar essa percepção
+- Adereços de cena (não-interativos): o que existe só para imersão, não para puzzle
 
-## Lista de materiais
-- (itens consolidados)
+## 6. Puzzles
+(criar ${numPuzzles}, em ordem de resolução)
 
-## Observações de montagem
-(dicas práticas)`;
+### Puzzle 1 — [Nome] · MECÂNICO ou ELETRÔNICO
+- **Posição na sala:** onde fisicamente está localizado
+- **O que o jogador vê ao se aproximar:** descrição sensorial completa
+- **Narrativa do puzzle:** por que esse objeto/mecanismo existe dentro da história
+- **Lógica de dedução:** o raciocínio exato que leva à solução, passo a passo
+- **Solução exata:** [especifique sem ambiguidade]
+- **O que libera:** o que o jogador acessa ou recebe ao resolver
+- **Materiais e especificações:** lista com descrição técnica de cada item
+- **Custo estimado:** faixa em reais (ex: R$80–150)
+- **Instrução de montagem:** como instalar e configurar
+- **Reset entre grupos:** o que o operador faz para reiniciar em menos de 2 minutos
+(repita este bloco para cada puzzle)
+
+## 7. Fluxo e Mapa da Experiência
+Diagrama textual da jornada completa:
+ENTRADA → [gatilho 1] → Puzzle 1 → [libera X] → [pista Y encontrada com X] → Puzzle 2 → ... → Puzzle final → SAÍDA
+Inclua: ramificações paralelas (se houver), momentos de revelação narrativa, pontos de tensão planejados, onde o game master pode intervir com dica.
+
+## 8. Curva de Dificuldade
+Descreva como a dificuldade evolui ao longo da experiência. Quais puzzles são de aquecimento, quais são o pico de tensão, como a sala "respira" para não frustrar nem entediar. Justifique com princípios de game design (curva de aprendizado, flow state, recompensa variável).
+
+## 9. Trilha Sonora e Design de Áudio
+- Música ambiente fase 1 (entrada): estilo, BPM, clima
+- Música ambiente fase 2 (tensão crescente): estilo, BPM, clima
+- Música fase 3 (clímax / puzzle final): estilo, BPM, clima
+- Efeitos sonoros programados: momento exato + descrição do som (ex: "ao resolver puzzle 3, som de fechadura abrindo + voz grave dizendo 'você está perto'")
+- Equipamento recomendado: caixa de som, posicionamento, controle pelo game master
+
+## 10. Lista de Materiais Completa
+Agrupe por categoria com quantidade, especificação técnica e faixa de preço unitária:
+- Cenografia e decoração
+- Fechaduras e mecanismos
+- Eletrônicos e iluminação
+- Adereços e props
+- Consumíveis e manutenção
+
+## 11. Orçamento Total Estimado
+Tabela com subtotal por categoria e total geral. Classifique: econômico / padrão / premium.
+
+## 12. Operação e Game Master
+- Posição de monitoramento: onde o GM fica, o que vê
+- Sistema de câmeras: quantas, onde posicionar
+- Sistema de dicas: como e quando intervir, texto sugerido de 3 dicas por puzzle difícil
+- Protocolo de emergência: como retirar jogadores com segurança
+- Tempo médio de reset entre grupos
+
+## 13. Potencial Comercial e Público-Alvo
+- Perfil ideal de grupo: faixa etária, contexto (team building, aniversário, casal, escola)
+- Argumento de venda: o que torna esta sala irresistível para o público-alvo
+- Precificação sugerida: faixa de valor por pessoa para Aracaju/SE e Salvador/BA
+- Potencial de recompra: essa sala faz o cliente querer voltar? Por quê?
+
+## 14. Fontes e Referências de Pesquisa
+Liste as referências reais que embasaram este projeto:
+- Sites e portais especializados (ex: roomescapeartist.com, escaperoomtips.com, thelogicescapes.com)
+- Comunidades e fóruns (ex: r/escaperooms, Escape Room Enthusiasts no Facebook)
+- Livros ou artigos de game design aplicáveis
+- Salas ou empresas de referência mundial no tema escolhido
+- Qualquer outra fonte relevante com URL quando disponível`;
 
   let usuario;
   if (projetoAnterior) {
-    usuario = `Projeto atual da sala:\n\n${projetoAnterior}\n\n---\nO ADM pediu este ajuste: ${pedidoAjuste}\n\nReescreva o PROJETO COMPLETO no mesmo formato, aplicando o ajuste.`;
+    usuario = `Projeto atual da sala:\n\n${projetoAnterior}\n\n---\nO ADM pediu este ajuste: ${pedidoAjuste}\n\nReescreva o PROJETO EXECUTIVO COMPLETO no mesmo formato, aplicando o ajuste com a mesma profundidade e mantendo todas as 14 seções.`;
   } else {
-    usuario = `Crie o projeto de uma sala de escape com:
+    usuario = `Elabore o PROJETO EXECUTIVO COMPLETO de uma sala de escape com os seguintes parâmetros:
 - Tema: ${dados.tema}
-- Duração do jogo: ${dados.tempoMin} minutos
+- Duração: ${dados.tempoMin} minutos
+- Puzzles: ${numPuzzles}
 - Jogadores: ${dados.jogadores}
 - Dificuldade: ${dados.dificuldade}` +
-      (dados.instrucoes ? `\n- Pedido especial do ADM: ${dados.instrucoes}` : '');
+      (dados.instrucoes ? `\n- Instrução específica do ADM: ${dados.instrucoes}` : '') + `
+
+Entregue o projeto completo com todas as 14 seções. Seja o Cientista: rigoroso, criativo, preciso. Este documento vai direto para produção.`;
   }
   return { sistema, usuario };
 }
@@ -1689,6 +1845,7 @@ async function _criarSala() {
     tempoMin:   document.getElementById('cri-tempo')?.value      || '60',
     jogadores:  document.getElementById('cri-jogadores')?.value  || '3 a 6',
     dificuldade:document.getElementById('cri-dificuldade')?.value || 'Média',
+    numPuzzles: document.getElementById('cri-puzzles')?.value    || '0',
     instrucoes: (document.getElementById('cri-instrucoes')?.value || '').trim(),
   };
 
@@ -1931,6 +2088,8 @@ window.mpros_toggleMotor    = _toggleMotor;
 window.mpros_rodarAgora     = _rodarAgora;
 window.mpros_salvarGKey     = _salvarGKey;
 window.mpros_salvarMaxLeads = _salvarMaxLeads;
+window.mpros_filtrar        = _filtrar;
+window.mpros_limparFiltros  = _limparFiltros;
 window.mpros_verLead        = _verLead;
 window.mpros_aprovar        = _aprovar;
 window.mpros_descartar      = _descartar;
@@ -1955,7 +2114,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v1.8 — remove apikey (CORS) + tela estável na busca carregada.');
+console.info('[KEYO-07] ✅ Cientista v1.9 — filtros de prospecção + puzzles configuráveis + projeto aprofundado com fontes.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

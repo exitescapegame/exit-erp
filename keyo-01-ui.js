@@ -40,23 +40,59 @@ window.KEYO_AGENTS.forEach(a => { _kHistory[a.id] = []; });
 // ════════════════════════════════════════════════════════════════
 // ETAPA 1.3 — INJETAR NO MENU VIA MENUS[] + rSb()
 // ════════════════════════════════════════════════════════════════
+// ── PATCH SEGURO DO rSb() ────────────────────────────────────────
+// MENUS é const local no ERP — não acessível via window.MENUS.
+// Solução: interceptar rSb() e injetar o item KEYO após cada redesenho,
+// sem MutationObserver e sem tocar no array MENUS original.
 function _injetarMenu() {
-  if (window.MENUS && Array.isArray(window.MENUS)) {
-    if (!window.MENUS.find(m => m.id === 'keyo')) {
-      window.MENUS.push({ id: 'keyo', lbl: 'KEYO · IA', ic: '🧠', perm: 'tudo' });
-      if (typeof window.rSb === 'function') window.rSb();
-      console.info('[KEYO-01] ✅ Item KEYO adicionado via MENUS.push + rSb().');
-    }
+  if (!window.rSb) {
+    console.warn('[KEYO-01] rSb() não encontrado — tentando novamente em 500ms.');
+    setTimeout(_injetarMenu, 500);
     return;
   }
-  console.warn('[KEYO-01] MENUS não disponível — usando fallback DOM.');
-  _injetarMenuDOM();
+
+  // Já foi patchado?
+  if (window.__KEYO_RSB_PATCHED__) return;
+  window.__KEYO_RSB_PATCHED__ = true;
+
+  const _rSbOrig = window.rSb;
+  window.rSb = function() {
+    _rSbOrig.apply(this, arguments);   // executa o rSb original primeiro
+    _injetarItemDOM();                  // depois injeta o item KEYO
+  };
+
+  // Executa uma vez já para aparecer imediatamente
+  _injetarItemDOM();
+  console.info('[KEYO-01] ✅ rSb() interceptado — item KEYO será injetado após cada redesenho.');
 }
 
-function _injetarMenuDOM() {
-  // MutationObserver removido — causava corrupção do sidebar do ERP ao interceptar
-  // redesenhos do rSb(). Sem MENUS[], a injeção é abortada para preservar o ERP.
-  console.warn('[KEYO-01] MENUS[] não disponível — injeção DOM abortada para preservar sidebar do ERP.');
+function _injetarItemDOM() {
+  const nav = document.getElementById('sbNav');
+  if (!nav) return;
+
+  // Atualiza active se já existe
+  const existing = document.getElementById('keyo-sb-item');
+  if (existing) {
+    existing.className = 'sb-item' + (window.PA === 'keyo' ? ' active' : '');
+    return;
+  }
+
+  // Seção
+  const secao = document.createElement('div');
+  secao.className = 'sb-section';
+  secao.textContent = 'Inteligência';
+
+  // Item
+  const item = document.createElement('div');
+  item.id = 'keyo-sb-item';
+  item.className = 'sb-item' + (window.PA === 'keyo' ? ' active' : '');
+  item.innerHTML = '🧠<span>KEYO · IA</span>';
+  item.onclick = function() {
+    if (typeof window.goTo === 'function') window.goTo('keyo');
+  };
+
+  nav.appendChild(secao);
+  nav.appendChild(item);
 }
 
 // ════════════════════════════════════════════════════════════════

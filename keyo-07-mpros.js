@@ -357,6 +357,28 @@ function _renderInline() {
   if (msgs)      msgs.style.display      = 'none';
   if (inputArea) inputArea.style.display = 'none';
 
+  // ── FIX BUG 3: proteger contra renderPage() do ERP ──────────
+  // O goTo('keyo') do keyo-01 não seta PA='keyo', então qualquer
+  // chamada a renderPage() dentro do ERP (ex: opFinalizar, sDB callbacks)
+  // substituía o #pc e derrubava a tela. Patchamos renderPage aqui de
+  // forma segura: só protege enquanto a tela KEYO está visível.
+  if (!window.__KEYO_RENDERPAGE_PATCHED__) {
+    window.__KEYO_RENDERPAGE_PATCHED__ = true;
+    const _rpOrig = window.renderPage;
+    if (typeof _rpOrig === 'function') {
+      window.renderPage = function() {
+        // Se o container do KEYO estiver visível no #pc, não deixa o ERP sobrescrever
+        const pc = document.getElementById('pc');
+        if (pc && pc.contains(document.getElementById('keyo-wrap'))) {
+          console.info('[KEYO-07] renderPage() bloqueado — tela KEYO ativa.');
+          return;
+        }
+        return _rpOrig.apply(this, arguments);
+      };
+      console.info('[KEYO-07] ✅ renderPage() patchado — tela KEYO protegida.');
+    }
+  }
+
   const main = document.getElementById('keyo-main');
   if (!main) return;
 
@@ -451,7 +473,7 @@ function _renderAba(id) {
   else if (id === 'pipeline')  { content.innerHTML = _htmlPipeline(); }
   else if (id === 'relatorio') { content.innerHTML = _htmlRelatorio(); }
   else if (id === 'config')    { content.innerHTML = _htmlConfig(); }
-  else if (id === 'criacao')   { content.innerHTML = _htmlCriacao(); }
+  else if (id === 'criacao')   { _criandoSala = false; content.innerHTML = _htmlCriacao(); }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -489,17 +511,7 @@ function _htmlFila() {
   </div>
 </div>`;
 
-  if (!fila.length) {
-    html += `<div class="mpros-vazio">
-      <div class="mpros-vazio-icon">🎯</div>
-      <p>Nenhum lead na fila.<br>
-      Clique em <strong>"Buscar agora"</strong> para iniciar uma rodada de prospecção<br>
-      ou aguarde o motor diário (meia-noite).</p>
-    </div>`;
-    return html;
-  }
-
-  // ── Painel de filtros ────────────────────────────────────────
+  // ── Painel de filtros — sempre visível, mesmo com fila vazia ────
   const cidadesDisponiveis = [...new Set(fila.map(l => l.municipio || l.localizacao).filter(Boolean))].sort();
   html += `
 <div id="mpros-filtros">
@@ -545,6 +557,17 @@ function _htmlFila() {
   if (_filtros.tamanho)   filaFiltrada = filaFiltrada.filter(l => (l.tamanhoEstimado || 'medio') === _filtros.tamanho);
 
   const temFiltro = Object.values(_filtros).some(v => v !== '');
+
+  if (!fila.length) {
+    html += `<div class="mpros-vazio">
+      <div class="mpros-vazio-icon">🎯</div>
+      <p>Nenhum lead na fila.<br>
+      Clique em <strong>"Buscar agora"</strong> para iniciar uma rodada de prospecção<br>
+      ou aguarde o motor diário (meia-noite).</p>
+    </div>`;
+    return html;
+  }
+
   html += `<div class="mpros-filtro-contador">${temFiltro ? `${filaFiltrada.length} de ${fila.length} leads` : `${fila.length} leads na fila`}</div>`;
 
   if (!filaFiltrada.length) {
@@ -2114,7 +2137,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v1.9 — filtros de prospecção + puzzles configuráveis + projeto aprofundado com fontes.');
+console.info('[KEYO-07] ✅ Cientista v2.0 — FIX: filtros sempre visíveis · criação de sala desbloqueada · renderPage() patchado contra saída para PDV.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

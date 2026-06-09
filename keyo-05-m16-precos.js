@@ -2,7 +2,7 @@
 // EXIT GAMES — KEYO M16: PRECIFICAÇÃO DE GRUPOS v1.0
 // Arquivo: keyo-05-m16-precos.js
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
-// Acessa: rlsSalas(), DB.unidades
+// Acessa: rlsSalas(), rlsUnidades()
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_M16() {
@@ -114,7 +114,8 @@ let _resultado  = null;
 // HELPERS
 // ════════════════════════════════════════════════════════════════
 function _unidades() {
-  return (window.DB && window.DB.unidades) ? window.DB.unidades : [];
+  try { return window.rlsUnidades ? window.rlsUnidades() : []; }
+  catch(e) { return []; }
 }
 
 function _salas() {
@@ -501,6 +502,6 @@ window.m16_copiar         = _copiar;
 window.m16_whatsapp       = _whatsapp;
 window.m16_gerarIA        = _gerarIA;
 
-console.info('[KEYO-M16] ✅ M16 Precificação de Grupos v1.0 carregado.');
+console.info('[KEYO-M16] ✅ M16 Precificação de Grupos v1.1 carregado.');
 
 })();

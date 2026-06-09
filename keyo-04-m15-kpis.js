@@ -321,7 +321,11 @@ Regras:
 
     const r = await _fetchComTimeout(edgeUrl, {   // [v1.3-B]
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (window.SUPA_KEY || ''),
+        'apikey': window.SUPA_KEY || '',
+      },
       body: JSON.stringify({
         agente: 'fin',
         mensagem: prompt,
@@ -483,7 +487,11 @@ Você é o analista financeiro da EXIT GAMES. Responda de forma direta e objetiv
 
     const r = await _fetchComTimeout(edgeUrl, {   // [v1.3-B]
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (window.SUPA_KEY || ''),
+        'apikey': window.SUPA_KEY || '',
+      },
       body: JSON.stringify({
         agente: 'fin',
         mensagem: pergunta,

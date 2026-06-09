@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v1.3
+// EXIT GAMES — KEYO UI v1.4
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
@@ -316,11 +316,29 @@ async function _enviar() {
   try {
     const resp = await fetch(window.KEYO_EDGE_URL, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + (window.SUPA_KEY || window.KEYO_ANON_KEY || ''),
-        'apikey':         window.SUPA_KEY || window.KEYO_ANON_KEY || '',
-      },
+      headers: (function() {
+        // Tenta pegar JWT da sessão ativa do ERP (várias fontes)
+        let jwt = '';
+        try {
+          // Fonte 1: sessão Supabase no localStorage
+          const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          if (sbKey) {
+            const session = JSON.parse(localStorage.getItem(sbKey) || '{}');
+            jwt = session?.access_token || session?.data?.session?.access_token || '';
+          }
+          // Fonte 2: window._keyoToken (injetado pelo ERP)
+          if (!jwt && window._keyoToken) jwt = window._keyoToken;
+          // Fonte 3: anon key como fallback
+          if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+        } catch(e) {
+          jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+        }
+        return {
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer ' + jwt,
+          'apikey':         window.KEYO_ANON_KEY || '',
+        };
+      })(),
       body: JSON.stringify({
         agente:      _kAgente,
         mensagem:    texto,
@@ -441,6 +459,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.3 carregada — Etapas 1.2 + 1.3 + 1.4 ativas.');
+console.info('[KEYO-01] ✅ UI v1.4 carregada — JWT da sessão ativo.');
 
 })();

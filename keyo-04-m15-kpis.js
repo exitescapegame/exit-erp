@@ -1,18 +1,22 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M15: DASHBOARD KPIs v1.3
+// EXIT GAMES — KEYO M15: DASHBOARD KPIs v1.4
 // Arquivo: keyo-04-m15-kpis.js
 // Depende de: ERP base (_setTimerSeguro, _limparTimerSeguro, san)
 // Acessa: DB.vendas, DB.clientes, DB.unidades
 // NUNCA modificar funções do ERP base. (Lei #2)
 // ───────────────────────────────────────────────────────────────
-// MUDANÇAS v1.2 → v1.3 (apenas correções — lógica de IA intacta):
-//   [v1.3-A] Chat inline agora aparece já no 1º "Analisar com IA"
-//            (antes ficava em display:none até o refresh de 60s).
-//   [v1.3-B] fetch com timeout/abort (30s) → não trava mais o módulo
-//            se a Edge Function pendurar.
-//   [v1.3-C] refresh de 60s não re-renderiza enquanto você digita no
-//            chat ou durante uma chamada (não apaga mais o texto).
-//   [v1.3-D] mensagens do chat sanitizadas com san() do ERP.
+// MUDANÇAS v1.3 → v1.4:
+//   [v1.4-A] FIX CRÍTICO: dashboard só renderiza quando o agente
+//            ativo é "kpis". Guard duplo: (a) verifica window._kAgent
+//            antes de montar; (b) registra hooks start/stop em
+//            window.KEYO_MODULE_HOOKS['kpis'] para que o core possa
+//            limpar o módulo ao trocar de agente.
+//   [v1.4-B] _k15Stop() agora também remove o DOM #keyo-m15-inline
+//            e restaura keyo-msgs + keyo-input-area (reversão limpa).
+//   [v1.4-C] Monkey-patch seguro em window._keyoSelectAgent: ao sair
+//            do agente kpis, _k15Stop() é chamado automaticamente;
+//            ao entrar em kpis, _k15Start() é disparado — sem depender
+//            de alterações no keyo-00-core.js.
 //   Nada da inteligência do KEYO mudou: prompt, contexto, agente fin,
 //   _k15CalcKPIs e todos os nomes públicos seguem iguais.
 // ═══════════════════════════════════════════════════════════════
@@ -676,7 +680,17 @@ function _k15RenderKPIs() {
   }
 }
 
+// [v1.4-A] Guard: só monta se o agente ativo for realmente 'kpis'
 function _k15Start() {
+  // ── GUARD DE AGENTE ─────────────────────────────────────────
+  // window._kAgent é a variável do core que guarda o agente ativo.
+  // Se não for 'kpis', não montamos nada (evita aparecer em MKT, etc.)
+  const agenteAtivo = window._kAgent || '';
+  if (agenteAtivo && agenteAtivo !== 'kpis') {
+    console.warn('[KEYO-M15] _k15Start ignorado — agente ativo é "' + agenteAtivo + '", não "kpis".');
+    return;
+  }
+
   const anterior = document.getElementById('keyo-m15-inline');
   if (anterior) anterior.remove();
 
@@ -697,9 +711,68 @@ function _k15Start() {
   window._setTimerSeguro('m15-refresh', _k15RenderKPIs, 60000, true);
 }
 
+// [v1.4-B] Stop: para timer E limpa o DOM completamente
 function _k15Stop() {
   window._limparTimerSeguro('m15-refresh');
+
+  // Remove o painel do DOM
+  const area = document.getElementById('keyo-m15-inline');
+  if (area) area.remove();
+
+  // Restaura a área de chat padrão do core
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      msgs.style.display      = '';
+  if (inputArea) inputArea.style.display = '';
 }
+
+// ════════════════════════════════════════════════════════════════
+// [v1.4-C] REGISTRO NO SISTEMA DE HOOKS DO CORE
+// Registra start/stop em KEYO_MODULE_HOOKS para que o core possa
+// chamar automaticamente ao trocar de agente.
+// Também faz monkey-patch em _keyoSelectAgent como fallback seguro.
+// ════════════════════════════════════════════════════════════════
+(function _registrarHooks() {
+  // 1. Registra nos hooks declarativos (para cores futuros compatíveis)
+  if (!window.KEYO_MODULE_HOOKS) window.KEYO_MODULE_HOOKS = {};
+  window.KEYO_MODULE_HOOKS['kpis'] = { start: _k15Start, stop: _k15Stop };
+
+  // 2. Monkey-patch em _keyoSelectAgent (fallback robusto para o core atual)
+  //    Aguarda o core estar disponível (pode carregar depois deste módulo)
+  function _patchSelectAgent() {
+    if (typeof window._keyoSelectAgent !== 'function') return; // core ainda não carregou
+    if (window._keyoSelectAgent.__m15patched__) return;        // já foi patchado
+
+    const _orig = window._keyoSelectAgent;
+    window._keyoSelectAgent = function(novoAgente) {
+      const anteriorAgente = window._kAgent || '';
+
+      // Se estava em kpis e vai sair → parar M15
+      if (anteriorAgente === 'kpis' && novoAgente !== 'kpis') {
+        _k15Stop();
+      }
+
+      // Executa a troca original de agente
+      _orig.apply(this, arguments);
+
+      // Se chegou em kpis → iniciar M15
+      if (novoAgente === 'kpis') {
+        // Pequeno delay para o core terminar de renderizar o container
+        setTimeout(_k15Start, 50);
+      }
+    };
+    window._keyoSelectAgent.__m15patched__ = true;
+    console.info('[KEYO-M15] ✅ Monkey-patch em _keyoSelectAgent aplicado.');
+  }
+
+  // Tenta patchear agora; se o core ainda não carregou, tenta no load
+  _patchSelectAgent();
+  if (!window._keyoSelectAgent || !window._keyoSelectAgent.__m15patched__) {
+    window.addEventListener('load', _patchSelectAgent, { once: true });
+    // Fallback extra: tenta após 500ms (garante ordem de carregamento)
+    setTimeout(_patchSelectAgent, 500);
+  }
+})();
 
 // ════════════════════════════════════════════════════════════════
 // AÇÕES DE PERÍODO
@@ -724,6 +797,6 @@ window.m15_analisar      = _k15AnalisarIA;
 window.m15_chat_enviar   = _k15ChatEnviar;
 window.m15_chat_keydown  = _k15ChatKeydown;
 
-console.info('[KEYO-M15] ✅ M15 Dashboard KPIs v1.3 (IA) carregado.');
+console.info('[KEYO-M15] ✅ M15 Dashboard KPIs v1.4 (fix: só aparece em kpis) carregado.');
 
 })();

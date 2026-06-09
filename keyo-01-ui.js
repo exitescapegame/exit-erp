@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v1.4
+// EXIT GAMES — KEYO UI v1.6
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
+// v1.6: aba Campanhas abaixo dos agentes no painel lateral
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -18,6 +19,7 @@ if (!window.__KEYO_00_LOADED__) {
   return;
 }
 window.__KEYO_01_LOADED__ = true;
+window.__KEYO_UI_LOADED__ = true; // alias para diagnóstico
 
 // ── Referências originais do ERP (para verificação de integridade) ──
 const _ERP_ORIG_RENDER = window.renderPage;
@@ -30,16 +32,15 @@ const _ERP_ORIG_GOTO   = window.goTo;
 let _kAgente  = 'keyo';
 let _kLoading = false;
 let _kHistory = {};   // { agentId: [ {role, texto, ts} ] }
+let _kAba     = 'chat'; // 'chat' | 'campanhas'
 
 // Inicializa histórico para todos os agentes
 window.KEYO_AGENTS.forEach(a => { _kHistory[a.id] = []; });
 
 // ════════════════════════════════════════════════════════════════
 // ETAPA 1.3 — INJETAR NO MENU VIA MENUS[] + rSb()
-// Estratégia do plano mestre: push no array MENUS, nunca reescrever rSb()
 // ════════════════════════════════════════════════════════════════
 function _injetarMenu() {
-  // Estratégia primária: MENUS.push + rSb() (método do plano mestre)
   if (window.MENUS && Array.isArray(window.MENUS)) {
     if (!window.MENUS.find(m => m.id === 'keyo')) {
       window.MENUS.push({ id: 'keyo', lbl: 'KEYO · IA', ic: '🧠', perm: 'tudo' });
@@ -48,8 +49,6 @@ function _injetarMenu() {
     }
     return;
   }
-
-  // Estratégia fallback: injeção direta no DOM com MutationObserver
   console.warn('[KEYO-01] MENUS não disponível — usando fallback DOM.');
   _injetarMenuDOM();
 }
@@ -86,7 +85,6 @@ function _injetarMenuDOM() {
 
   _fazerInjecao();
 
-  // MutationObserver: reinjecta se o ERP recriar o sbNav
   const obs = new MutationObserver(function() {
     if (!document.getElementById('keyo-menu-item')) _fazerInjecao();
   });
@@ -95,7 +93,6 @@ function _injetarMenuDOM() {
 
 // ════════════════════════════════════════════════════════════════
 // ETAPA 1.2 — MONKEY-PATCH SEGURO DO renderPage()
-// Intercepta PA === 'keyo', delega tudo mais ao original
 // ════════════════════════════════════════════════════════════════
 (function _patchRenderPage() {
   if (!window.renderPage) return;
@@ -109,13 +106,34 @@ function _injetarMenuDOM() {
       }
       return;
     }
+    // M12 agora é renderizado dentro do KEYO — não intercepta PA='keyo-m12' aqui
     return _orig.apply(this, arguments);
   };
   console.info('[KEYO-01] ✅ renderPage() interceptado com segurança.');
 })();
 
 // ════════════════════════════════════════════════════════════════
-// HTML DA TELA KEYO
+// CSS EXTRA — aba Campanhas no painel lateral
+// ════════════════════════════════════════════════════════════════
+(function _injetarCSSAbas() {
+  if (document.getElementById('keyo-ui-abas-css')) return;
+  const s = document.createElement('style');
+  s.id = 'keyo-ui-abas-css';
+  s.textContent = `
+/* ── Separador e aba Campanhas ── */
+#keyo-agents-sep{height:1px;background:rgba(255,255,255,0.08);margin:8px 12px}
+#keyo-agents-modulos{padding:0 0 8px}
+#keyo-agents-modulos-title{padding:8px 16px 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px}
+.keyo-mod-btn{display:flex;align-items:center;gap:9px;padding:10px 16px;cursor:pointer;border:none;background:none;width:100%;text-align:left;color:rgba(255,255,255,0.5);font-size:12px;font-family:inherit;border-left:3px solid transparent;transition:all .15s}
+.keyo-mod-btn:hover{background:rgba(255,255,255,0.07);color:#f0f0f8}
+.keyo-mod-btn.active{background:rgba(201,168,76,.12);color:#C9A84C;font-weight:700;border-left-color:#C9A84C}
+.keyo-mod-emoji{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+`;
+  document.head.appendChild(s);
+})();
+
+// ════════════════════════════════════════════════════════════════
+// HTML DA TELA KEYO — com aba Campanhas abaixo dos agentes
 // ════════════════════════════════════════════════════════════════
 function _keyoHTML() {
   const ag = window.KEYO_AGENTS[0];
@@ -133,7 +151,18 @@ function _keyoHTML() {
         <span class="keyo-agent-desc">${a.desc}</span>
       </span>
     </button>`).join('')}
+
+    <div id="keyo-agents-sep"></div>
+    <div id="keyo-agents-modulos">
+      <div id="keyo-agents-modulos-title">Módulos</div>
+      <button class="keyo-mod-btn" id="keyo-mod-campanhas"
+              onclick="window.keyo_abrirModulo('campanhas')">
+        <span class="keyo-mod-emoji">📅</span>
+        <span>Campanhas</span>
+      </button>
+    </div>
   </div>
+
   <div id="keyo-main">
     <div id="keyo-header">
       <span id="keyo-header-emoji">${ag.emoji}</span>
@@ -162,10 +191,58 @@ function _keyoHTML() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// ABRIR MÓDULO (Campanhas ou voltar ao chat)
+// ════════════════════════════════════════════════════════════════
+function _abrirModulo(modulo) {
+  _kAba = modulo;
+
+  // Desmarca agentes, marca módulo
+  document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('keyo-mod-' + modulo);
+  if (btn) btn.classList.add('active');
+
+  if (modulo === 'campanhas') {
+    // Atualiza header
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '📅';
+    if (nome)  nome.textContent  = 'Campanhas';
+    if (desc)  desc.textContent  = 'Agendador de campanhas de marketing';
+
+    // Esconde input do chat, mostra área do M12
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+
+    // Renderiza M12 se disponível
+    if (typeof window._k12RenderAgendadorInline === 'function') {
+      window._k12RenderAgendadorInline();
+    } else if (typeof window.__KEYO_M12_LOADED__ !== 'undefined') {
+      // M12 carregado mas sem função inline — fallback
+      const main = document.getElementById('keyo-msgs');
+      if (main) {
+        main.style.display = 'block';
+        main.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo M12 não inicializado. Recarregue a página.</div>';
+      }
+    } else {
+      const main = document.getElementById('keyo-msgs');
+      if (main) {
+        main.style.display = 'block';
+        main.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de campanhas não encontrado.</div>';
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // INIT — chamado após renderizar a tela
 // ════════════════════════════════════════════════════════════════
 function _keyoInit() {
   _kAgente  = 'keyo';
+  _kAba     = 'chat';
   _kLoading = false;
   window.KEYO_AGENTS.forEach(a => { if (!_kHistory[a.id]) _kHistory[a.id] = []; });
   _renderHistory();
@@ -179,17 +256,29 @@ function _keyoInit() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// TROCAR AGENTE
+// TROCAR AGENTE — volta ao chat se estava em módulo
 // ════════════════════════════════════════════════════════════════
 function _trocarAgente(id) {
   const ag = window.KEYO_AGENTS.find(a => a.id === id);
   if (!ag) return;
+
+  // Se estava em módulo, restaura área de chat
+  if (_kAba !== 'chat') {
+    _kAba = 'chat';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    const m12area   = document.getElementById('keyo-m12-inline');
+    if (inputArea) inputArea.style.display = '';
+    if (msgs)      msgs.style.display      = '';
+    if (m12area)   m12area.remove();
+  }
 
   _kAgente = id;
 
   document.querySelectorAll('.keyo-agent-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.agent === id);
   });
+  document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
 
   const emoji = document.getElementById('keyo-header-emoji');
   const nome  = document.getElementById('keyo-header-nome');
@@ -208,7 +297,7 @@ function _trocarAgente(id) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// RENDERIZAR HISTÓRICO DO AGENTE ATIVO
+// RENDERIZAR HISTÓRICO
 // ════════════════════════════════════════════════════════════════
 function _renderHistory() {
   const msgs = document.getElementById('keyo-msgs');
@@ -242,7 +331,7 @@ function _appendMsgDOM(container, role, texto, ts) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// MARKDOWN → HTML (simples e seguro)
+// MARKDOWN → HTML
 // ════════════════════════════════════════════════════════════════
 function _formato(txt) {
   return txt
@@ -279,10 +368,7 @@ function _hideLoading() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ETAPA 1.4 — _keyoSend(): ENVIO PARA EDGE FUNCTION
-// Payload exato do plano mestre:
-// { agente, mensagem, historico, unidade_id }
-// Resposta esperada: { resposta: "..." }
+// ETAPA 1.4 — ENVIO PARA EDGE FUNCTION
 // ════════════════════════════════════════════════════════════════
 async function _enviar() {
   if (_kLoading) return;
@@ -294,38 +380,30 @@ async function _enviar() {
   const texto = input.value.trim();
   if (!texto) return;
 
-  // Limpa input
   input.value = '';
   input.style.height = 'auto';
   if (send) send.disabled = true;
   _kLoading = true;
 
-  // Exibe mensagem do usuário
   _appendMsg('user', texto);
   _showLoading();
 
-  // Monta histórico resumido para contexto (últimas 10 trocas)
   const hist = (_kHistory[_kAgente] || [])
     .filter(function(m) { return m.role !== 'user' || m.texto !== texto; })
     .slice(-20)
     .map(function(m) { return { role: m.role === 'user' ? 'user' : 'assistant', content: m.texto }; });
 
-  // Detecta unidade ativa do ERP (se disponível)
   const unidadeId = (window.UA && window.UA.unidade) ? window.UA.unidade : 1;
 
   try {
     const resp = await fetch(window.KEYO_EDGE_URL, {
       method:  'POST',
       headers: (function() {
-        // Tenta pegar JWT da sessão ativa do ERP (várias fontes)
         let jwt = '';
         try {
-          // Fonte 1: sessão do ERP (exit_unidade_session)
           const erpSession = JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
           jwt = erpSession?.access_token || '';
-          // Fonte 2: window._keyoToken (injetado pelo ERP)
           if (!jwt && window._keyoToken) jwt = window._keyoToken;
-          // Fonte 3: anon key como fallback
           if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
         } catch(e) {
           jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
@@ -344,14 +422,11 @@ async function _enviar() {
       })
     });
 
-    if (!resp.ok) {
-      throw new Error('HTTP ' + resp.status);
-    }
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
     const data = await resp.json();
     _hideLoading();
 
-    // Aceita qualquer campo de resposta que a Edge Function retornar
     const resposta = data.resposta
                   || data.reply
                   || data.message
@@ -373,7 +448,7 @@ async function _enviar() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// LIMPAR CHAT (com confirmação)
+// LIMPAR CHAT
 // ════════════════════════════════════════════════════════════════
 function _limparChat() {
   if (!confirm('Limpar o histórico deste agente?')) return;
@@ -407,7 +482,6 @@ function _scrollBottom() {
 // RENDERIZAR TELA (chamado pelo item do menu DOM fallback)
 // ════════════════════════════════════════════════════════════════
 function _renderTela() {
-  // Marca item ativo
   document.querySelectorAll('#sbNav .sb-item').forEach(el => el.classList.remove('active'));
   const menuItem = document.getElementById('keyo-menu-item');
   if (menuItem) menuItem.classList.add('active');
@@ -428,16 +502,15 @@ function _renderTela() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// VERIFICAÇÃO DE INTEGRIDADE PÓS-CARGA
-// Garante que não sobrescrevemos nada do ERP
+// VERIFICAÇÃO DE INTEGRIDADE
 // ════════════════════════════════════════════════════════════════
 window.addEventListener('load', function() {
-  if (window.rSb      && window.rSb      !== _ERP_ORIG_RSB)    console.error('[KEYO-01] ⚠️ rSb() foi sobrescrito!');
-  if (window.goTo     && window.goTo     !== _ERP_ORIG_GOTO)   console.error('[KEYO-01] ⚠️ goTo() foi sobrescrito!');
+  if (window.rSb  && window.rSb  !== _ERP_ORIG_RSB)  console.error('[KEYO-01] ⚠️ rSb() foi sobrescrito!');
+  if (window.goTo && window.goTo !== _ERP_ORIG_GOTO) console.error('[KEYO-01] ⚠️ goTo() foi sobrescrito!');
 }, { once: true });
 
 // ════════════════════════════════════════════════════════════════
-// EXPÕE GLOBALMENTE (chamadas inline no HTML)
+// EXPÕE GLOBALMENTE
 // ════════════════════════════════════════════════════════════════
 window.keyo_renderTela   = _renderTela;
 window.keyo_trocarAgente = _trocarAgente;
@@ -445,7 +518,8 @@ window.keyo_enviar       = _enviar;
 window.keyo_onKeyDown    = _onKeyDown;
 window.keyo_resize       = _resize;
 window.keyo_limparChat   = _limparChat;
-window.keyo_addMsg       = _appendMsg;   // compatibilidade keyo-00-core
+window.keyo_addMsg       = _appendMsg;
+window.keyo_abrirModulo  = _abrirModulo;
 
 // ════════════════════════════════════════════════════════════════
 // INIT
@@ -456,6 +530,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.4 carregada — JWT da sessão ativo.');
+console.info('[KEYO-01] ✅ UI v1.6 carregada — aba Campanhas no painel lateral.');
 
 })();

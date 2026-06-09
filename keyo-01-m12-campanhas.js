@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M12: AGENDADOR DE CAMPANHAS v1.0
+// EXIT GAMES — KEYO M12: AGENDADOR DE CAMPANHAS v1.1
 // Arquivo: keyo-01-m12-campanhas.js
 // Injetar via: <script src="keyo-01-m12-campanhas.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
+// v1.1: renderização inline dentro da tela KEYO (sem item no menu)
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_M12() {
@@ -137,11 +138,26 @@ const M12_STATUS = {
 // ════════════════════════════════════════════════════════════════
 // ETAPA 2A.2 — _k12RenderAgendador() — LISTAGEM
 // ════════════════════════════════════════════════════════════════
-function _k12RenderAgendador() {
-  const pc = document.getElementById('pc');
-  if (!pc) return;
+// Renderiza dentro do keyo-main (chamado por keyo_abrirModulo)
+function _k12RenderAgendadorInline() {
+  // Remove área inline anterior se existir
+  const anterior = document.getElementById('keyo-m12-inline');
+  if (anterior) anterior.remove();
 
-  pc.innerHTML = `
+  // Esconde msgs e input do chat
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      msgs.style.display      = 'none';
+  if (inputArea) inputArea.style.display = 'none';
+
+  // Cria área inline dentro do keyo-main
+  const main = document.getElementById('keyo-main');
+  if (!main) return;
+
+  const area = document.createElement('div');
+  area.id = 'keyo-m12-inline';
+  area.style.cssText = 'flex:1;overflow-y:auto;padding:20px';
+  area.innerHTML = `
 <div id="m12-wrap">
   <div id="m12-header">
     <h2>📅 Agendador de Campanhas</h2>
@@ -165,7 +181,13 @@ function _k12RenderAgendador() {
   <div id="m12-lista"></div>
 </div>`;
 
+  main.appendChild(area);
   _k12RenderLista();
+}
+
+// Mantido para compatibilidade com monkey-patch do renderPage (PA='keyo-m12')
+function _k12RenderAgendador() {
+  _k12RenderAgendadorInline();
 }
 
 function _k12RenderLista() {
@@ -559,78 +581,28 @@ function _getJWT() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// MONKEY-PATCH DO renderPage() — intercepta PA === 'keyo-m12'
-// ════════════════════════════════════════════════════════════════
-(function _patchRenderPage() {
-  if (!window.renderPage) return;
-  const _orig = window.renderPage;
-  window.renderPage = function() {
-    if (window.PA === 'keyo-m12') {
-      const e = document.getElementById('pc');
-      if (e) _k12RenderAgendador();
-      return;
-    }
-    return _orig.apply(this, arguments);
-  };
-})();
-
-// ════════════════════════════════════════════════════════════════
-// INJETAR NO MENU KEYO (sub-item dentro da seção INTELIGÊNCIA)
-// ════════════════════════════════════════════════════════════════
-function _injetarMenuM12() {
-  function _fazer() {
-    const keyoItem = document.getElementById('keyo-menu-item');
-    if (!keyoItem) return false;
-    if (document.getElementById('keyo-m12-menu-item')) return true;
-
-    const item = document.createElement('div');
-    item.id = 'keyo-m12-menu-item';
-    item.className = 'sb-item';
-    item.innerHTML = '&nbsp;&nbsp;📅 <span>Campanhas</span>';
-    item.style.cssText = 'cursor:pointer;font-size:12px;padding-left:28px';
-    item.onclick = function() {
-      window.PA = 'keyo-m12';
-      document.querySelectorAll('#sbNav .sb-item').forEach(el => el.classList.remove('active'));
-      item.classList.add('active');
-      _k12RenderAgendador();
-    };
-
-    keyoItem.after(item);
-    return true;
-  }
-
-  if (!_fazer()) {
-    const obs = new MutationObserver(function() {
-      if (_fazer()) obs.disconnect();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  }
-}
-
-// ════════════════════════════════════════════════════════════════
 // EXPÕE GLOBALMENTE
 // ════════════════════════════════════════════════════════════════
-window.k12_renderLista  = _k12RenderLista;
-window.k12_abrirModal   = _k12AbrirModal;
-window.k12_salvar       = _k12Salvar;
-window.k12_gerarIA      = _k12GerarIA;
-window.k12_preview      = _k12Preview;
-window.k12_aprovar      = _k12Aprovar;
-window.k12_cancelar     = _k12Cancelar;
+window.k12_renderLista          = _k12RenderLista;
+window.k12_abrirModal           = _k12AbrirModal;
+window.k12_salvar               = _k12Salvar;
+window.k12_gerarIA              = _k12GerarIA;
+window.k12_preview              = _k12Preview;
+window.k12_aprovar              = _k12Aprovar;
+window.k12_cancelar             = _k12Cancelar;
+window._k12RenderAgendadorInline = _k12RenderAgendadorInline;
 
 // ════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
-    _injetarMenuM12();
     _k12IniciarMonitor();
   });
 } else {
-  _injetarMenuM12();
   _k12IniciarMonitor();
 }
 
-console.info('[KEYO-M12] ✅ M12 Agendador de Campanhas v1.0 carregado.');
+console.info('[KEYO-M12] ✅ M12 Agendador de Campanhas v1.1 carregado.');
 
 })();

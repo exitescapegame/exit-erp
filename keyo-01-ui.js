@@ -175,6 +175,21 @@ function _keyoHTML() {
         <span class="keyo-mod-emoji">💰</span>
         <span>Precificação</span>
       </button>
+      <button class="keyo-mod-btn" id="keyo-mod-churn"
+              onclick="window.keyo_abrirModulo('churn')">
+        <span class="keyo-mod-emoji">📉</span>
+        <span>Churn</span>
+      </button>
+      <button class="keyo-mod-btn" id="keyo-mod-propostas"
+              onclick="window.keyo_abrirModulo('propostas')">
+        <span class="keyo-mod-emoji">📋</span>
+        <span>Propostas</span>
+      </button>
+      <button class="keyo-mod-btn" id="keyo-mod-kpis"
+              onclick="window.keyo_abrirModulo('kpis')">
+        <span class="keyo-mod-emoji">📊</span>
+        <span>KPIs</span>
+      </button>
     </div>
   </div>
 
@@ -271,6 +286,60 @@ function _abrirModulo(modulo) {
         main.style.display = 'block';
         main.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de precificação não encontrado.</div>';
       }
+    }
+  }
+
+  if (modulo === 'churn') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '📉';
+    if (nome)  nome.textContent  = 'Churn';
+    if (desc)  desc.textContent  = 'Análise de retenção de clientes';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+    if (typeof window._m13RenderInline === 'function') {
+      window._m13RenderInline();
+    } else {
+      if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo M13 não encontrado.</div>'; }
+    }
+  }
+
+  if (modulo === 'propostas') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '📋';
+    if (nome)  nome.textContent  = 'Propostas';
+    if (desc)  desc.textContent  = 'Gestão de propostas comerciais';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+    if (typeof window._m14RenderInline === 'function') {
+      window._m14RenderInline();
+    } else {
+      if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo M14 não encontrado.</div>'; }
+    }
+  }
+
+  if (modulo === 'kpis') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '📊';
+    if (nome)  nome.textContent  = 'KPIs';
+    if (desc)  desc.textContent  = 'Indicadores de desempenho';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+    if (typeof window._m15RenderInline === 'function') {
+      window._m15RenderInline();
+    } else {
+      if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo M15 não encontrado.</div>'; }
     }
   }
 }

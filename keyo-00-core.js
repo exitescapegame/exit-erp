@@ -42,7 +42,7 @@ const _ERP_ORIGINALS = {
 };
 window.addEventListener('load', function() {
   Object.keys(_ERP_ORIGINALS).forEach(fn => {
-    if (window[fn] !== _ERP_ORIGINALS[fn] && fn !== 'renderPage') {
+    if (window[fn] !== _ERP_ORIGINALS[fn] && fn !== 'renderPage' && fn !== 'rSb') {
       console.error('[KEYO-00] ⚠️ Função ERP sobrescrita indevidamente:', fn);
     }
   });

@@ -13,7 +13,7 @@ if (!window.__KEYO_00_LOADED__) { console.error('[KEYO-M14] Core não carregado.
 window.__KEYO_M14_LOADED__ = true;
 
 // ── VERIFICAÇÃO DE DEPENDÊNCIAS ─────────────────────────────────
-const _DEPS = ['DB', 'UA', 'toast', 'sDB', 'uid', 'hoje', 'fM', 'san', 'isAdm'];
+const _DEPS = ['toast', 'uid', 'hoje', 'fM', 'san']; // UA/DB/sDB/isAdm são pós-login
 const _depsFaltando = _DEPS.filter(d => typeof window[d] === 'undefined');
 if (_depsFaltando.length > 0) {
   console.error('[KEYO-M14] Dependências ausentes:', _depsFaltando, '— módulo abortado.');

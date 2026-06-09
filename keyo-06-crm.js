@@ -128,51 +128,36 @@ window.addEventListener('load', function() {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// ETAPA 3.1 — MONKEY-PATCH SEGURO EM renderPage
-// Intercepta apenas PA='clientes', delega todo o resto ao original.
+// ETAPA 3.1 — PATCH SEGURO NO goTo()
+// PA e local no ERP (nao acessivel via window.PA).
+// Mesma estrategia do keyo-01-ui.js: intercepta goTo('clientes'),
+// deixa o ERP renderizar normalmente e depois injeta as abas.
 // ════════════════════════════════════════════════════════════════
-(function _patchRenderPage() {
-  // Espera renderPage estar disponível (pode ter sido patchado pelo KEYO-01-UI)
+(function _patchGoTo() {
   function _aplicarPatch() {
-    if (!window.renderPage) {
-      setTimeout(_aplicarPatch, 300);
-      return;
-    }
-    if (window.__KEYO_CRM_RP_PATCHED__) return;
-    window.__KEYO_CRM_RP_PATCHED__ = true;
+    if (!window.goTo) { setTimeout(_aplicarPatch, 300); return; }
+    if (window.__KEYO_CRM_GOTO_PATCHED__) return;
+    window.__KEYO_CRM_GOTO_PATCHED__ = true;
 
-    const _renderPageCRMOrig = window.renderPage;
-
-    window.renderPage = function() {
-      // Só intercepta quando estamos na página de clientes
-      if (window.PA === 'clientes') {
-        const e = document.getElementById('pc');
-        if (!e) return _renderPageCRMOrig.apply(this, arguments);
-
-        // Chama rClientes() original para obter o HTML da lista
-        let htmlOriginal = '';
-        try {
-          if (typeof window.rClientes === 'function') {
-            // rClientes normalmente escreve direto em #pc — capturamos via innerHTML
-            _renderPageCRMOrig.apply(this, arguments);
-            htmlOriginal = e.innerHTML;
-          } else {
-            return _renderPageCRMOrig.apply(this, arguments);
-          }
-        } catch(err) {
-          console.error('[KEYO-CRM] Erro ao capturar rClientes():', err);
-          return _renderPageCRMOrig.apply(this, arguments);
-        }
-
-        // Injeta abas em volta do conteúdo original
-        e.innerHTML = _htmlComAbas(htmlOriginal);
-        _initAbas();
-        return;
+    const _gotoOrig = window.goTo;
+    window.goTo = function(pg) {
+      var ret = _gotoOrig.apply(this, arguments);
+      if (pg === 'clientes') {
+        setTimeout(_injetarAbas, 50);
       }
-      return _renderPageCRMOrig.apply(this, arguments);
+      return ret;
     };
 
-    console.info('[KEYO-CRM] ✅ renderPage() interceptado — abas CRM ativas na tela de Clientes.');
+    console.info('[KEYO-CRM] goTo() interceptado — abas CRM ativas na tela de Clientes.');
+  }
+
+  function _injetarAbas() {
+    var e = document.getElementById('pc');
+    if (!e) return;
+    if (document.getElementById('keyo-crm-tabs')) return;
+    var htmlOriginal = e.innerHTML;
+    e.innerHTML = _htmlComAbas(htmlOriginal);
+    _initAbas();
   }
 
   if (document.readyState === 'loading') {

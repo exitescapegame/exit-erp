@@ -327,7 +327,7 @@ Regras:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (_SUPA_KEY),
+        'Authorization': 'Bearer ' + ((window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : _SUPA_KEY),
         'apikey': _SUPA_KEY,
       },
       body: JSON.stringify({
@@ -493,7 +493,7 @@ Você é o analista financeiro da EXIT GAMES. Responda de forma direta e objetiv
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (_SUPA_KEY),
+        'Authorization': 'Bearer ' + ((window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : _SUPA_KEY),
         'apikey': _SUPA_KEY,
       },
       body: JSON.stringify({

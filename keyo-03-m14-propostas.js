@@ -532,6 +532,8 @@ function _carregarHistorico(id) {
 // ════════════════════════════════════════════════════════════════
 window._m14RenderInline        = _renderInline;
 window.m14_tipo                = _setTipo;
+window.m14_subtipo             = _setSubtipo;
+window.m14_local               = _setLocal;
 window.m14_gerar               = _gerar;
 window.m14_copiar              = _copiar;
 window.m14_whatsapp            = _whatsapp;

@@ -3,9 +3,8 @@
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v1.9: FIX — _trocarAgente() agora remove inline de TODOS os módulos
-//        (m12 a m16) e para o timer M15. _abrirModulo() também limpa
-//        módulos anteriores antes de montar o novo.
+// v1.9: FIX — _trocarAgente() remove módulos inline SEMPRE (não só
+//        quando _kAba !== 'chat'). Remove m12 a m16 e chama _k15Stop().
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -228,16 +227,6 @@ function _keyoHTML() {
 function _abrirModulo(modulo) {
   _kAba = modulo;
 
-  // Remove inline de TODOS os módulos antes de montar o novo
-  ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
-   'keyo-m15-inline','keyo-m16-inline'].forEach(function(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-  });
-
-  // Para o timer do M15 se estiver rodando e não for kpis
-  if (modulo !== 'kpis' && typeof window._k15Stop === 'function') window._k15Stop();
-
   // Desmarca agentes, marca módulo
   document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
@@ -381,24 +370,18 @@ function _trocarAgente(id) {
   const ag = window.KEYO_AGENTS.find(a => a.id === id);
   if (!ag) return;
 
-  // Se estava em módulo, restaura área de chat
-  if (_kAba !== 'chat') {
-    _kAba = 'chat';
-    const inputArea = document.getElementById('keyo-input-area');
-    const msgs      = document.getElementById('keyo-msgs');
-    if (inputArea) inputArea.style.display = '';
-    if (msgs)      msgs.style.display      = '';
-
-    // Remove inline de TODOS os módulos (m12 a m16)
-    ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
-     'keyo-m15-inline','keyo-m16-inline'].forEach(function(id) {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    });
-
-    // Para o timer do M15 se estiver rodando
-    if (typeof window._k15Stop === 'function') window._k15Stop();
-  }
+  // Sempre limpa módulos inline ao trocar de agente
+  _kAba = 'chat';
+  const inputArea = document.getElementById('keyo-input-area');
+  const msgs      = document.getElementById('keyo-msgs');
+  if (inputArea) inputArea.style.display = '';
+  if (msgs)      msgs.style.display      = '';
+  ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
+   'keyo-m15-inline','keyo-m16-inline'].forEach(function(mid) {
+    const el = document.getElementById(mid);
+    if (el) el.remove();
+  });
+  if (typeof window._k15Stop === 'function') window._k15Stop();
 
   _kAgente = id;
 
@@ -654,6 +637,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.9 carregada — fix: módulos inline limpam corretamente ao trocar agente/módulo.');
+console.info('[KEYO-01] ✅ UI v1.9 — fix: módulos inline removidos sempre ao trocar agente.');
 
 })();

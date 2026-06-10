@@ -192,13 +192,26 @@ let _igCache = {
 
 async function _igAPI(acao, params = {}) {
   /* Todas as chamadas à API do Instagram passam pela Edge Function
-     para não expor tokens no frontend. */
+     para não expor tokens no frontend.
+     Autenticação: usa o JWT da sessão do ERP (mesmo padrão do chat).
+     A Edge Function exige um usuário logado (auth.getUser) — só a anon
+     key resulta em 401 "Sessão inválida". */
+  let jwt = '';
+  try {
+    const erpSession = JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
+    jwt = erpSession?.access_token || '';
+    if (!jwt && window._keyoToken) jwt = window._keyoToken;
+    if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || _IG_ANON;
+  } catch (e) {
+    jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || _IG_ANON;
+  }
   try {
     const resp = await fetch(_IG_EDGE, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + _IG_ANON,
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + jwt,
+        'apikey':        window.KEYO_ANON_KEY || _IG_ANON,
       },
       body: JSON.stringify({
         agente:     'instagram',
@@ -661,6 +674,9 @@ function _igRenderPagina() {
       </div>
       <div id="keyo-ig-unid-sel">${unidBtns}</div>
     </div>
+    <div style="margin-top:8px">
+      <button class="ig-unid-btn" onclick="window._igDescobrir()" title="Lista as contas @ que o token enxerga e seus IDs">🔍 Descobrir contas</button>
+    </div>
   </div>
   <div id="keyo-ig-abas">${abasBtns}</div>
   <div id="keyo-ig-corpo"></div>
@@ -751,6 +767,39 @@ document.addEventListener('click', function (e) {
 // ── Expõe funções de navegação globalmente ──────────────────────
 window._igNavAba      = _igNavAba;
 window._igNavUnidade  = _igNavUnidade;
+
+// ── Descobrir contas: lista as @ que o token enxerga e seus IDs ──
+window._igDescobrir = async function () {
+  const corpo = document.getElementById('keyo-ig-corpo');
+  if (corpo) corpo.innerHTML = '<div style="padding:24px;color:#888899;font-size:13px">🔍 Consultando o token…</div>';
+  try {
+    const data = await _igAPI('descobrir', {});
+    const paginas = data.paginas || [];
+    if (!paginas.length) {
+      if (corpo) corpo.innerHTML = '<div style="padding:24px;color:#a32d2d;font-size:13px">Nenhuma Página encontrada. O token de System User ainda não tem as Páginas do Facebook atribuídas — verifique na Meta Business.</div>';
+      return;
+    }
+    const linhas = paginas.map(p => `
+      <tr>
+        <td style="padding:8px 10px;border-bottom:0.5px solid #e8e8f0">${p.ig_username ? '@' + p.ig_username : '—'}</td>
+        <td style="padding:8px 10px;border-bottom:0.5px solid #e8e8f0">${p.page_nome || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:0.5px solid #e8e8f0;font-family:monospace;font-size:12px;user-select:all">${p.ig_id || '—'}</td>
+      </tr>`).join('');
+    if (corpo) corpo.innerHTML = `
+      <div style="padding:18px">
+        <div style="font-size:13px;font-weight:700;color:#111118;margin-bottom:4px">Contas encontradas</div>
+        <div style="font-size:11px;color:#888899;margin-bottom:12px">Copie cada <strong>ig_id</strong> para os secrets IG_USER_ARACAJU / IG_USER_SALVADOR.</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="text-align:left;color:#888899;font-size:11px">
+            <th style="padding:6px 10px">Conta @</th><th style="padding:6px 10px">Página FB</th><th style="padding:6px 10px">ig_id</th>
+          </tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    if (corpo) corpo.innerHTML = '<div style="padding:24px;color:#a32d2d;font-size:13px">Erro: ' + e.message + '</div>';
+  }
+};
 
 
 // ════════════════════════════════════════════════════════════════

@@ -365,12 +365,15 @@ let _abaAtiva = 'fila'; // 'fila' | 'aprovados' | 'pipeline' | 'relatorio' | 'co
 let _filtros = { categoria: '', cidade: '', potencial: '', tamanho: '' };
 
 function _renderInline() {
-  // Remove área anterior (garante idempotência)
-  const anterior = document.getElementById('keyo-mpros-inline');
-  if (anterior) anterior.remove();
+  // Remove TODOS os módulos inline que possam estar abertos (evita sobreposição)
+  ['keyo-mpros-inline','keyo-m12-inline','keyo-m13-inline',
+   'keyo-m14-inline','keyo-m15-inline','keyo-m16-inline'].forEach(function(mid) {
+    const el = document.getElementById(mid);
+    if (el) el.remove();
+  });
+  // Para o timer do KPIs se estiver rodando
+  if (typeof window._k15Stop === 'function') window._k15Stop();
 
-  // Execução síncrona — o requestAnimationFrame anterior criava race condition:
-  // _trocarAgente() limpava o inline e logo em seguida o rAF recriava a div no DOM errado.
   const msgs      = document.getElementById('keyo-msgs');
   const inputArea = document.getElementById('keyo-input-area');
   if (msgs)      { msgs.style.display      = 'none'; }
@@ -1654,6 +1657,8 @@ function _htmlCriacao() {
           </div>
           <div class="cri-lista-acoes">
             <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_verSala('${s.id}')">👁 Ver</button>
+            <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_downloadSala('${s.id}')">⬇️ Baixar</button>
+            <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_emailSala('${s.id}')">📧 E-mail</button>
             <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_imprimirSala('${s.id}')">🖨️ Imprimir</button>
             <button class="mpros-btn mpros-btn-danger" onclick="window.mpros_excluirSala('${s.id}')">🗑</button>
           </div>

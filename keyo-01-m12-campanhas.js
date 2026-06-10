@@ -1,9 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M12: AGENDADOR DE CAMPANHAS v1.1
+// EXIT GAMES — KEYO M12: AGENDADOR DE CAMPANHAS v1.2
 // Arquivo: keyo-01-m12-campanhas.js
 // Injetar via: <script src="keyo-01-m12-campanhas.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
 // v1.1: renderização inline dentro da tela KEYO (sem item no menu)
+// v1.2: MELHORIA 3 — _k12GerarIA() agora injeta contexto real do DB
+//        (data, ano, unidade, clientes, faturamento do mês, ticket médio,
+//         campanhas anteriores no mesmo canal) antes do prompt da IA.
+//        Adicionada _k12MontarContexto(canal, unidadeId). Sem quebra de API.
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_M12() {
@@ -388,16 +392,66 @@ function _k12Salvar(id) {
   _k12RenderLista();
 }
 
+// ── Contexto real do DB para geração de campanha ────────────────
+function _k12MontarContexto(canal, unidadeId) {
+  try {
+    const hoje     = typeof window.hoje === 'function' ? window.hoje() : new Date().toISOString().slice(0, 10);
+    const anoAtual = new Date().getFullYear();
+    const mesAtual = hoje.slice(0, 7);
+    const dataFmt  = new Date(hoje + 'T12:00:00').toLocaleDateString('pt-BR');
+
+    const vendas   = Array.isArray(window.DB?.vendas)   ? window.DB.vendas   : [];
+    const clientes = Array.isArray(window.DB?.clientes) ? window.DB.clientes : [];
+
+    const vendasMes = vendas.filter(v => v.status === 'confirmado' && v.data?.startsWith(mesAtual));
+    const fat       = vendasMes.reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
+    const ticket    = vendasMes.length ? (fat / vendasMes.length) : 0;
+
+    const nomeUnidade = (unidadeId == 2)
+      ? 'EXIT SALVADOR — Shopping Barra'
+      : 'EXIT ARACAJU — Shopping Jardins';
+
+    const campanhasAnt = (window.DB?.keyoCampanhas || [])
+      .filter(c => c.canal === canal && c.status !== 'rascunho')
+      .slice(-3)
+      .map(c => `"${c.titulo}" (${c.status})`)
+      .join(', ');
+
+    return [
+      `╔══ CONTEXTO EXIT GAMES — ${dataFmt} (${anoAtual}) ══╗`,
+      `Unidade: ${nomeUnidade}`,
+      `Clientes cadastrados: ${clientes.length}`,
+      `Vendas confirmadas este mês: ${vendasMes.length}`,
+      `Faturamento do mês: R$ ${fat.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      `Ticket médio: R$ ${ticket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      campanhasAnt ? `Últimas campanhas no canal ${canal}: ${campanhasAnt}` : '',
+      `╚══════════════════════════════════════════╝`,
+    ].filter(Boolean).join('\n');
+  } catch(e) {
+    console.warn('[KEYO-M12] _k12MontarContexto falhou:', e);
+    return '';
+  }
+}
+
 // ── Gerar mensagem com IA ────────────────────────────────────────
 async function _k12GerarIA() {
-  const prompt  = document.getElementById('m12-ia-prompt')?.value.trim();
-  const canal   = document.getElementById('m12-canal')?.value;
-  const titulo  = document.getElementById('m12-titulo')?.value.trim();
+  const prompt    = document.getElementById('m12-ia-prompt')?.value.trim();
+  const canal     = document.getElementById('m12-canal')?.value;
+  const titulo    = document.getElementById('m12-titulo')?.value.trim();
+  const unidadeId = document.getElementById('m12-unidade')?.value;
 
   if (!prompt) { window.toast('Descreva o tipo de campanha para a IA.', 'warn'); return; }
 
   const btn = document.querySelector('#m12-modal .m12-btn-aprovar');
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  const ctx         = _k12MontarContexto(canal, unidadeId);
+  const msgCompleta = (ctx ? ctx + '\n\n' : '') +
+    `Crie uma mensagem de campanha de marketing para canal ${canal || 'WhatsApp'} sobre: "${prompt}". ` +
+    `Título sugerido: "${titulo || 'Promoção EXIT GAMES'}". ` +
+    `Use os dados de contexto acima (clientes, faturamento, unidade) para personalizar o tom e a urgência. ` +
+    `A mensagem deve ser direta, atrativa, com no máximo 200 caracteres, em português brasileiro. ` +
+    `Retorne SOMENTE o texto da mensagem, sem aspas, sem prefixo.`;
 
   try {
     const jwt = _getJWT();
@@ -410,9 +464,9 @@ async function _k12GerarIA() {
       },
       body: JSON.stringify({
         agente:     'mkt',
-        mensagem:   `Crie uma mensagem de campanha de marketing para canal ${canal || 'WhatsApp'} sobre: "${prompt}". Título sugerido: "${titulo || 'Promoção EXIT GAMES'}". A mensagem deve ser direta, atrativa, com no máximo 200 caracteres, em português brasileiro. Retorne SOMENTE o texto da mensagem, sem aspas, sem prefixo.`,
+        mensagem:   msgCompleta,
         historico:  [],
-        unidade_id: Number(window.UA?.unidade) || 1,
+        unidade_id: Number(unidadeId) || Number(window.UA?.unidade) || 1,
       })
     });
 
@@ -603,6 +657,6 @@ if (document.readyState === 'loading') {
   _k12IniciarMonitor();
 }
 
-console.info('[KEYO-M12] ✅ M12 Agendador de Campanhas v1.1 carregado.');
+console.info('[KEYO-M12] ✅ M12 Agendador de Campanhas v1.2 — _k12GerarIA() com contexto real do DB (data, unidade, faturamento, campanhas anteriores).');
 
 })();

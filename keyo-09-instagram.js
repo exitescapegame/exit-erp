@@ -668,62 +668,131 @@ function _igRenderPagina() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// INTEGRAÇÃO COM O ROUTER DO ERP (renderPage patch)
+// INTEGRAÇÃO INLINE (padrão Cientista) — monta dentro de #keyo-main
+// SEM apagar a tela do KEYO·IA. Não sobrescreve mais window.renderPage.
 // ════════════════════════════════════════════════════════════════
 
-const _renderPageOrig = window.renderPage;
+const _IG_INLINE_ID = 'keyo-instagram-inline';
 
-window.renderPage = function (pagina) {
-  if (pagina === 'keyo-instagram') {
-    const container = document.getElementById('app') || document.getElementById('main') || document.body;
-    container.innerHTML = _igRenderPagina();
-    _igRenderModal();
-    _igNavAba('feed');
-    return;
-  }
-  if (typeof _renderPageOrig === 'function') _renderPageOrig(pagina);
-};
+// IDs de inline de outros módulos — removidos ao abrir o Instagram
+const _IG_OUTROS_INLINE = ['keyo-mpros-inline','keyo-m12-inline','keyo-m13-inline',
+  'keyo-m14-inline','keyo-m15-inline','keyo-m16-inline'];
+
+function _igMontarInline() {
+  // Fecha Cientista e demais módulos inline (evita sobreposição)
+  if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
+  _IG_OUTROS_INLINE.forEach(function (mid) {
+    const el = document.getElementById(mid);
+    if (el) el.remove();
+  });
+  if (typeof window._k15Stop === 'function') window._k15Stop();
+
+  // Esconde a área de chat
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      msgs.style.display      = 'none';
+  if (inputArea) inputArea.style.display = 'none';
+
+  const main = document.getElementById('keyo-main');
+  if (!main) return;
+
+  // Atualiza o cabeçalho
+  const emoji = document.getElementById('keyo-header-emoji');
+  const nome  = document.getElementById('keyo-header-nome');
+  const desc  = document.getElementById('keyo-header-desc');
+  if (emoji) emoji.textContent = '📷';
+  if (nome)  nome.textContent  = 'Instagram';
+  if (desc)  desc.textContent  = 'Feed, comentários, mensagens e insights';
+
+  let area = document.getElementById(_IG_INLINE_ID);
+  if (area) area.remove();
+  area = document.createElement('div');
+  area.id = _IG_INLINE_ID;
+  area.style.cssText = 'flex:1;overflow:auto;display:flex;flex-direction:column';
+  area.innerHTML = _igRenderPagina();
+  main.appendChild(area);
+
+  _igRenderModal();
+  _igNavAba('feed');
+}
+
+function _abrirInstagram() {
+  document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('keyo-mod-instagram');
+  if (btn) btn.classList.add('active');
+  _igMontarInline();
+}
+
+function _fecharInstagram() {
+  const area = document.getElementById(_IG_INLINE_ID);
+  if (area) area.remove();
+  const btn = document.getElementById('keyo-mod-instagram');
+  if (btn) btn.classList.remove('active');
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      msgs.style.cssText      = '';
+  if (inputArea) inputArea.style.cssText = '';
+}
+
+window.instagram_abrir  = _abrirInstagram;
+window.instagram_fechar = _fecharInstagram;
+
+// Auto-fecha o Instagram quando o usuário clica em outro agente/módulo.
+// (O keyo-01-ui.js não conhece este módulo, então tratamos aqui.)
+document.addEventListener('click', function (e) {
+  if (!document.getElementById(_IG_INLINE_ID)) return;
+  const alvo = e.target.closest('.keyo-agent-btn, .keyo-mod-btn');
+  if (!alvo) return;
+  if (alvo.id === 'keyo-mod-instagram') return; // clicou no próprio
+  _fecharInstagram();
+}, true);
 
 // ── Expõe funções de navegação globalmente ──────────────────────
 window._igNavAba      = _igNavAba;
 window._igNavUnidade  = _igNavUnidade;
 
+
 // ════════════════════════════════════════════════════════════════
-// SIDEBAR — injeta item no menu do ERP
+// SIDEBAR — injeta botão "Instagram" na lista de MÓDULOS
+// (mesmo container e classe do Cientista: #keyo-agents-modulos / .keyo-mod-btn)
 // ════════════════════════════════════════════════════════════════
 
-function _igInjetarSidebar() {
-  // Aguarda o DOM estar pronto e o ERP ter renderizado o sidebar
-  const tentativas = [300, 800, 1500, 3000];
-  tentativas.forEach(delay => {
-    setTimeout(() => {
-      // Tenta encontrar o item "KEYO" no sidebar para inserir após
-      const sidebar = document.querySelector('#sidebar, #nav, .sidebar, nav');
-      if (!sidebar) return;
-      if (document.getElementById('keyo-ig-nav-item')) return;
+(function _injetarBotaoInstagram() {
+  function _ensureBotao() {
+    const modulosDiv = document.getElementById('keyo-agents-modulos');
+    if (!modulosDiv) return false;
+    let btn = document.getElementById('keyo-mod-instagram');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'keyo-mod-btn';
+      btn.id        = 'keyo-mod-instagram';
+      btn.innerHTML = '<span class="keyo-mod-emoji">📷</span><span>Instagram</span>';
+      btn.onclick   = window.instagram_abrir;
+      modulosDiv.appendChild(btn);
+    }
+    // Sincroniza 'active' com o estado do inline
+    if (document.getElementById('keyo-instagram-inline')) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+    return true;
+  }
 
-      // Procura item KEYO existente
-      const keyoItem = Array.from(sidebar.querySelectorAll('*'))
-        .find(el => el.textContent.trim() === 'KEYO' || el.dataset?.page === 'keyo');
+  function _tentar() {
+    if (!_ensureBotao()) setTimeout(_tentar, 600);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _tentar);
+  else _tentar();
 
-      const li = document.createElement('li');
-      li.id = 'keyo-ig-nav-item';
-      li.style.cssText = 'cursor:pointer;padding:8px 16px;font-size:13px;color:#888899;display:flex;align-items:center;gap:8px';
-      li.innerHTML = '📷 Instagram';
-      li.addEventListener('mouseenter', () => li.style.color = '#C9A84C');
-      li.addEventListener('mouseleave', () => li.style.color = '#888899');
-      li.addEventListener('click', () => window.renderPage('keyo-instagram'));
-
-      if (keyoItem?.parentElement) {
-        keyoItem.parentElement.insertAdjacentElement('afterend', li);
-      } else {
-        sidebar.appendChild(li);
-      }
-    }, delay);
-  });
-}
-
-_igInjetarSidebar();
+  try {
+    const _obs = new MutationObserver(() => { _ensureBotao(); });
+    _obs.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {
+    setInterval(_ensureBotao, 1500);
+  }
+})();
 
 // ════════════════════════════════════════════════════════════════
 // INIT CHECK — avisa se Edge Function não suporta acao=instagram

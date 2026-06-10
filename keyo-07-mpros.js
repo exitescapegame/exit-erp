@@ -470,7 +470,15 @@ function _renderAba(id) {
   else if (id === 'pipeline')  { content.innerHTML = _htmlPipeline(); }
   else if (id === 'relatorio') { content.innerHTML = _htmlRelatorio(); }
   else if (id === 'config')    { content.innerHTML = _htmlConfig(); }
-  else if (id === 'criacao')   { _criandoSala = false; content.innerHTML = _htmlCriacao(); }
+  else if (id === 'criacao')   {
+    _criandoSala = false;
+    // Restaura _salaAtual da lista salva se estiver null (ex: usuário saiu e voltou)
+    if (!_salaAtual) {
+      const salas = _salas();
+      if (salas.length > 0) _salaAtual = salas[salas.length - 1]; // mais recente
+    }
+    content.innerHTML = _htmlCriacao();
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1842,7 +1850,7 @@ Entregue o projeto completo com todas as 14 seções. Seja o Cientista: rigoroso
   return { sistema, usuario };
 }
 
-// ── Chamada à IA (mesmo canal/formato do scoring que funciona) ──
+// ── Chamada simples à IA ─────────────────────────────────────────
 async function _chamarCientista(sistema, usuario) {
   const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/super-action';
   const unidade  = (window.UA && (window.UA.unidade || window.UA.unidadeId)) || 1;
@@ -1851,7 +1859,7 @@ async function _chamarCientista(sistema, usuario) {
     method: 'POST',
     headers: _keyoHeaders(),
     body: JSON.stringify({
-      agente:     'mkt',                       // canal existente; o cérebro vai na mensagem
+      agente:     'mkt',
       mensagem:   `${sistema}\n\n${usuario}`,
       historico:  [],
       unidade_id: unidade,
@@ -1862,6 +1870,104 @@ async function _chamarCientista(sistema, usuario) {
   let texto = (data && data.resposta) ? data.resposta : '';
   if (!texto && Array.isArray(data?.content)) texto = data.content.map(c => c.text || '').join('');
   return (texto || '').trim();
+}
+
+// ── Chamada em 2 partes para projetos grandes (evita truncamento por max_tokens) ──
+// Parte 1: seções 1–5 (conceito, sinopse, narrativa, briefing, cenografia)
+// Parte 2: seções 6–14 (puzzles completos + fluxo + orçamento etc.)
+async function _chamarCientistaCompleto(dados, projetoAnterior, pedidoAjuste) {
+  const qtd = dados && Number(dados.numPuzzles) > 0
+    ? Number(dados.numPuzzles)
+    : Math.max(3, Math.round(Number(dados?.tempoMin || 60) / 9));
+
+  // Para refinamentos ou projetos pequenos (≤5 puzzles), usa chamada única
+  if (projetoAnterior || qtd <= 5) {
+    const { sistema, usuario } = _promptCientista(dados, projetoAnterior, pedidoAjuste);
+    return await _chamarCientista(sistema, usuario);
+  }
+
+  // Para projetos grandes (6+ puzzles): divide em 2 chamadas sequenciais
+  const statusEl = document.getElementById('cri-resultado');
+
+  // — PARTE 1: seções 1–5 —
+  if (statusEl) statusEl.innerHTML = `<div class="cri-painel cri-loading">🔬 Parte 1/2 — Construindo conceito, narrativa e cenografia...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
+
+  const { sistema } = _promptCientista(dados);
+  const usuarioParte1 = `Elabore as SEÇÕES 1 a 5 do PROJETO EXECUTIVO de uma sala de escape com os seguintes parâmetros:
+- Tema: ${dados.tema}
+- Duração: ${dados.tempoMin} minutos
+- Puzzles: ${qtd} (serão detalhados na etapa seguinte)
+- Jogadores: ${dados.jogadores}
+- Dificuldade: ${dados.dificuldade}
+${dados.instrucoes ? `- Instrução específica: ${dados.instrucoes}` : ''}
+
+Entregue APENAS as seções 1, 2, 3, 4 e 5 com toda a profundidade exigida. Termine exatamente na seção 5. Não comece os puzzles ainda.`;
+
+  const parte1 = await _chamarCientista(sistema, usuarioParte1);
+  if (!parte1) throw new Error('Parte 1 retornou vazia');
+
+  // — PARTE 2: seção 6 (puzzles) + seções 7–14 —
+  if (statusEl) statusEl.innerHTML = `<div class="cri-painel cri-loading">🔬 Parte 2/2 — Projetando os ${qtd} puzzles e detalhes operacionais...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
+
+  function _templatePuzzlesFull(n) {
+    let t = '';
+    for (let i = 1; i <= n; i++) {
+      t += `\n### Puzzle ${i} — [Nome] · MECÂNICO ou ELETRÔNICO\n` +
+        `- **Posição na sala:** onde fisicamente está localizado\n` +
+        `- **O que o jogador vê ao se aproximar:** descrição sensorial completa\n` +
+        `- **Narrativa do puzzle:** por que esse objeto/mecanismo existe dentro da história\n` +
+        `- **Lógica de dedução:** o raciocínio exato que leva à solução, passo a passo\n` +
+        `- **Solução exata:** [especifique sem ambiguidade]\n` +
+        `- **O que libera:** o que o jogador acessa ou recebe ao resolver\n` +
+        `- **Materiais e especificações:** lista com descrição técnica de cada item\n` +
+        `- **Custo estimado:** faixa em reais (ex: R$80–150)\n` +
+        `- **Instrução de montagem:** como instalar e configurar\n` +
+        `- **Reset entre grupos:** o que o operador faz para reiniciar em menos de 2 minutos\n`;
+    }
+    return t;
+  }
+
+  const usuarioParte2 = `Continuação do projeto da sala abaixo. Você já entregou as seções 1–5. Agora entregue as SEÇÕES 6 a 14.
+
+CONTEXTO DA SALA (seções 1–5 já criadas):
+${parte1.slice(0, 3000)}
+
+---
+AGORA ENTREGUE:
+
+## 6. Puzzles — OBRIGATÓRIO: EXATAMENTE ${qtd} puzzles — NÃO CRIE MAIS NEM MENOS
+ATENÇÃO: você DEVE criar TODOS os ${qtd} puzzles numerados abaixo. NÃO pare antes do Puzzle ${qtd}. NÃO pule nenhum.
+${_templatePuzzlesFull(qtd)}
+
+## 7. Fluxo e Mapa da Experiência
+Diagrama textual: ENTRADA → [gatilho 1] → Puzzle 1 → ... → Puzzle final → SAÍDA. Inclua ramificações paralelas, momentos de revelação, pontos de tensão, onde o GM pode intervir.
+
+## 8. Curva de Dificuldade
+Como a dificuldade evolui. Puzzles de aquecimento, pico de tensão, como a sala "respira". Justifique com game design.
+
+## 9. Trilha Sonora e Design de Áudio
+Fases musicais, efeitos sonoros programados com momento exato, equipamento recomendado.
+
+## 10. Lista de Materiais Completa
+Por categoria: cenografia, fechaduras, eletrônicos, adereços, consumíveis — com quantidade, especificação e faixa de preço.
+
+## 11. Orçamento Total Estimado
+Tabela com subtotal por categoria e total geral. Econômico / padrão / premium.
+
+## 12. Operação e Game Master
+Posição de monitoramento, câmeras, sistema de dicas (3 por puzzle difícil), protocolo de emergência, tempo de reset.
+
+## 13. Potencial Comercial e Público-Alvo
+Perfil ideal, argumento de venda, precificação para Aracaju/SE e Salvador/BA, potencial de recompra.
+
+## 14. Fontes e Referências de Pesquisa
+Sites especializados, comunidades, livros/artigos de game design, salas de referência mundial.`;
+
+  const parte2 = await _chamarCientista(sistema, usuarioParte2);
+  if (!parte2) throw new Error('Parte 2 retornou vazia');
+
+  // Une as duas partes
+  return parte1.trim() + '\n\n' + parte2.trim();
 }
 
 // ── Extrai título do projeto (primeira linha com #) ──────────────
@@ -1890,8 +1996,7 @@ async function _criarSala() {
   if (res) res.innerHTML = `<div class="cri-painel cri-loading">🔬 O Cientista está projetando a sala com calma...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
 
   try {
-    const { sistema, usuario } = _promptCientista(dados);
-    const texto = await _chamarCientista(sistema, usuario);
+    const texto = await _chamarCientistaCompleto(dados);
     if (!texto) throw new Error('Resposta vazia');
 
     const sala = {
@@ -1941,14 +2046,16 @@ function _renderProjeto(sala) {
       <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_copiarSala('${sala.id}')">📋 Copiar</button>
       <button class="mpros-btn mpros-btn-success"   onclick="window.mpros_enviarSala('${sala.id}')">💬 WhatsApp</button>
       <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_imprimirSala('${sala.id}')">🖨️ Imprimir</button>
+      <button class="mpros-btn mpros-btn-primary"   onclick="document.getElementById('cri-ajuste-bloco-${sala.id}').scrollIntoView({behavior:'smooth'});document.getElementById('cri-ajuste-${sala.id}').focus()">✏️ Pedir ajuste</button>
     </div>
   </div>
   ${_md2html(sala.projeto)}
-  <div class="cri-painel" style="margin-top:18px;margin-bottom:0">
-    <label style="font-size:11px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px">Pedir um ajuste ao Cientista</label>
-    <textarea id="cri-ajuste-${sala.id}" style="width:100%;margin-top:6px;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #d8d8e8;border-radius:8px;min-height:50px" placeholder="Ex: deixe o puzzle 3 mais difícil, troque o cadeado por um cofre, adicione um susto no final..."></textarea>
+  <div class="cri-painel" id="cri-ajuste-bloco-${sala.id}" style="margin-top:18px;margin-bottom:0;border:2px solid #C9A84C">
+    <label style="font-size:11px;font-weight:700;color:#888899;text-transform:uppercase;letter-spacing:.5px">✏️ Pedir um ajuste ao Cientista</label>
+    <p style="font-size:11px;color:#888899;margin:4px 0 8px">Ex: "deixe o puzzle 3 mais difícil", "troque o cadeado por um cofre", "adicione um susto no final", "crie mais 2 puzzles"</p>
+    <textarea id="cri-ajuste-${sala.id}" style="width:100%;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #d8d8e8;border-radius:8px;min-height:60px;box-sizing:border-box" placeholder="Descreva o que quer mudar ou adicionar..."></textarea>
     <div class="cri-actions">
-      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_refinarSala('${sala.id}')">🔁 Aplicar ajuste</button>
+      <button class="mpros-btn mpros-btn-primary" onclick="window.mpros_refinarSala('${sala.id}')">🔁 Aplicar ajuste</button>
     </div>
   </div>
 </div>`;
@@ -1967,8 +2074,7 @@ async function _refinarSala(id) {
   if (res) res.innerHTML = `<div class="cri-painel cri-loading">🔁 Aplicando seu ajuste...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
 
   try {
-    const { sistema, usuario } = _promptCientista(sala, sala.projeto, pedido);
-    const texto = await _chamarCientista(sistema, usuario);
+    const texto = await _chamarCientistaCompleto(sala, sala.projeto, pedido);
     if (!texto) throw new Error('Resposta vazia');
     sala.projeto = texto;
     sala.titulo  = _tituloDoProjeto(texto, sala.tema);
@@ -2011,9 +2117,8 @@ function _excluirSala(id) {
 function _imprimirSala(id) {
   const sala = _salas().find(s => s.id === id) || _salaAtual;
   if (!sala) return;
-  const w = window.open('', '_blank');
-  if (!w) { window.toast('Permita pop-ups para imprimir.', 'warn'); return; }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${_esc(sala.titulo)}</title>
+
+  const htmlConteudo = `<!doctype html><html><head><meta charset="utf-8"><title>${_esc(sala.titulo)}</title>
 <style>
   body{font-family:Arial,Helvetica,sans-serif;color:#222;line-height:1.6;max-width:760px;margin:24px auto;padding:0 22px}
   h1{font-size:22px;border-bottom:2px solid #C9A84C;padding-bottom:8px}
@@ -2021,13 +2126,43 @@ function _imprimirSala(id) {
   h3{font-size:14px;margin:14px 0 4px}
   ul{padding-left:20px} li{margin-bottom:3px}
   .meta{font-size:12px;color:#777;margin-bottom:16px}
+  @media print{body{margin:0}}
 </style></head><body>
 <div class="meta">EXIT GAMES — Projeto de Sala · Tema: ${_esc(sala.tema)} · ${sala.tempoMin} min · ${_esc(sala.jogadores)} jogadores · ${_esc(sala.dificuldade)}</div>
 ${_md2html(sala.projeto)}
-</body></html>`);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
+</body></html>`;
+
+  // Tenta primeiro via window.open (melhor resultado de impressão)
+  const w = window.open('', '_blank');
+  if (w) {
+    w.document.write(htmlConteudo);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 600);
+    return;
+  }
+
+  // Fallback: iframe oculto (funciona mesmo com popup blocker)
+  let iframe = document.getElementById('_keyo_print_iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = '_keyo_print_iframe';
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
+    document.body.appendChild(iframe);
+  }
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(htmlConteudo);
+  doc.close();
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      // Se tudo falhar, oferece download do txt como alternativa
+      window.toast('Impressão bloqueada pelo navegador. Use ⬇️ Baixar .txt.', 'warn');
+    }
+  }, 600);
 }
 
 // ── Download como arquivo .txt ─────────────────────────────────

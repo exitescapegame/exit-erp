@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v2.0
+// EXIT GAMES — KEYO UI v2.1
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
@@ -522,6 +522,78 @@ function _hideLoading() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// CONTEXTO REAL DO DB — injetado no prompt de cada agente
+// Resolve o problema de a IA inventar dados e usar datas antigas.
+// O M15 (KPIs) já faz isso correto — replicamos o padrão aqui.
+// ════════════════════════════════════════════════════════════════
+function _montarContextoAgente(agente) {
+  try {
+    const hoje     = typeof window.hoje === 'function' ? window.hoje() : new Date().toISOString().slice(0, 10);
+    const anoAtual = new Date().getFullYear();
+    const mesAtual = hoje.slice(0, 7);
+
+    const vendas   = Array.isArray(window.DB?.vendas)   ? window.DB.vendas   : [];
+    const clientes = Array.isArray(window.DB?.clientes) ? window.DB.clientes : [];
+    const unidades = Array.isArray(window.DB?.unidades) ? window.DB.unidades : [];
+
+    const vendasConf = vendas.filter(v => v.status === 'confirmado');
+    const vendasMes  = vendasConf.filter(v => v.data?.startsWith(mesAtual));
+    const fat        = vendasMes.reduce((s, v)  => s + (Number(v.valorTotal) || 0), 0);
+    const fatTotal   = vendasConf.reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
+    const ticket     = vendasMes.length ? (fat / vendasMes.length) : 0;
+    const canceladas = vendas.filter(v => v.status === 'cancelado').length;
+
+    const nomeUnidade = (window.UA?.unidade === 2 || window.UA?.unidadeId === 2)
+      ? 'EXIT SALVADOR — Shopping Barra'
+      : 'EXIT ARACAJU — Shopping Jardins';
+
+    const campanhasAtivas = Array.isArray(window.DB?.keyoCampanhas)
+      ? window.DB.keyoCampanhas.filter(c => c.status === 'agendada').length
+      : 0;
+
+    const salas = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
+    const staff = Array.isArray(window.DB?.staff) ? window.DB.staff : [];
+
+    const base = [
+      '╔══ CONTEXTO REAL DA EXIT GAMES (use estes dados — não invente) ══╗',
+      'Data de hoje: ' + new Date(hoje).toLocaleDateString('pt-BR') + ' (' + anoAtual + ')',
+      'Unidade ativa: ' + nomeUnidade,
+      'Clientes cadastrados: ' + clientes.length,
+      'Vendas confirmadas este mês (' + mesAtual + '): ' + vendasMes.length,
+      'Faturamento do mês: R$ ' + fat.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      'Ticket médio do mês: R$ ' + ticket.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      'Faturamento acumulado total: R$ ' + fatTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      'Cancelamentos (histórico): ' + canceladas,
+    ];
+
+    // Contexto adicional por agente
+    if (agente === 'mkt')  base.push('Campanhas agendadas: ' + campanhasAtivas);
+    if (agente === 'ops')  base.push('Salas cadastradas: ' + salas.length);
+    if (agente === 'rh')   base.push('Equipe cadastrada: ' + staff.length + ' pessoas');
+    if (agente === 'vendas') {
+      const top = vendas
+        .filter(v => v.status === 'confirmado' && v.data?.startsWith(mesAtual))
+        .reduce((acc, v) => {
+          const salas2 = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
+          const sala = salas2.find(s => String(s.id) === String(v.salaId));
+          const nome = sala ? sala.nome : ('Sala ' + v.salaId);
+          acc[nome] = (acc[nome] || 0) + 1;
+          return acc;
+        }, {});
+      const topStr = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3)
+        .map(([n, q]) => n + ' (' + q + 'x)').join(', ');
+      if (topStr) base.push('Salas mais reservadas este mês: ' + topStr);
+    }
+
+    base.push('╚════════════════════════════════════════════════════════════╝');
+    return base.join('\n');
+  } catch(e) {
+    console.warn('[KEYO-01] _montarContextoAgente falhou:', e);
+    return '';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // ETAPA 1.4 — ENVIO PARA EDGE FUNCTION
 // ════════════════════════════════════════════════════════════════
 async function _enviar() {
@@ -549,6 +621,10 @@ async function _enviar() {
 
   const unidadeId = (window.UA && window.UA.unidade) ? window.UA.unidade : 1;
 
+  // Injeta contexto real do DB no payload — evita que a IA invente dados ou use anos antigos
+  const _ctx = _montarContextoAgente(_kAgente);
+  const _msgFinal = _ctx ? (_ctx + '\n\n' + texto) : texto;
+
   try {
     const resp = await fetch(window.KEYO_EDGE_URL, {
       method:  'POST',
@@ -570,7 +646,7 @@ async function _enviar() {
       })(),
       body: JSON.stringify({
         agente:      _kAgente,
-        mensagem:    texto,
+        mensagem:    _msgFinal,  // contexto real + pergunta do usuário
         historico:   hist,
         unidade_id:  unidadeId,
       })
@@ -681,6 +757,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.0 — FIX: keyo-mpros-inline na lista de limpeza; _abrirModulo() reseta todos os inline antes de abrir novo módulo.');
+console.info('[KEYO-01] ✅ UI v2.1 — FIX: keyo-mpros-inline na lista de limpeza; _abrirModulo() reseta todos os inline antes de abrir novo módulo.');
 
 })();

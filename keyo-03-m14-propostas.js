@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M14: PROPOSTAS COMERCIAIS v2.0
+// EXIT GAMES — KEYO M14: PROPOSTAS COMERCIAIS v2.1
 // Arquivo: keyo-03-m14-propostas.js
 // Depende de: keyo-00-core.js e keyo-01-ui.js
 // Acessa: DB.unidades, rlsSalas()
@@ -210,7 +210,7 @@ async function _pesquisarMercado(tipoObj, subtipoObj, localObj, pessoas) {
       },
       body: JSON.stringify({
         agente: 'pesquisa',
-        mensagem: `Pesquise no mercado brasileiro: quais são os preços praticados por empresas de escape room para eventos do tipo "${tipoObj.nome} — ${subtipoObj?.nome || ''}" com ${pessoas} pessoas, realizados em ${localObj?.nome || 'local do cliente'}? Quais são os diferenciais e estrutura de proposta que as melhores empresas do setor usam? Cite valores reais se possível. Responda em até 200 palavras de forma objetiva.`,
+        mensagem: `Contexto: hoje é ${new Date().toLocaleDateString('pt-BR')} (${new Date().getFullYear()}). Pesquise no mercado brasileiro: quais são os preços praticados por empresas de escape room para eventos do tipo "${tipoObj.nome} — ${subtipoObj?.nome || ''}" com ${pessoas} pessoas, realizados em ${localObj?.nome || 'local do cliente'}? Quais são os diferenciais e estrutura de proposta que as melhores empresas do setor usam? Cite valores reais se possível. Responda em até 200 palavras de forma objetiva.`,
         historico: [],
         unidade_id: 1,
       })
@@ -434,7 +434,11 @@ async function _gerar() {
     ? `\n\nINTELIGÊNCIA DE MERCADO (use obrigatoriamente para embasar preços e diferenciais):\n${_mercado}`
     : '';
 
+  const anoAtual = new Date().getFullYear();
+  const dataHoje = new Date().toLocaleDateString('pt-BR');
+
   const prompt = `Você é o consultor comercial sênior da EXIT GAMES, empresa de escape room com unidades em Aracaju e Salvador.
+ATENÇÃO: hoje é ${dataHoje} (ano ${anoAtual}). Use esta data em toda a proposta — nunca use anos anteriores.
 
 EVENTO SOLICITADO:
 - Tipo: ${tipoObj?.nome || _tipo}
@@ -541,6 +545,6 @@ window.m14_email               = _email;
 window.m14_regenerar           = _regenerar;
 window.m14_carregarHistorico   = _carregarHistorico;
 
-console.info('[KEYO-M14] ✅ M14 Propostas Comerciais v1.0 carregado.');
+console.info('[KEYO-M14-v2.1] ✅ M14 Propostas Comerciais v1.0 carregado.');
 
 })();

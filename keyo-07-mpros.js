@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.9 (remove apikey CORS + não derruba tela na busca)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v2.0 (remove apikey CORS + não derruba tela na busca)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -84,7 +84,15 @@ function _initDB() {
   if (!window.DB.keyoMprosRelatorio) window.DB.keyoMprosRelatorio = [];
 
   // Salas de escape criadas pelo Cientista (função Criação)
-  if (!window.DB.keyoSalas) window.DB.keyoSalas = [];
+  // Restaura do localStorage ANTES de inicializar vazio — garante persistência entre sessões
+  if (!window.DB.keyoSalas || window.DB.keyoSalas.length === 0) {
+    try {
+      const _salasLocal = JSON.parse(localStorage.getItem('keyo_salas_v1') || '[]');
+      window.DB.keyoSalas = Array.isArray(_salasLocal) ? _salasLocal : [];
+    } catch(e) {
+      window.DB.keyoSalas = [];
+    }
+  }
   /*
     Sala: {
       id, titulo, tema, tempoMin, jogadores, dificuldade,
@@ -105,6 +113,16 @@ _initDB();
 // ── Helpers de acesso ───────────────────────────────────────────
 function _leads()  { return Array.isArray(window.DB?.keyoLeads) ? window.DB.keyoLeads : []; }
 function _config() { return window.DB?.keyoMprosConfig || {}; }
+function _salas()  { return Array.isArray(window.DB?.keyoSalas) ? window.DB.keyoSalas : []; }
+
+// Persiste salas no localStorage (independente do sDB do ERP que não mapeia keyoSalas)
+function _persistirSalas() {
+  try {
+    localStorage.setItem('keyo_salas_v1', JSON.stringify(window.DB.keyoSalas || []));
+  } catch(e) {
+    console.warn('[KEYO-07] localStorage cheio — salas não puderam ser persistidas:', e);
+  }
+}
 
 // ── Constantes ──────────────────────────────────────────────────
 const CATEGORIAS = [
@@ -1579,7 +1597,6 @@ async function _rodarAgora(silencioso = false) {
 let _salaAtual = null;       // projeto em exibição (transitório)
 let _criandoSala = false;
 
-function _salas() { return Array.isArray(window.DB?.keyoSalas) ? window.DB.keyoSalas : []; }
 
 const TEMAS_CRIACAO = [
   'Terror', 'Suspense / Mistério', 'Ação / Espionagem', 'Aventura / Tesouro',
@@ -1891,6 +1908,7 @@ async function _criarSala() {
     };
     window.DB.keyoSalas.push(sala);
     if (typeof window.sDB === 'function') window.sDB();
+    _persistirSalas(); // garante persistência mesmo que sDB() não mapeie keyoSalas
 
     _salaAtual = sala;
     if (res) res.innerHTML = _renderProjeto(sala);
@@ -1917,9 +1935,12 @@ function _renderProjeto(sala) {
       <span class="cri-tag">${_esc(sala.jogadores)} jogadores</span>
       <span class="cri-tag">${_esc(sala.dificuldade)}</span>
     </div>
-    <div class="cri-lista-acoes">
+    <div class="cri-lista-acoes" style="gap:6px;flex-wrap:wrap">
+      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_downloadSala('${sala.id}')">⬇️ Baixar .txt</button>
+      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_emailSala('${sala.id}')">📧 E-mail</button>
+      <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_copiarSala('${sala.id}')">📋 Copiar</button>
+      <button class="mpros-btn mpros-btn-success"   onclick="window.mpros_enviarSala('${sala.id}')">💬 WhatsApp</button>
       <button class="mpros-btn mpros-btn-secondary" onclick="window.mpros_imprimirSala('${sala.id}')">🖨️ Imprimir</button>
-      <button class="mpros-btn mpros-btn-success" onclick="window.mpros_enviarSala('${sala.id}')">📲 Enviar</button>
     </div>
   </div>
   ${_md2html(sala.projeto)}
@@ -1952,6 +1973,7 @@ async function _refinarSala(id) {
     sala.projeto = texto;
     sala.titulo  = _tituloDoProjeto(texto, sala.tema);
     if (typeof window.sDB === 'function') window.sDB();
+    _persistirSalas(); // garante persistência mesmo que sDB() não mapeie keyoSalas
     _salaAtual = sala;
     if (res) res.innerHTML = _renderProjeto(sala);
     window.toast('✅ Ajuste aplicado!', 'ok');
@@ -1981,6 +2003,7 @@ function _excluirSala(id) {
   if (i >= 0) arr.splice(i, 1);
   if (_salaAtual && _salaAtual.id === id) _salaAtual = null;
   if (typeof window.sDB === 'function') window.sDB();
+  _persistirSalas();
   _renderAba('criacao');
   window.toast('Sala excluída.', 'info');
 }
@@ -2007,21 +2030,67 @@ ${_md2html(sala.projeto)}
   setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
 }
 
+// ── Download como arquivo .txt ─────────────────────────────────
+function _downloadSala(id) {
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const conteudo = '🔬 PROJETO DE SALA — EXIT GAMES\n' +
+    'Tema: ' + sala.tema + ' | ' + sala.tempoMin + 'min | ' + sala.jogadores + ' jogadores | ' + sala.dificuldade + '\n' +
+    'Criado em: ' + new Date(sala.criadoEm).toLocaleDateString('pt-BR') + ' por ' + (sala.criadoPor || 'ADM') + '\n' +
+    '═'.repeat(60) + '\n\n' +
+    sala.projeto;
+  const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = (sala.titulo || 'projeto-sala').replace(/[^a-zA-Z0-9\s\-_]/g, '').trim().replace(/\s+/g, '-') + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  window.toast('⬇️ Arquivo baixado!', 'ok');
+}
+
+// ── Enviar por e-mail (abre cliente de e-mail nativo) ───────────
+function _emailSala(id) {
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const subject = encodeURIComponent('🔬 Projeto de Sala: ' + sala.titulo + ' | EXIT GAMES');
+  const body    = encodeURIComponent(
+    'PROJETO DE SALA — EXIT GAMES\n' +
+    'Tema: ' + sala.tema + ' | ' + sala.tempoMin + 'min | ' + sala.jogadores + ' jogadores | ' + sala.dificuldade + '\n' +
+    'Criado em: ' + new Date(sala.criadoEm).toLocaleDateString('pt-BR') + '\n\n' +
+    sala.projeto.slice(0, 8000) +
+    (sala.projeto.length > 8000 ? '\n\n[... use o botão Baixar .txt para o documento completo]' : '')
+  );
+  window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+}
+
+// ── Copiar tudo para clipboard ──────────────────────────────────
+function _copiarSala(id) {
+  const sala = _salas().find(s => s.id === id) || _salaAtual;
+  if (!sala) return;
+  const texto = '🔬 PROJETO DE SALA — ' + sala.titulo + '\nTema: ' + sala.tema + ' · ' + sala.tempoMin + 'min · ' + sala.jogadores + ' jogadores · ' + sala.dificuldade + '\n\n' + sala.projeto;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(
+      () => window.toast('📋 Projeto copiado!', 'ok'),
+      () => { window.toast('Não foi possível copiar automaticamente.', 'warn'); }
+    );
+  } else {
+    window.toast('Navegador não suporta cópia automática.', 'warn');
+  }
+}
+
+// ── WhatsApp (resumo — projeto completo é muito longo para URL) ─
 function _enviarSala(id) {
   const sala = _salas().find(s => s.id === id) || _salaAtual;
   if (!sala) return;
-  const texto = `🔬 PROJETO DE SALA — ${sala.titulo}\nTema: ${sala.tema} · ${sala.tempoMin}min · ${sala.jogadores} jogadores · ${sala.dificuldade}\n\n${sala.projeto}`;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(texto).then(
-      () => window.toast('📋 Projeto copiado! Cole no WhatsApp ou e-mail.', 'ok'),
-      () => _enviarWhatsFallback(texto)
-    );
-  } else {
-    _enviarWhatsFallback(texto);
-  }
-}
-function _enviarWhatsFallback(texto) {
-  const url = 'https://wa.me/?text=' + encodeURIComponent(texto.slice(0, 1500));
+  const resumo = '🔬 *Projeto de Sala — EXIT GAMES*\n' +
+    '*' + sala.titulo + '*\n' +
+    'Tema: ' + sala.tema + ' | ' + sala.tempoMin + 'min | ' + sala.jogadores + ' jogadores | ' + sala.dificuldade + '\n\n' +
+    sala.projeto.slice(0, 1200) +
+    (sala.projeto.length > 1200 ? '\n\n_[documento completo disponível — use Baixar .txt ou E-mail]_' : '');
+  const url = 'https://wa.me/?text=' + encodeURIComponent(resumo);
   window.open(url, '_blank');
 }
 
@@ -2131,6 +2200,9 @@ window.mpros_verSala        = _verSala;
 window.mpros_excluirSala    = _excluirSala;
 window.mpros_imprimirSala   = _imprimirSala;
 window.mpros_enviarSala     = _enviarSala;
+window.mpros_downloadSala   = _downloadSala;
+window.mpros_emailSala      = _emailSala;
+window.mpros_copiarSala     = _copiarSala;
 
 // Registra como módulo abrível pelo keyo-01-ui
 if (!window._keyoModulos) window._keyoModulos = {};
@@ -2141,7 +2213,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v1.9 — puzzles enumerados · filtros visíveis · criação desbloqueada · sobreposição corrigida (renderPage gerenciado pelo keyo-01).');
+console.info('[KEYO-07] ✅ Cientista v2.0 — persistência localStorage + download/email/copiar — puzzles enumerados · filtros visíveis · criação desbloqueada · sobreposição corrigida (renderPage gerenciado pelo keyo-01).');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

@@ -351,46 +351,45 @@ function _renderInline() {
   const anterior = document.getElementById('keyo-mpros-inline');
   if (anterior) anterior.remove();
 
-  // Esconde chat
-  const msgs      = document.getElementById('keyo-msgs');
-  const inputArea = document.getElementById('keyo-input-area');
-  if (msgs)      msgs.style.display      = 'none';
-  if (inputArea) inputArea.style.display = 'none';
+  // FIX 4: usa requestAnimationFrame para rodar DEPOIS do keyo-01
+  // evita que _trocarAgente() restaure display dos elementos após escondermos
+  requestAnimationFrame(function() {
+    const msgs      = document.getElementById('keyo-msgs');
+    const inputArea = document.getElementById('keyo-input-area');
+    if (msgs)      { msgs.style.cssText      = 'display:none!important'; }
+    if (inputArea) { inputArea.style.cssText = 'display:none!important'; }
 
-  // ── FIX BUG 3: proteger contra renderPage() do ERP ──────────
-  // O goTo('keyo') do keyo-01 não seta PA='keyo', então qualquer
-  // chamada a renderPage() dentro do ERP (ex: opFinalizar, sDB callbacks)
-  // substituía o #pc e derrubava a tela. Patchamos renderPage aqui de
-  // forma segura: só protege enquanto a tela KEYO está visível.
-  if (!window.__KEYO_RENDERPAGE_PATCHED__) {
-    window.__KEYO_RENDERPAGE_PATCHED__ = true;
-    const _rpOrig = window.renderPage;
-    if (typeof _rpOrig === 'function') {
-      window.renderPage = function() {
-        // Se o container do KEYO estiver visível no #pc, não deixa o ERP sobrescrever
-        const pc = document.getElementById('pc');
-        if (pc && pc.contains(document.getElementById('keyo-wrap'))) {
-          console.info('[KEYO-07] renderPage() bloqueado — tela KEYO ativa.');
-          return;
-        }
-        return _rpOrig.apply(this, arguments);
-      };
-      console.info('[KEYO-07] ✅ renderPage() patchado — tela KEYO protegida.');
+    // FIX 3: proteger contra renderPage() do ERP que derrubava a tela para PDV
+    if (!window.__KEYO_RENDERPAGE_PATCHED__) {
+      window.__KEYO_RENDERPAGE_PATCHED__ = true;
+      const _rpOrig = window.renderPage;
+      if (typeof _rpOrig === 'function') {
+        window.renderPage = function() {
+          if (document.getElementById('keyo-wrap')) {
+            console.info('[KEYO-07] renderPage() bloqueado — tela KEYO ativa.');
+            return;
+          }
+          window.__KEYO_RENDERPAGE_PATCHED__ = false;
+          window.renderPage = _rpOrig;
+          return _rpOrig.apply(this, arguments);
+        };
+        console.info('[KEYO-07] ✅ renderPage() patchado — tela KEYO protegida.');
+      }
     }
-  }
 
-  const main = document.getElementById('keyo-main');
-  if (!main) return;
+    const main = document.getElementById('keyo-main');
+    if (!main) return;
 
-  const area = document.createElement('div');
-  area.id = 'keyo-mpros-inline';
-  area.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column';
-  area.innerHTML = _htmlPrincipal();
-  main.appendChild(area);
+    const area = document.createElement('div');
+    area.id = 'keyo-mpros-inline';
+    area.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column';
+    area.innerHTML = _htmlPrincipal();
+    main.appendChild(area);
 
-  _atualizarAbas();
-  _renderAba(_abaAtiva);
-  _atualizarMotorBadge();
+    _atualizarAbas();
+    _renderAba(_abaAtiva);
+    _atualizarMotorBadge();
+  });
 }
 
 function _htmlPrincipal() {
@@ -1705,9 +1704,34 @@ ${listaHtml}
 
 // ── O "cérebro" do Cientista (instruções) ────────────────────────
 function _promptCientista(dados, projetoAnterior, pedidoAjuste) {
-  const numPuzzles = dados && dados.numPuzzles && Number(dados.numPuzzles) > 0
-    ? `EXATAMENTE ${dados.numPuzzles} puzzles`
-    : `aproximadamente ${dados ? Math.max(3, Math.round(Number(dados.tempoMin || 60) / 9)) : 6} puzzles (1 a cada 8–10 minutos)`;
+  const qtd = dados && Number(dados.numPuzzles) > 0
+    ? Number(dados.numPuzzles)
+    : Math.max(3, Math.round(Number(dados?.tempoMin || 60) / 9));
+
+  const numPuzzlesLabel = dados && Number(dados.numPuzzles) > 0
+    ? `EXATAMENTE ${qtd} puzzles — NÃO CRIE MAIS NEM MENOS`
+    : `${qtd} puzzles (calculado: 1 a cada 8–10 minutos de jogo)`;
+
+  // Gera o template enumerado de cada puzzle no corpo do prompt.
+  // Mostrar só "Puzzle 1 + repita" faz o modelo criar apenas 1-2.
+  // Com cada número explícito, ele é obrigado a preencher todos.
+  function _templatePuzzles(n) {
+    let t = '';
+    for (let i = 1; i <= n; i++) {
+      t += `\n### Puzzle ${i} — [Nome] · MECÂNICO ou ELETRÔNICO\n` +
+        `- **Posição na sala:** onde fisicamente está localizado\n` +
+        `- **O que o jogador vê ao se aproximar:** descrição sensorial completa\n` +
+        `- **Narrativa do puzzle:** por que esse objeto/mecanismo existe dentro da história\n` +
+        `- **Lógica de dedução:** o raciocínio exato que leva à solução, passo a passo\n` +
+        `- **Solução exata:** [especifique sem ambiguidade]\n` +
+        `- **O que libera:** o que o jogador acessa ou recebe ao resolver\n` +
+        `- **Materiais e especificações:** lista com descrição técnica de cada item\n` +
+        `- **Custo estimado:** faixa em reais (ex: R$80–150)\n` +
+        `- **Instrução de montagem:** como instalar e configurar\n` +
+        `- **Reset entre grupos:** o que o operador faz para reiniciar em menos de 2 minutos\n`;
+    }
+    return t;
+  }
 
   const sistema = `Você é o CIENTISTA da EXIT GAMES — o maior especialista em design de salas de escape físicas do Brasil. Você combina domínio de game design, psicologia da experiência, cenografia teatral, eletrônica aplicada e narrativa imersiva. Sua entrega não é um rascunho: é um PROJETO EXECUTIVO completo, rigoroso e pronto para produção — como um arquiteto entrega uma planta antes da obra.
 
@@ -1751,21 +1775,9 @@ Descreva o espaço como um diretor de arte:
 - Temperatura e sensação: frio, abafado, úmido — como criar essa percepção
 - Adereços de cena (não-interativos): o que existe só para imersão, não para puzzle
 
-## 6. Puzzles
-(criar ${numPuzzles}, em ordem de resolução)
-
-### Puzzle 1 — [Nome] · MECÂNICO ou ELETRÔNICO
-- **Posição na sala:** onde fisicamente está localizado
-- **O que o jogador vê ao se aproximar:** descrição sensorial completa
-- **Narrativa do puzzle:** por que esse objeto/mecanismo existe dentro da história
-- **Lógica de dedução:** o raciocínio exato que leva à solução, passo a passo
-- **Solução exata:** [especifique sem ambiguidade]
-- **O que libera:** o que o jogador acessa ou recebe ao resolver
-- **Materiais e especificações:** lista com descrição técnica de cada item
-- **Custo estimado:** faixa em reais (ex: R$80–150)
-- **Instrução de montagem:** como instalar e configurar
-- **Reset entre grupos:** o que o operador faz para reiniciar em menos de 2 minutos
-(repita este bloco para cada puzzle)
+## 6. Puzzles — OBRIGATÓRIO: ${numPuzzlesLabel}
+ATENÇÃO: você DEVE criar TODOS os ${qtd} puzzles numerados abaixo. NÃO pare antes do Puzzle ${qtd}. NÃO pule nenhum. Cada puzzle deve ter todos os campos preenchidos.
+${_templatePuzzles(qtd)}
 
 ## 7. Fluxo e Mapa da Experiência
 Diagrama textual da jornada completa:
@@ -1821,10 +1833,12 @@ Liste as referências reais que embasaram este projeto:
     usuario = `Elabore o PROJETO EXECUTIVO COMPLETO de uma sala de escape com os seguintes parâmetros:
 - Tema: ${dados.tema}
 - Duração: ${dados.tempoMin} minutos
-- Puzzles: ${numPuzzles}
+- Puzzles: ${numPuzzlesLabel}
 - Jogadores: ${dados.jogadores}
 - Dificuldade: ${dados.dificuldade}` +
       (dados.instrucoes ? `\n- Instrução específica do ADM: ${dados.instrucoes}` : '') + `
+
+IMPORTANTE: a seção 6 (Puzzles) deve conter TODOS os ${qtd} puzzles, numerados de 1 a ${qtd}, cada um com todos os campos preenchidos. Não pare antes do Puzzle ${qtd}.
 
 Entregue o projeto completo com todas as 14 seções. Seja o Cientista: rigoroso, criativo, preciso. Este documento vai direto para produção.`;
   }
@@ -2080,7 +2094,14 @@ function _abrirMpros() {
   function _limparSeForaDoMpros() {
     const div = document.getElementById('keyo-mpros-inline');
     const mb  = document.getElementById('keyo-mod-mpros');
-    if (div && mb && !mb.classList.contains('active')) div.remove();
+    if (div && mb && !mb.classList.contains('active')) {
+      div.remove();
+      const msgs      = document.getElementById('keyo-msgs');
+      const inputArea = document.getElementById('keyo-input-area');
+      if (msgs)      msgs.style.cssText      = '';
+      if (inputArea) inputArea.style.cssText = '';
+      window.__KEYO_RENDERPAGE_PATCHED__ = false;
+    }
   }
 
   // Tenta na carga e re-tenta enquanto o container não existir
@@ -2137,7 +2158,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v2.0 — FIX: filtros sempre visíveis · criação de sala desbloqueada · renderPage() patchado contra saída para PDV.');
+console.info('[KEYO-07] ✅ Cientista v2.2 — puzzles enumerados no prompt · filtros sempre visíveis · criação desbloqueada · renderPage patchado · sobreposição corrigida.');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

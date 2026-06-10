@@ -492,11 +492,11 @@ function _igRenderInsights(ins) {
   if (!corpo) return;
 
   const metricas = [
-    { chave: 'impressions',       label: 'Impressões (30d)',    emoji: '👁️' },
+    { chave: 'views',             label: 'Visualizações (30d)', emoji: '👁️' },
     { chave: 'reach',             label: 'Alcance (30d)',       emoji: '📡' },
-    { chave: 'profile_views',     label: 'Visitas ao perfil',   emoji: '👤' },
+    { chave: 'accounts_engaged',  label: 'Contas engajadas',    emoji: '👤' },
     { chave: 'follower_count',    label: 'Seguidores',          emoji: '👥' },
-    { chave: 'website_clicks',    label: 'Cliques no link',     emoji: '🔗' },
+    { chave: 'media_count',       label: 'Publicações',         emoji: '🖼️' },
     { chave: 'total_interactions',label: 'Interações (30d)',    emoji: '❤️' },
   ];
 

@@ -2232,10 +2232,15 @@ function _enviarSala(id) {
 // ════════════════════════════════════════════════════════════════
 // INTEGRAÇÃO COM keyo-01-ui.js (abrirModulo)
 // ════════════════════════════════════════════════════════════════
-// [v1.5] Abre a tela do Cientista. O roteador do KEYO (keyo_abrirModulo) não
-// conhece este módulo, então fazemos a abertura aqui, no MESMO padrão usado
-// pelos outros módulos (marca ativo + atualiza header + renderiza).
+// CONTROLE DE ABERTURA DO CIENTISTA
+// Flag explícita — evita que o MutationObserver cause sobreposição
+// ao detectar estado intermediário do DOM durante navegação.
+// ════════════════════════════════════════════════════════════════
+let _mprosAberto = false;
+
 function _abrirMpros() {
+  _mprosAberto = true;
+
   document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('keyo-mod-mpros');
@@ -2251,59 +2256,58 @@ function _abrirMpros() {
   _renderInline();
 }
 
-// Injeta e mantém o botão no menu, e limpa a tela ao sair do módulo.
-// [v1.4] Reencaixa o botão sempre que o KEYO redesenha o menu (antes ele sumia).
+function _fecharMpros() {
+  _mprosAberto = false;
+  const div = document.getElementById('keyo-mpros-inline');
+  if (div) div.remove();
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      msgs.style.cssText      = '';
+  if (inputArea) inputArea.style.cssText = '';
+}
+
+// Expõe _fecharMpros para que keyo-01-ui.js possa chamar ao trocar agente/módulo
+window.mpros_fechar = _fecharMpros;
+
+// ── Injeta botão no menu lateral ─────────────────────────────────
+// Só injeta o botão. NÃO reabre o Cientista automaticamente — isso
+// era a causa da sobreposição: o observer via o botão 'active' e
+// chamava _renderInline() por cima de outros módulos.
 (function _injetarBotaoMenu() {
   function _ensureBotao() {
     const modulosDiv = document.getElementById('keyo-agents-modulos');
-    if (!modulosDiv) return false;                         // menu ainda não existe
+    if (!modulosDiv) return false;
     let btn = document.getElementById('keyo-mod-mpros');
     if (!btn) {
       btn = document.createElement('button');
       btn.className = 'keyo-mod-btn';
       btn.id        = 'keyo-mod-mpros';
       btn.innerHTML = '<span class="keyo-mod-emoji">🔬</span><span>Cientista</span>';
-      btn.onclick   = _abrirMpros;        // abre direto, sem depender do roteador do KEYO
+      btn.onclick   = _abrirMpros;
       modulosDiv.appendChild(btn);
     }
-    // Se a tela do Cientista está aberta, mantém o botão marcado como ATIVO.
-    // Isso evita que a limpeza (abaixo) derrube a tela quando o menu é
-    // redesenhado durante uma busca/pausa.
-    if (document.getElementById('keyo-mpros-inline')) btn.classList.add('active');
+    // Sincroniza classe 'active' com a flag — sem reabrir
+    if (_mprosAberto && document.getElementById('keyo-mpros-inline')) {
+      btn.classList.add('active');
+    } else if (!_mprosAberto) {
+      btn.classList.remove('active');
+    }
     return true;
   }
 
-  // Remove a tela do Cientista quando o usuário navegou pra fora dele
-  // (clicou num agente ou em outro módulo → botão deixa de estar 'active').
-  function _limparSeForaDoMpros() {
-    const div = document.getElementById('keyo-mpros-inline');
-    const mb      = document.getElementById('keyo-mod-mpros');
-    const keyoWrap = document.getElementById('keyo-wrap');
-
-    // Limpa se: botão não está ativo OU o KEYO inteiro saiu do DOM
-    if (div && (!mb || !mb.classList.contains('active') || !keyoWrap)) {
-      div.remove();
-      // Restaura msgs/inputArea (podem ter ficado escondidos)
-      const msgs      = document.getElementById('keyo-msgs');
-      const inputArea = document.getElementById('keyo-input-area');
-      if (msgs)      msgs.style.cssText      = '';
-      if (inputArea) inputArea.style.cssText = '';
-    }
-  }
-
-  // Tenta na carga e re-tenta enquanto o container não existir
   function _tentar() {
     if (!_ensureBotao()) setTimeout(_tentar, 600);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _tentar);
   else _tentar();
 
-  // Mantém o botão presente e a tela coerente mesmo após re-renderizações do KEYO
+  // Observer APENAS para recolocar o botão se o menu for reconstruído
+  // NÃO faz mais limpeza nem reabertura — elimina a sobreposição
   try {
-    const _obs = new MutationObserver(() => { _ensureBotao(); _limparSeForaDoMpros(); });
+    const _obs = new MutationObserver(() => { _ensureBotao(); });
     _obs.observe(document.body, { childList: true, subtree: true });
   } catch (e) {
-    setInterval(() => { _ensureBotao(); _limparSeForaDoMpros(); }, 1500); // fallback
+    setInterval(_ensureBotao, 1500);
   }
 })();
 

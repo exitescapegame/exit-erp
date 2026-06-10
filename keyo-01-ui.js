@@ -264,7 +264,8 @@ function _abrirModulo(modulo) {
   if (btn) btn.classList.add('active');
 
   // Remove TODOS os painéis inline antes de abrir o novo
-  // (keyo-mpros-inline tem ID próprio fora da lista padrão dos outros módulos)
+  // Fecha Cientista via flag explícita (evita sobreposição pelo MutationObserver)
+  if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
    'keyo-m15-inline','keyo-m16-inline','keyo-mpros-inline'].forEach(function(mid) {
     const el = document.getElementById(mid);
@@ -396,6 +397,8 @@ function _keyoInit() {
   _kAgente  = 'keyo';
   _kAba     = 'chat';
   _kLoading = false;
+  // Reseta flag do Cientista (KEYO foi reaberto do zero)
+  if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   window.KEYO_AGENTS.forEach(a => { if (!_kHistory[a.id]) _kHistory[a.id] = []; });
   _renderHistory();
   if (_kHistory['keyo'].length === 0) {
@@ -416,6 +419,8 @@ function _trocarAgente(id) {
 
   // Sempre limpa módulos inline ao trocar de agente
   _kAba = 'chat';
+  // Fecha Cientista via flag explícita (evita sobreposição pelo MutationObserver)
+  if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   const inputArea = document.getElementById('keyo-input-area');
   const msgs      = document.getElementById('keyo-msgs');
   if (inputArea) inputArea.style.display = '';

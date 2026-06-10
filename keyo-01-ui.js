@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v1.9
+// EXIT GAMES — KEYO UI v2.0
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v1.9: FIX — _trocarAgente() remove módulos inline SEMPRE (não só
+// v2.0: FIX — keyo-mpros-inline adicionado na lista de limpeza de _trocarAgente() e _abrirModulo(); remove módulos inline SEMPRE (não só
 //        quando _kAba !== 'chat'). Remove m12 a m16 e chama _k15Stop().
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
@@ -263,6 +263,20 @@ function _abrirModulo(modulo) {
   const btn = document.getElementById('keyo-mod-' + modulo);
   if (btn) btn.classList.add('active');
 
+  // Remove TODOS os painéis inline antes de abrir o novo
+  // (keyo-mpros-inline tem ID próprio fora da lista padrão dos outros módulos)
+  ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
+   'keyo-m15-inline','keyo-m16-inline','keyo-mpros-inline'].forEach(function(mid) {
+    const el = document.getElementById(mid);
+    if (el) el.remove();
+  });
+  // Restaura msgs/inputArea caso o Cientista os tenha escondido
+  const _msgs = document.getElementById('keyo-msgs');
+  const _ia   = document.getElementById('keyo-input-area');
+  if (_msgs) _msgs.style.cssText = '';
+  if (_ia)   _ia.style.cssText   = '';
+  if (typeof window._k15Stop === 'function') window._k15Stop();
+
   if (modulo === 'campanhas') {
     // Atualiza header
     const emoji = document.getElementById('keyo-header-emoji');
@@ -407,7 +421,7 @@ function _trocarAgente(id) {
   if (inputArea) inputArea.style.display = '';
   if (msgs)      msgs.style.display      = '';
   ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
-   'keyo-m15-inline','keyo-m16-inline'].forEach(function(mid) {
+   'keyo-m15-inline','keyo-m16-inline','keyo-mpros-inline'].forEach(function(mid) {
     const el = document.getElementById(mid);
     if (el) el.remove();
   });
@@ -667,6 +681,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.0 — fix: renderPage() patchado no goTo — tela KEYO protegida contra PDV em todos os módulos.');
+console.info('[KEYO-01] ✅ UI v2.0 — FIX: keyo-mpros-inline na lista de limpeza; _abrirModulo() reseta todos os inline antes de abrir novo módulo.');
 
 })();

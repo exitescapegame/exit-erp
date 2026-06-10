@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.8 (remove apikey CORS + não derruba tela na busca)
+// EXIT GAMES — KEYO M07: MPROS — PROSPECÇÃO ATIVA v1.9 (remove apikey CORS + não derruba tela na busca)
 // Arquivo: keyo-07-mpros.js
 // Injetar via: <script src="keyo-07-mpros.js"></script>
 // Depende de: keyo-00-core.js e keyo-01-ui.js (carregar antes)
@@ -347,33 +347,29 @@ let _abaAtiva = 'fila'; // 'fila' | 'aprovados' | 'pipeline' | 'relatorio' | 'co
 let _filtros = { categoria: '', cidade: '', potencial: '', tamanho: '' };
 
 function _renderInline() {
-  // Remove área anterior
+  // Remove área anterior (garante idempotência)
   const anterior = document.getElementById('keyo-mpros-inline');
   if (anterior) anterior.remove();
 
-  // FIX 4: usa requestAnimationFrame para rodar DEPOIS do keyo-01
-  // evita que _trocarAgente() restaure display dos elementos após escondermos
-  requestAnimationFrame(function() {
-    const msgs      = document.getElementById('keyo-msgs');
-    const inputArea = document.getElementById('keyo-input-area');
-    if (msgs)      { msgs.style.cssText      = 'display:none!important'; }
-    if (inputArea) { inputArea.style.cssText = 'display:none!important'; }
+  // Execução síncrona — o requestAnimationFrame anterior criava race condition:
+  // _trocarAgente() limpava o inline e logo em seguida o rAF recriava a div no DOM errado.
+  const msgs      = document.getElementById('keyo-msgs');
+  const inputArea = document.getElementById('keyo-input-area');
+  if (msgs)      { msgs.style.display      = 'none'; }
+  if (inputArea) { inputArea.style.display = 'none'; }
 
-    // renderPage() protegido pelo keyo-01-ui (patch definitivo lá)
+  const main = document.getElementById('keyo-main');
+  if (!main) return;
 
-    const main = document.getElementById('keyo-main');
-    if (!main) return;
+  const area = document.createElement('div');
+  area.id = 'keyo-mpros-inline';
+  area.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column';
+  area.innerHTML = _htmlPrincipal();
+  main.appendChild(area);
 
-    const area = document.createElement('div');
-    area.id = 'keyo-mpros-inline';
-    area.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column';
-    area.innerHTML = _htmlPrincipal();
-    main.appendChild(area);
-
-    _atualizarAbas();
-    _renderAba(_abaAtiva);
-    _atualizarMotorBadge();
-  });
+  _atualizarAbas();
+  _renderAba(_abaAtiva);
+  _atualizarMotorBadge();
 }
 
 function _htmlPrincipal() {
@@ -2077,9 +2073,13 @@ function _abrirMpros() {
   // (clicou num agente ou em outro módulo → botão deixa de estar 'active').
   function _limparSeForaDoMpros() {
     const div = document.getElementById('keyo-mpros-inline');
-    const mb  = document.getElementById('keyo-mod-mpros');
-    if (div && mb && !mb.classList.contains('active')) {
+    const mb      = document.getElementById('keyo-mod-mpros');
+    const keyoWrap = document.getElementById('keyo-wrap');
+
+    // Limpa se: botão não está ativo OU o KEYO inteiro saiu do DOM
+    if (div && (!mb || !mb.classList.contains('active') || !keyoWrap)) {
       div.remove();
+      // Restaura msgs/inputArea (podem ter ficado escondidos)
       const msgs      = document.getElementById('keyo-msgs');
       const inputArea = document.getElementById('keyo-input-area');
       if (msgs)      msgs.style.cssText      = '';
@@ -2141,7 +2141,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v2.3 — puzzles enumerados · filtros visíveis · criação desbloqueada · sobreposição corrigida (renderPage gerenciado pelo keyo-01).');
+console.info('[KEYO-07] ✅ Cientista v1.9 — puzzles enumerados · filtros visíveis · criação desbloqueada · sobreposição corrigida (renderPage gerenciado pelo keyo-01).');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

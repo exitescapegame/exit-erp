@@ -103,7 +103,32 @@ function _injetarItemDOM() {
 // ════════════════════════════════════════════════════════════════
 (function _patchGoTo() {
   if (!window.goTo) return;
-  const _orig = window.goTo;
+  const _orig     = window.goTo;
+  const _rpOrig   = window.renderPage;
+
+  // ── Patch de renderPage ──────────────────────────────────────
+  // O goTo('keyo') não seta PA='keyo' (PA é local do ERP).
+  // Qualquer chamada a renderPage() — opFinalizar, sDB callbacks,
+  // timers, botões do ERP — substituía o #pc derrubando a tela KEYO.
+  // Solução: interceptar renderPage() e bloquear enquanto #keyo-wrap
+  // estiver visível. Ao navegar para fora do KEYO, restaura o original.
+  function _patchRenderPage() {
+    if (window.__KEYO_RP_PATCHED__) return;
+    if (typeof _rpOrig !== 'function') return;
+    window.__KEYO_RP_PATCHED__ = true;
+    window.renderPage = function() {
+      if (document.getElementById('keyo-wrap')) {
+        console.info('[KEYO-01] renderPage() bloqueado — tela KEYO ativa.');
+        return;
+      }
+      // Saiu do KEYO — remove o patch e executa normalmente
+      window.__KEYO_RP_PATCHED__ = false;
+      window.renderPage = _rpOrig;
+      return _rpOrig.apply(this, arguments);
+    };
+    console.info('[KEYO-01] ✅ renderPage() patchado — tela KEYO protegida contra PDV.');
+  }
+
   window.goTo = function(pg) {
     if (pg === 'keyo') {
       // Atualiza estado visual do sidebar
@@ -116,8 +141,13 @@ function _injetarItemDOM() {
         e.innerHTML = _keyoHTML();
         _keyoInit();
       }
+      // Protege renderPage IMEDIATAMENTE após renderizar o KEYO
+      _patchRenderPage();
       return;
     }
+    // Saindo do KEYO: remove patch do renderPage
+    window.__KEYO_RP_PATCHED__ = false;
+    window.renderPage = _rpOrig;
     return _orig.apply(this, arguments);
   };
   console.info('[KEYO-01] ✅ goTo() interceptado com segurança.');
@@ -637,6 +667,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v1.9 — fix: módulos inline removidos sempre ao trocar agente.');
+console.info('[KEYO-01] ✅ UI v2.0 — fix: renderPage() patchado no goTo — tela KEYO protegida contra PDV em todos os módulos.');
 
 })();

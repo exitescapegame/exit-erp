@@ -359,23 +359,7 @@ function _renderInline() {
     if (msgs)      { msgs.style.cssText      = 'display:none!important'; }
     if (inputArea) { inputArea.style.cssText = 'display:none!important'; }
 
-    // FIX 3: proteger contra renderPage() do ERP que derrubava a tela para PDV
-    if (!window.__KEYO_RENDERPAGE_PATCHED__) {
-      window.__KEYO_RENDERPAGE_PATCHED__ = true;
-      const _rpOrig = window.renderPage;
-      if (typeof _rpOrig === 'function') {
-        window.renderPage = function() {
-          if (document.getElementById('keyo-wrap')) {
-            console.info('[KEYO-07] renderPage() bloqueado — tela KEYO ativa.');
-            return;
-          }
-          window.__KEYO_RENDERPAGE_PATCHED__ = false;
-          window.renderPage = _rpOrig;
-          return _rpOrig.apply(this, arguments);
-        };
-        console.info('[KEYO-07] ✅ renderPage() patchado — tela KEYO protegida.');
-      }
-    }
+    // renderPage() protegido pelo keyo-01-ui (patch definitivo lá)
 
     const main = document.getElementById('keyo-main');
     if (!main) return;
@@ -2100,7 +2084,6 @@ function _abrirMpros() {
       const inputArea = document.getElementById('keyo-input-area');
       if (msgs)      msgs.style.cssText      = '';
       if (inputArea) inputArea.style.cssText = '';
-      window.__KEYO_RENDERPAGE_PATCHED__ = false;
     }
   }
 
@@ -2158,7 +2141,7 @@ window._keyoModulos['mpros'] = _renderInline;
 // ════════════════════════════════════════════════════════════════
 _agendarMotor();
 
-console.info('[KEYO-07] ✅ Cientista v2.2 — puzzles enumerados no prompt · filtros sempre visíveis · criação desbloqueada · renderPage patchado · sobreposição corrigida.');
+console.info('[KEYO-07] ✅ Cientista v2.3 — puzzles enumerados · filtros visíveis · criação desbloqueada · sobreposição corrigida (renderPage gerenciado pelo keyo-01).');
 console.info('[KEYO-07] Proxy: keyo-proxy Edge Function → Nominatim · Google Places · PNCP · Scoring IA');
 console.info('[KEYO-07] Motor agendado para meia-noite. Use mpros_rodarAgora() para teste manual.');
 

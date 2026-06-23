@@ -7741,6 +7741,9 @@ async function confirmarVenda(){ // [B4] async for slot lock
   venda.eventoTs  = _eventoTs;
   venda.origemPDV = true;       // flag: originado pelo PDV
   DB.vendas.push(venda);
+  // [PERSIST] Salva a venda no Supabase IMEDIATAMENTE — não espera o auto-save.
+  // Evita perda se a página recarregar/fechar antes do save automático.
+  try { if (typeof sDBSupabase === 'function') sDBSupabase(); } catch(_e){}
 
   // 2. Espelho atômico no módulo de PDV (evento de pagamento)
   if (!DB.eventosPDV) DB.eventosPDV = [];

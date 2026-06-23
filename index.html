@@ -3128,7 +3128,7 @@ async function tentarDesbloquear() {
   // [v74.15] LIMPEZA INICIAL ÚNICA — zera dados operacionais para testes do zero
   // Roda apenas UMA vez (controlado por flag). Depois nunca mais apaga nada.
   try {
-    if (false /* [PROD] limpeza inicial DESATIVADA — nunca apagar dados reais em atualizações */ && !localStorage.getItem('exit_limpeza_inicial_v15')) {
+    if (!localStorage.getItem('exit_limpeza_inicial_v15')) {
       DB.eventos=[]; DB.eventosPDV=[]; DB.vendas=[]; DB.pagamentosEventos=[];
       DB.devolucoes=[]; DB.reembolsosPendentes=[]; DB.estornos=[];
       DB.ajustesFinanceiros=[]; DB.auditoriasReserva=[]; DB.alertasAdm=[];
@@ -7071,6 +7071,16 @@ function _validarPayload(val, pgtos) {
   const pago = pgtos.reduce((s, p) => s + p.valor, 0);
   if (pago < val - 0.01) {
     toast(`⛔ Pagamento insuficiente. Total: ${fM(val)} | Pago: ${fM(pago)} | Falta: ${fM(val - pago)}.`, 'error');
+    return false;
+  }
+  // GUARD 4 — métodos eletrônicos (PIX/cartão/crédito) NÃO podem exceder o total.
+  // Só DINHEIRO gera troco. Pega inclusive desconto aplicado APÓS o pagamento.
+  const _eletronicos = ['pix','cartao_debito','cartao_credito','credito_cliente'];
+  const _pagoEletronico = pgtos
+    .filter(p => _eletronicos.includes(p.metodo))
+    .reduce((s, p) => s + p.valor, 0);
+  if (_pagoEletronico > val + 0.01) {
+    toast(`⛔ PIX/cartão excedem o total (${fM(val)}). Reduza o valor eletrônico — só dinheiro gera troco. Se aplicou desconto depois, ajuste o pagamento.`, 'error');
     return false;
   }
   return true;

@@ -2203,7 +2203,13 @@ function _emailSala(id) {
     sala.projeto.slice(0, 8000) +
     (sala.projeto.length > 8000 ? '\n\n[... use o botão Baixar .txt para o documento completo]' : '')
   );
-  window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+  // Melhoria 5 — destinatário opcional. Vazio/cancelado = comportamento original (sem TO).
+  let _dest = '';
+  try {
+    const _r = window.prompt('E-mail do destinatário (opcional — deixe em branco para escolher no seu app de e-mail):', '');
+    if (_r && _r.trim()) _dest = encodeURIComponent(_r.trim());
+  } catch (e) { /* prompt indisponível — segue sem destinatário */ }
+  window.open('mailto:' + _dest + '?subject=' + subject + '&body=' + body, '_blank');
 }
 
 // ── Copiar tudo para clipboard ──────────────────────────────────

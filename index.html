@@ -3128,7 +3128,7 @@ async function tentarDesbloquear() {
   // [v74.15] LIMPEZA INICIAL ÚNICA — zera dados operacionais para testes do zero
   // Roda apenas UMA vez (controlado por flag). Depois nunca mais apaga nada.
   try {
-    if (!localStorage.getItem('exit_limpeza_inicial_v15')) {
+    if (false /* [PROD] limpeza inicial DESATIVADA — nunca apagar dados reais em atualizações */ && !localStorage.getItem('exit_limpeza_inicial_v15')) {
       DB.eventos=[]; DB.eventosPDV=[]; DB.vendas=[]; DB.pagamentosEventos=[];
       DB.devolucoes=[]; DB.reembolsosPendentes=[]; DB.estornos=[];
       DB.ajustesFinanceiros=[]; DB.auditoriasReserva=[]; DB.alertasAdm=[];

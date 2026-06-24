@@ -8260,7 +8260,7 @@ function garantirSessaoCaixa(uId){
       totalVendasPDV:0,
       totalEntradas:0,
       totalSaidas:0,
-      meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,outros:0}
+      meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0}
     };
     DB.sessoesCaixa.push(sess);
   }
@@ -8282,7 +8282,7 @@ function abrirFechamentoCaixa(){
     v.status==='confirmado' && v.data===hoje() && String(v.unidadeId)===uId
   );
 
-  const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,outros:0};
+  const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0};
   vendasSessao.forEach(v=>{
     if(v.pagamentos&&v.pagamentos.length){
       v.pagamentos.forEach(p=>{
@@ -8325,7 +8325,7 @@ function abrirFechamentoCaixa(){
   const m=document.createElement('div');m.className='mo';m.id='mFechamentoCaixa';
   document.body.appendChild(m);
 
-  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',outros:'🔄 Outros'};
+  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito do cliente (vale)',outros:'🔄 Outros'};
   const meioRows=Object.entries(totaisMeio).map(([k,v])=>v>0||k==='dinheiro'?`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">${meioLabels[k]||k}</span>
@@ -8399,7 +8399,7 @@ function _fcVisualizarRelatorio(){
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   const cx=getCx(uId);
   const now=new Date();
-  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',outros:'🔄 Outros'};
+  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito do cliente (vale)',outros:'🔄 Outros'};
   const meioHtml=Object.entries(totaisMeio).map(([k,v])=>`
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #e8e8f0">
       <span>${meioLabels[k]||k}</span><strong>${fM(v)}</strong>
@@ -8442,7 +8442,7 @@ function _fcImprimirRelatorio(){
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   const cx=getCx(uId);
   const now=new Date();
-  const meioLabels={dinheiro:'Dinheiro',pix:'PIX',cartao_debito:'Debito',cartao_credito:'Credito',outros:'Outros'};
+  const meioLabels={dinheiro:'Dinheiro',pix:'PIX',cartao_debito:'Debito',cartao_credito:'Credito',credito_cliente:'Credito do cliente (vale)',outros:'Outros'};
   const meioHtml=Object.entries(totaisMeio||{}).map(([k,v])=>`<div class="rcb-linha"><span>${meioLabels[k]||k}</span><span>${fM(v)}</span></div>`).join('');
   const html=`<div class="rcb">
     <div class="rcb-logo">${san(unidade?.nome||'EXIT GAMES')}</div>
@@ -8539,7 +8539,7 @@ function _fcConfirmar(){
   DB.sessoesCaixa.push({
     id:uid(),unidadeId:uId,status:'PENDENTE_ABERTURA',criadaEm:agora(),
     saldoAbertura:fundo,totalVendasPDV:0,totalEntradas:0,totalSaidas:0,
-    meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,outros:0},
+    meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0},
     _fechamentoAnteriorId:relatorio.id
   });
 
@@ -8643,7 +8643,7 @@ function _confirmarAberturaCaixa(){
       abertaEm:agora(),abertaPor:UA.id,
       saldoAbertura:fundo,totalVendasPDV:0,
       totalEntradas:0,totalSaidas:0,
-      meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,outros:0}
+      meiosPagamento:{dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0}
     });
   }
 
@@ -11174,7 +11174,7 @@ function rFechamentosCaixa(){
   const totalVendasGeral=filtrados.reduce((s,f)=>s+(f.totalVendas||0),0);
   const totalFundos=filtrados.reduce((s,f)=>s+(f.fundoParaAmanha||0),0);
 
-  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',outros:'🔄 Outros'};
+  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito do cliente (vale)',outros:'🔄 Outros'};
 
   const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px"><span style="font-size:12px;font-weight:600;color:var(--text2)">Unidade:</span>
     <select onchange="window._relFinUnidade=this.value;renderPage()">

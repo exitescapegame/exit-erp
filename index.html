@@ -3764,17 +3764,30 @@ async function sDBSupabase() {
 
   // Vendas (upsert por id)
   if (DB.vendas?.length) {
-    ops.push(supaFetch('vendas', 'POST',
-      DB.vendas
-        .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
-        .map(v => ({
-          id: String(v.id),
-          unidade_id: String(v.unidadeId),
-          data: v.data,
-          dados: { ...v, unidadeId: String(v.unidadeId) }, // sincroniza blob com coluna
-          criado_em: v.criadoEm || new Date().toISOString()
-        }))
-    ));
+    // [BLINDAGEM 21000] Protege o lote contra o erro "ON CONFLICT cannot affect row a second time":
+    //  (1) descarta venda sem id válido (registros corrompidos/teste, ex.: id "undefined");
+    //  (2) remove ids duplicados (mantém o primeiro) — upsert nunca pode ter chave repetida.
+    const _vendasValidas = DB.vendas
+      .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
+      .filter(v => v.id != null && String(v.id) !== '' && String(v.id) !== 'undefined' && String(v.id) !== 'null');
+    const _vistos = new Set();
+    const _vendasUnicas = _vendasValidas.filter(v => {
+      const k = String(v.id);
+      if (_vistos.has(k)) return false;
+      _vistos.add(k); return true;
+    });
+    if (_vendasUnicas.length) {
+      ops.push(supaFetch('vendas', 'POST',
+        _vendasUnicas
+          .map(v => ({
+            id: String(v.id),
+            unidade_id: String(v.unidadeId),
+            data: v.data,
+            dados: { ...v, id: v.id, unidadeId: String(v.unidadeId) }, // garante id no blob + sincroniza unidade
+            criado_em: v.criadoEm || new Date().toISOString()
+          }))
+      ));
+    }
   }
 
   // Ocupação

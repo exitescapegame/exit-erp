@@ -418,6 +418,66 @@ function _abrirModulo(modulo) {
       if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de Autorizações não encontrado.</div>'; }
     }
   }
+
+  if (modulo === 'brain') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '🧠';
+    if (nome)  nome.textContent  = 'Brain Loop';
+    if (desc)  desc.textContent  = 'Monitoramento autônomo e iniciativas proativas';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'block';
+    if (msgs) {
+      const status = (typeof window.keyoBrain_status === 'function')
+        ? window.keyoBrain_status()
+        : null;
+      if (status) {
+        const cor = status.ativo ? '#1E8449' : '#C0392B';
+        const icone = status.ativo ? '🟢' : '🔴';
+        msgs.innerHTML = `
+<div style="padding:24px;max-width:600px;margin:0 auto;font:13px/1.6 system-ui,sans-serif">
+  <div style="background:#fff;border:1px solid #e3e3e3;border-radius:10px;padding:20px;margin-bottom:12px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#1a1a2e">Status do Brain Loop</div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><span style="color:#888;font-size:11px;text-transform:uppercase">Status</span><br><span style="font-weight:700;color:${cor}">${icone} ${status.ativo ? 'Ativo' : 'Pausado'}</span></div>
+      <div><span style="color:#888;font-size:11px;text-transform:uppercase">Rodadas</span><br><span style="font-weight:700">${status.rodadas}</span></div>
+      <div><span style="color:#888;font-size:11px;text-transform:uppercase">Pendentes</span><br><span style="font-weight:700;color:${status.pendentes > 0 ? '#C0392B' : '#1E8449'}">${status.pendentes}</span></div>
+      <div><span style="color:#888;font-size:11px;text-transform:uppercase">Erros</span><br><span style="font-weight:700;color:${status.erros > 0 ? '#C0392B' : '#888'}">${status.erros}</span></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="window.keyoBrain_start();window.keyo_abrirModulo('brain')" style="background:#1E8449;color:#fff;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">▶ Iniciar</button>
+    <button onclick="window.keyoBrain_stop();window.keyo_abrirModulo('brain')" style="background:#eee;color:#C0392B;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">⏹ Pausar</button>
+    <button onclick="window.keyoBrain_tick().then(()=>window.keyo_abrirModulo('brain'))" style="background:#C9A84C;color:#1a1a2e;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer">⚡ Tick Agora</button>
+  </div>
+  <div style="margin-top:12px;font-size:11px;color:#aaa">O Brain Loop verifica automaticamente a cada 5 min e cria iniciativas na fila de Autorizações.</div>
+</div>`;
+      } else {
+        msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo Brain Loop (keyo-11-brain.js) não encontrado.</div>';
+      }
+    }
+  }
+
+  if (modulo === 'memoria') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '💾';
+    if (nome)  nome.textContent  = 'Memória';
+    if (desc)  desc.textContent  = 'Aprendizado acumulado e base de conhecimento';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+    if (typeof window._kMemRenderInline === 'function') {
+      window._kMemRenderInline();
+    } else {
+      if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de Memória (keyo-12-memory.js) não encontrado.</div>'; }
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -796,6 +856,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.1 — FIX: keyo-mpros-inline na lista de limpeza; _abrirModulo() reseta todos os inline antes de abrir novo módulo.');
+console.info('[KEYO-01] ✅ UI v2.2 — Módulos Brain Loop (brain) e Memória (memoria) adicionados ao _abrirModulo().');
 
 })();

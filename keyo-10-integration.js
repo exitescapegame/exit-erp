@@ -36,6 +36,9 @@ var _MODULOS = [
   { nome: 'CRM',          flag: '__KEYO_CRM_LOADED__',  btnId: null },
   { nome: 'Cientista',    flag: '__KEYO_MPROS_LOADED__', btnId: 'keyo-mod-mpros' },
   { nome: 'Instagram',    flag: '__KEYO_IG_LOADED__',   btnId: 'keyo-mod-instagram' },
+  { nome: 'Brain Loop',   flag: '__KEYO_M17_LOADED__',  btnId: 'keyo-mod-brain' },
+  { nome: 'Memória',      flag: '__KEYO_M18_LOADED__',  btnId: 'keyo-mod-memoria' },
+  { nome: 'Autorizações', flag: '__KEYO_M20_LOADED__',  btnId: 'keyo-mod-autorizacoes' },
 ];
 
 // Funções do ERP base que precisam continuar existindo (nav e persistência)
@@ -200,6 +203,6 @@ if (document.readyState === 'loading') {
   _boot();
 }
 
-console.info('[KEYO-10] ✅ Integration / Health-check v1.0 — selo de saúde aditivo (não invasivo). Rode window.keyoDiagnostico() no console quando quiser.');
+console.info('[KEYO-10] ✅ Integration / Health-check v1.1 — M17 Brain Loop, M18 Memória, M20 Autorizações adicionados ao diagnóstico. Rode window.keyoDiagnostico() no console quando quiser.');
 
 })();

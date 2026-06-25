@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v2.1
+// EXIT GAMES — KEYO UI v2.3
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
@@ -659,22 +659,59 @@ function _montarContextoAgente(agente) {
     const salas = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
     const staff = Array.isArray(window.DB?.staff) ? window.DB.staff : [];
 
+    // [v2.3] Dados financeiros reais + unidade ativa (para o agente pensar estratégico)
+    const contasPagar   = Array.isArray(window.DB?.contasPagar)   ? window.DB.contasPagar   : [];
+    const contasReceber = Array.isArray(window.DB?.contasReceber) ? window.DB.contasReceber : [];
+    const uniId  = String(window.UA?.unidadeId ?? window.UA?.unidade ?? 1);
+    const fmtBRL = n => 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+    // [v2.3] Tendência de faturamento — últimos 4 meses (dá noção de evolução, não só foto)
+    const tendencia = [];
+    for (let i = 3; i >= 0; i--) {
+      const dt = new Date();
+      dt.setDate(1);
+      dt.setMonth(dt.getMonth() - i);
+      const ym  = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+      const tot = vendasConf.filter(v => v.data?.startsWith(ym)).reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
+      tendencia.push(ym + ' = ' + fmtBRL(tot));
+    }
+
     const base = [
       '╔══ CONTEXTO REAL DA EXIT GAMES (use estes dados — não invente) ══╗',
+      'EXIT GAMES BRASIL — escape rooms. Slogan: "Não criamos apenas jogos. Conectamos pessoas."',
+      'Unidades: EXIT ARACAJU (id 1) e EXIT SALVADOR (id 2).',
+      'Instagram — a marca tem 2 contas: Aracaju = @exit.games · Salvador = @exitgames.ssa.',
+      '─────────────────────────────────────────────',
       'Data de hoje: ' + new Date(hoje).toLocaleDateString('pt-BR') + ' (' + anoAtual + ')',
       'Unidade ativa: ' + nomeUnidade,
       'Clientes cadastrados: ' + clientes.length,
       'Vendas confirmadas este mês (' + mesAtual + '): ' + vendasMes.length,
-      'Faturamento do mês: R$ ' + fat.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-      'Ticket médio do mês: R$ ' + ticket.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-      'Faturamento acumulado total: R$ ' + fatTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+      'Faturamento do mês: ' + fmtBRL(fat),
+      'Ticket médio do mês: ' + fmtBRL(ticket),
+      'Faturamento acumulado total: ' + fmtBRL(fatTotal),
+      'Evolução do faturamento (4 meses): ' + tendencia.join(' · '),
       'Cancelamentos (histórico): ' + canceladas,
     ];
 
     // Contexto adicional por agente
-    if (agente === 'mkt')  base.push('Campanhas agendadas: ' + campanhasAtivas);
+    if (agente === 'mkt') {
+      base.push('Campanhas agendadas: ' + campanhasAtivas);
+      base.push('Instagram desta unidade: ' + (uniId === '2' ? '@exitgames.ssa (Salvador)' : '@exit.games (Aracaju)'));
+    }
     if (agente === 'ops')  base.push('Salas cadastradas: ' + salas.length);
     if (agente === 'rh')   base.push('Equipe cadastrada: ' + staff.length + ' pessoas');
+
+    // [v2.3] Bloco financeiro real — agente Financeiro e KEYO geral
+    if (agente === 'fin' || agente === 'keyo') {
+      const cpAberto = contasPagar.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
+      const crAberto = contasReceber.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
+      const cpSoma = cpAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+      const crSoma = crAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+      base.push('Contas a pagar em aberto (unidade ativa): ' + cpAberto.length + ' lançamento(s) · ' + fmtBRL(cpSoma));
+      base.push('Contas a receber em aberto (unidade ativa): ' + crAberto.length + ' lançamento(s) · ' + fmtBRL(crSoma));
+      base.push('Saldo projetado (a receber − a pagar): ' + fmtBRL(crSoma - cpSoma));
+    }
+
     if (agente === 'vendas') {
       const top = vendas
         .filter(v => v.status === 'confirmado' && v.data?.startsWith(mesAtual))
@@ -866,6 +903,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.2 — Módulos Brain Loop (brain) e Memória (memoria) adicionados ao _abrirModulo().');
+console.info('[KEYO-01] ✅ UI v2.3 — Fase 3: contexto enriquecido (marca + 2 contas IG, tendência de faturamento 4 meses, bloco financeiro real contasPagar/Receber). Comportamento de envio inalterado.');
 
 })();

@@ -176,6 +176,16 @@ function _injetarItemDOM() {
 .keyo-mod-btn:hover{background:rgba(255,255,255,0.07);color:#f0f0f8}
 .keyo-mod-btn.active{background:rgba(201,168,76,.12);color:#C9A84C;font-weight:700;border-left-color:#C9A84C}
 .keyo-mod-emoji{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+/* ── Setas fixas de rolagem (painel de agentes/módulos cortado em telas menores) ── */
+.keyo-scroll-btn{position:sticky;left:0;width:100%;height:24px;border:none;background:#13131f;color:#C9A84C;font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;flex-shrink:0}
+.keyo-scroll-btn:hover{background:#1c1c2c;color:#fff}
+.keyo-scroll-up{top:0;box-shadow:0 4px 6px -4px rgba(0,0,0,.5)}
+.keyo-scroll-down{bottom:0;box-shadow:0 -4px 6px -4px rgba(0,0,0,.5)}
+/* Scrollbar fina e visível (antes era invisível em vários dispositivos) */
+#keyo-agents{scrollbar-width:thin;scrollbar-color:rgba(201,168,76,.4) transparent}
+#keyo-agents::-webkit-scrollbar{width:6px}
+#keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:3px}
+#keyo-agents::-webkit-scrollbar-track{background:transparent}
 `;
   document.head.appendChild(s);
 })();

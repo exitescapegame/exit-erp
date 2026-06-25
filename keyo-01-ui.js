@@ -161,6 +161,13 @@ function _injetarItemDOM() {
   const s = document.createElement('style');
   s.id = 'keyo-ui-abas-css';
   s.textContent = `
+/* ── Agentes recolhível ── */
+#keyo-agents-title{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+#keyo-agents-title:hover{color:rgba(255,255,255,0.7)}
+#keyo-agents-chevron{font-size:11px;transition:transform .2s;opacity:.6}
+#keyo-agents.recolhido #keyo-agents-chevron{transform:rotate(-90deg)}
+#keyo-agents-list{overflow:hidden;transition:max-height .25s ease;max-height:1000px}
+#keyo-agents.recolhido #keyo-agents-list{max-height:0}
 /* ── Separador e aba Campanhas ── */
 #keyo-agents-sep{height:1px;background:rgba(255,255,255,0.08);margin:8px 12px}
 #keyo-agents-modulos{padding:0 0 8px}
@@ -181,7 +188,11 @@ function _keyoHTML() {
   return `
 <div id="keyo-wrap">
   <div id="keyo-agents">
-    <div id="keyo-agents-title">Agentes</div>
+    <div id="keyo-agents-title" onclick="window.keyo_toggleAgentes()" title="Mostrar/ocultar agentes">
+      <span>Agentes</span>
+      <span id="keyo-agents-chevron">▾</span>
+    </div>
+    <div id="keyo-agents-list">
     ${window.KEYO_AGENTS.map(a => `
     <button class="keyo-agent-btn${a.id === 'keyo' ? ' active' : ''}"
             data-agent="${a.id}"
@@ -192,6 +203,7 @@ function _keyoHTML() {
         <span class="keyo-agent-desc">${a.desc}</span>
       </span>
     </button>`).join('')}
+    </div>
 
     <div id="keyo-agents-sep"></div>
     <div id="keyo-agents-modulos">
@@ -770,6 +782,10 @@ window.keyo_resize       = _resize;
 window.keyo_limparChat   = _limparChat;
 window.keyo_addMsg       = _appendMsg;
 window.keyo_abrirModulo  = _abrirModulo;
+window.keyo_toggleAgentes = function () {
+  const box = document.getElementById('keyo-agents');
+  if (box) box.classList.toggle('recolhido');
+};
 
 // ════════════════════════════════════════════════════════════════
 // INIT

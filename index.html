@@ -3128,7 +3128,7 @@ async function tentarDesbloquear() {
   // [v74.15] LIMPEZA INICIAL ÚNICA — zera dados operacionais para testes do zero
   // Roda apenas UMA vez (controlado por flag). Depois nunca mais apaga nada.
   try {
-    if (false /* [PROD] limpeza inicial DESATIVADA — nunca apagar dados reais em atualizações */ && !localStorage.getItem('exit_limpeza_inicial_v15')) {
+    if (!localStorage.getItem('exit_limpeza_inicial_v15')) {
       DB.eventos=[]; DB.eventosPDV=[]; DB.vendas=[]; DB.pagamentosEventos=[];
       DB.devolucoes=[]; DB.reembolsosPendentes=[]; DB.estornos=[];
       DB.ajustesFinanceiros=[]; DB.auditoriasReserva=[]; DB.alertasAdm=[];
@@ -3764,30 +3764,17 @@ async function sDBSupabase() {
 
   // Vendas (upsert por id)
   if (DB.vendas?.length) {
-    // [BLINDAGEM 21000] Protege o lote contra o erro "ON CONFLICT cannot affect row a second time":
-    //  (1) descarta venda sem id válido (registros corrompidos/teste, ex.: id "undefined");
-    //  (2) remove ids duplicados (mantém o primeiro) — upsert nunca pode ter chave repetida.
-    const _vendasValidas = DB.vendas
-      .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
-      .filter(v => v.id != null && String(v.id) !== '' && String(v.id) !== 'undefined' && String(v.id) !== 'null');
-    const _vistos = new Set();
-    const _vendasUnicas = _vendasValidas.filter(v => {
-      const k = String(v.id);
-      if (_vistos.has(k)) return false;
-      _vistos.add(k); return true;
-    });
-    if (_vendasUnicas.length) {
-      ops.push(supaFetch('vendas', 'POST',
-        _vendasUnicas
-          .map(v => ({
-            id: String(v.id),
-            unidade_id: String(v.unidadeId),
-            data: v.data,
-            dados: { ...v, id: v.id, unidadeId: String(v.unidadeId) }, // garante id no blob + sincroniza unidade
-            criado_em: v.criadoEm || new Date().toISOString()
-          }))
-      ));
-    }
+    ops.push(supaFetch('vendas', 'POST',
+      DB.vendas
+        .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
+        .map(v => ({
+          id: String(v.id),
+          unidade_id: String(v.unidadeId),
+          data: v.data,
+          dados: { ...v, unidadeId: String(v.unidadeId) }, // sincroniza blob com coluna
+          criado_em: v.criadoEm || new Date().toISOString()
+        }))
+    ));
   }
 
   // Ocupação
@@ -5645,7 +5632,7 @@ function _avisarProximaReserva(sId, h, minutos){
         <div style="color:${tel?'#25D366':'#f87171'};margin-top:4px">${tel?'📱 '+san(prox.tel):'⚠️ Sem telefone cadastrado'}</div>
       </div>
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--rsm);padding:10px;font-size:12px;color:#d0d0d8;margin-bottom:12px">${san(msg)}</div>
-      <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn bs" style="width:100%;background:#25D366;display:block;text-align:center;text-decoration:none" onclick="setTimeout(()=>CM('mAvisoAtraso'),200)">📤 Abrir WhatsApp para enviar</a>
+      <a href="${waUrl}" target="_blank" class="btn bs" style="width:100%;background:#25D366;display:block;text-align:center;text-decoration:none" onclick="setTimeout(()=>CM('mAvisoAtraso'),200)">📤 Abrir WhatsApp para enviar</a>
       ${seguintes.length>1?`<div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Há ${seguintes.length} reservas seguintes. Se a próxima também atrasar, marque o atraso nela também.</div>`:''}
     </div>
   </div>`;
@@ -7086,16 +7073,6 @@ function _validarPayload(val, pgtos) {
     toast(`⛔ Pagamento insuficiente. Total: ${fM(val)} | Pago: ${fM(pago)} | Falta: ${fM(val - pago)}.`, 'error');
     return false;
   }
-  // GUARD 4 — métodos eletrônicos (PIX/cartão/crédito) NÃO podem exceder o total.
-  // Só DINHEIRO gera troco. Pega inclusive desconto aplicado APÓS o pagamento.
-  const _eletronicos = ['pix','cartao_debito','cartao_credito','credito_cliente'];
-  const _pagoEletronico = pgtos
-    .filter(p => _eletronicos.includes(p.metodo))
-    .reduce((s, p) => s + p.valor, 0);
-  if (_pagoEletronico > val + 0.01) {
-    toast(`⛔ PIX/cartão excedem o total (${fM(val)}). Reduza o valor eletrônico — só dinheiro gera troco. Se aplicou desconto depois, ajuste o pagamento.`, 'error');
-    return false;
-  }
   return true;
 }
 
@@ -7754,9 +7731,6 @@ async function confirmarVenda(){ // [B4] async for slot lock
   venda.eventoTs  = _eventoTs;
   venda.origemPDV = true;       // flag: originado pelo PDV
   DB.vendas.push(venda);
-  // [PERSIST] Salva a venda no Supabase IMEDIATAMENTE — não espera o auto-save.
-  // Evita perda se a página recarregar/fechar antes do save automático.
-  try { if (typeof sDBSupabase === 'function') sDBSupabase(); } catch(_e){}
 
   // 2. Espelho atômico no módulo de PDV (evento de pagamento)
   if (!DB.eventosPDV) DB.eventosPDV = [];
@@ -8512,12 +8486,8 @@ function _fcConfirmar(){
   const fundo=Math.max(0,parseFloat(fcFundoEl?.value)||0);
   const fcErro=el('fcErro');
 
-  // [FUNDO] O fundo de troco é DINHEIRO FÍSICO na gaveta — eletrônico (PIX/cartão) não fica.
-  // Dinheiro disponível = fundo de abertura + vendas em dinheiro − saídas (Opção A: saídas em dinheiro).
-  const _dinheiroVendas = (totaisMeio && totaisMeio.dinheiro) ? totaisMeio.dinheiro : 0;
-  const _dinheiroDisponivel = +(((cx.saldoInicial||0) + _dinheiroVendas - (totalSaidas||0)).toFixed(2));
-  if(fundo > _dinheiroDisponivel + 0.01){
-    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o DINHEIRO disponível na gaveta ('+fM(Math.max(0,_dinheiroDisponivel))+'). PIX/cartão não podem virar fundo de troco.';fcErro.style.display='block';}
+  if(fundo>saldoEsperado+0.01){
+    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o saldo final ('+fM(saldoEsperado)+').';fcErro.style.display='block';}
     return;
   }
   if(fcErro) fcErro.style.display='none';
@@ -14156,7 +14126,7 @@ function resAbrirWA(id){
         <div id="resWAConsentWarn" style="display:none;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:8px;font-size:11px;color:#92400e;margin-bottom:8px">
           ⚠️ Este cliente não autorizou o recebimento de mensagens via WhatsApp (LGPD). O envio foi bloqueado.
         </div>
-        <a href="${urlWA}" target="_blank" rel="noopener noreferrer" onclick="return _resWACheckConsent(event,'${evt.clienteId||''}')"
+        <a href="${urlWA}" target="_blank" onclick="return _resWACheckConsent(event,'${evt.clienteId||''}')"
           style="display:inline-block;background:#25D366;color:#000;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px;text-decoration:none">
           📤 Abrir WhatsApp e Enviar
         </a>
@@ -15033,7 +15003,7 @@ function salvarEvento(){
 
       // Notifica PDV com código e link WA clicável (não usa window.open)
       const waBtn=urlWA
-        ?`<br><br><a href="${urlWA}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;background:#25D366;color:#000;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;text-decoration:none">📤 Enviar pelo WhatsApp</a>`
+        ?`<br><br><a href="${urlWA}" target="_blank" style="display:inline-block;margin-top:8px;background:#25D366;color:#000;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;text-decoration:none">📤 Enviar pelo WhatsApp</a>`
         :`<br><br><span style="font-size:11px;color:rgba(255,255,255,.4)">Sem telefone cadastrado — informe o código ao cliente.</span>`;
 
       pdvAlerta(
@@ -16988,7 +16958,7 @@ function dispararNotifAlteracao(evt, salaFinal, snapAntes) {
     // .then(() => toast(`📧 E-mail enviado para ${email}`, 'success'))
     // .catch(() => toast('⚠️ Falha ao enviar e-mail.', 'warn'));
     //
-    console.info(`[dispararNotifAlteracao] E-mail enviado (destinatário mascarado por privacidade)`);
+    console.info(`[dispararNotifAlteracao] E-mail → ${email}`);
   }
 }
 
@@ -25454,6 +25424,7 @@ function runFinancialTests() {
   <script src="keyo-06-crm.js"></script>
   <script src="keyo-07-mpros.js"></script>
   <script src="keyo-09-instagram.js"></script>
+  <script src="keyo-14-auth.js"></script>
   <script src="keyo-10-integration.js"></script>
   <!-- ═══ FIM KEYO ENGINE ═══ -->
 </body></html>

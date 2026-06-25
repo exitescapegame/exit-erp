@@ -388,6 +388,24 @@ function _abrirModulo(modulo) {
       if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo M15 não encontrado.</div>'; }
     }
   }
+
+  if (modulo === 'autorizacoes') {
+    const emoji = document.getElementById('keyo-header-emoji');
+    const nome  = document.getElementById('keyo-header-nome');
+    const desc  = document.getElementById('keyo-header-desc');
+    if (emoji) emoji.textContent = '🔔';
+    if (nome)  nome.textContent  = 'Autorizações';
+    if (desc)  desc.textContent  = 'Iniciativas do KEYO aguardando sua decisão';
+    const inputArea = document.getElementById('keyo-input-area');
+    const msgs      = document.getElementById('keyo-msgs');
+    if (inputArea) inputArea.style.display = 'none';
+    if (msgs)      msgs.style.display      = 'none';
+    if (typeof window._kAuthRenderInline === 'function') {
+      window._kAuthRenderInline();
+    } else {
+      if (msgs) { msgs.style.display = 'block'; msgs.innerHTML = '<div style="padding:40px;text-align:center;color:#888">Módulo de Autorizações não encontrado.</div>'; }
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════

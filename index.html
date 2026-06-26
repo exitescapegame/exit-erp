@@ -4531,6 +4531,30 @@ function _patchPdvReservaBox() {
 }
 
 function precoAtual(uId){const u=DB.unidades.find(u=>String(u.id)===String(uId));if(!u)return 89;const d=new Date().getDay(),ds=hoje(),iF=DB.feriados.some(f=>f.data===ds);if(iF)return(u.precoFeriado||u.precoFimSemana||119);const diasFds=u.diasFimSemana||[0,6];return diasFds.includes(d)?(u.precoFimSemana||89):(u.precoSemana||89);}
+// [Etapa2-Preço] Retorna preço/pessoa da SALA para uma data específica (ou hoje).
+// Hierarquia: feriado → fim de semana → semana. Retorna null se o nível não estiver definido.
+// precoBase legado (campo único antigo) é usado como fallback antes de retornar null.
+function precoSala(sId, dataRef){
+  const s=DB.salas.find(x=>String(x.id)===String(sId));
+  if(!s)return null;
+  const dt=dataRef||hoje();
+  const d=new Date(dt+'T12:00:00').getDay();
+  const iF=DB.feriados&&DB.feriados.some(f=>f.data===dt);
+  const diasFds=[0,6]; // Dom e Sáb — fixo (não depende mais da unidade para preço)
+  let preco=null;
+  if(iF){
+    preco=(s.precoFeriado!=null&&s.precoFeriado!=='')?parseFloat(s.precoFeriado):null;
+  } else if(diasFds.includes(d)){
+    preco=(s.precoFimSemana!=null&&s.precoFimSemana!=='')?parseFloat(s.precoFimSemana):null;
+  } else {
+    preco=(s.precoSemana!=null&&s.precoSemana!=='')?parseFloat(s.precoSemana):null;
+  }
+  // Fallback: precoBase legado (campo único antigo da sala)
+  if((preco===null||isNaN(preco))&&s.precoBase&&parseFloat(s.precoBase)>0){
+    preco=parseFloat(s.precoBase);
+  }
+  return (preco!==null&&!isNaN(preco)&&preco>0)?preco:null;
+}
 // CORRIGIDO: aceita vírgula, ponto-e-vírgula ou espaço como separador de horários
 function normalizarHorarios(str){
   if(!str)return[];
@@ -6826,7 +6850,13 @@ function confirmarManu(){const sId=ev('mMauSId');const s=DB.salas.find(x=>x.id==
 // ── VENDA ESCAPE ─────────────────────
 function abrirVenda(sId,h){
   // CORRIGIDO: usa == para compatibilidade de tipo de ID
-  const s=DB.salas.find(x=>x.id==sId);const preco=precoAtual(pdvUID());
+  const s=DB.salas.find(x=>x.id==sId);
+  // [Etapa2-Preço] Preço vem da SALA (por pessoa). Se null → bloqueia a venda.
+  const preco=precoSala(sId,hoje());
+  if(preco===null){
+    toast('⚠️ Esta sala não tem preço definido para hoje. Cadastre em Configurações → Salas antes de vender.','warn');
+    return;
+  }
   _vCtx={sId,h,preco,cupomAplicado:null};
   _pgtos=[];
   // Limpa DOM imediatamente ao abrir — evita flash de conteúdo anterior
@@ -8764,12 +8794,13 @@ function abrirVendaAvulsa(){
   if(!tP('fazer_vendas')&&!isAdm()){toast('Sem permissão para vender.','warn');return;}
   const salas=DB.salas.filter(s=>String(s.unidadeId)===String(pdvUID())&&!s.manutencao);
   const hs=horariosU(pdvUID());
-  const preco=precoAtual(pdvUID());
+  // [Etapa2-Preço] Venda Avulsa não tem sala — preço digitado manualmente pelo atendente.
+  const preco=0;
   _vCtx={sId:null,h:null,preco,cupomAplicado:null,avulsa:true};
   _pgtos=[];
   el('mVT').textContent='💰 Venda Avulsa';
-  el('mVPRef').textContent=`Preço unitário: ${fM(preco)}`;
-  el('mVJ').value=2;el('mVV').value=(preco*2).toFixed(2);el('mVCu').value='';el('mVCuMsg').textContent='';
+  el('mVPRef').textContent='✏️ Digite o valor total manualmente no campo acima.';
+  el('mVJ').value=1;el('mVV').value='';el('mVCu').value='';el('mVCuMsg').textContent='';
   el('mVDup').style.display='none';el('btnCV').disabled=false;
   el('mVCl').innerHTML='<option value="">— Venda avulsa —</option>'+DB.clientes.map(c=>`<option value="${c.id}">${san(c.nome)} | ${san(c.telefone)}</option>`).join('');
   const _vci=el('mVCreditoInfo'); if(_vci){_vci.style.display='none';_vci.innerHTML='';} // [v74.33] esconde crédito até selecionar cliente
@@ -11634,17 +11665,7 @@ function rCfgU(){
     ${DB.unidades.length>1&&isAdm()?`<button class="btn bd bxs" onclick="excluirUnidade('${u.id}')" title="Excluir unidade">🗑 Excluir</button>`:''}
   </div>
   <div class="ir"><div class="fg"><label>Nome</label><input type="text" value="${san(u.nome)}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').nome=this.value;sDB();rSb()"></div><div class="fg"><label>Endereço / Shopping</label><input type="text" value="${san(u.endereco)}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').endereco=this.value;sDB()"></div></div>
-  <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.25);border-radius:var(--rsm);padding:14px;margin-bottom:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:10px">💰 Tabela de Preço Inteligente</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Defina quais dias da semana aplicam cada preço. Feriados sempre usam o preço de feriado.</div>
-    <div class="ir3">
-      <div class="fg"><label>Preço Semana (R$)</label><input type="number" value="${u.precoSemana}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').precoSemana=+this.value;sDB()"></div>
-      <div class="fg"><label>Preço Final de Semana (R$)</label><input type="number" value="${u.precoFimSemana}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').precoFimSemana=+this.value;sDB()"></div>
-      <div class="fg"><label>Preço Feriado (R$)</label><input type="number" value="${u.precoFeriado||u.precoFimSemana}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').precoFeriado=+this.value;sDB()"></div>
-    </div>
-    <div style="font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 6px">Dias com preço de FINAL DE SEMANA:</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((d,i)=>{const dias=u.diasFimSemana||[0,6];const ch=dias.includes(i);return`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" ${ch?'checked':''} onchange="toggleDiaFimSemana('${u.id}',${i},this.checked)"> ${d}</label>`;}).join('')}</div>
-  </div>
+  <!-- [Etapa2-Preço] Tabela de Preço por Unidade REMOVIDA. Preço agora é por SALA (Configurações → Salas). -->
   <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:var(--rsm);padding:14px;margin-bottom:12px">
     <div style="font-size:11px;font-weight:700;color:var(--info);margin-bottom:10px">🕐 Horários por Tipo de Dia <span style="font-weight:400;color:var(--text3)">(separe por vírgula: 14:00,15:30,17:00)</span></div>
     <div class="fg"><label>📅 Segunda a Sexta</label><input type="text" value="${san(u.horariosSemana||u.horarios)}" onchange="const x=normalizarHorarios(this.value);DB.unidades.find(f=>String(f.id)==='${u.id}').horariosSemana=x.join(',');this.value=x.join(',');sDB()" placeholder="14:00,15:30,17:00,18:30,20:00,21:30"></div>
@@ -13498,22 +13519,20 @@ function nresCalcPreco(){
   _nres.salaId=sId;
 
   const s=DB.salas.find(x=>String(x.id)===String(sId));
-  const u=DB.unidades.find(x=>String(x.id)===String(uId));
   let preco=0;
 
-  // Prioridade 1: precoBase da sala — específico por sala, tem precedência total
-  if(s&&s.precoBase&&parseFloat(s.precoBase)>0){
-    preco=parseFloat(s.precoBase);
-  // Prioridade 2: tabela de preços da unidade por dia da semana / feriado
-  } else if(u){
-    const d=new Date(dt+'T12:00:00').getDay();            // 0=dom…6=sáb
-    const df=u.diasFimSemana||[0,6];                      // dias considerados fim de semana
-    const iF=DB.feriados&&DB.feriados.some(f=>f.data===dt);
-    if(iF) preco=parseFloat(u.precoFeriado)||parseFloat(u.precoFimSemana)||89;
-    else   preco=df.includes(d)?(parseFloat(u.precoFimSemana)||89):(parseFloat(u.precoSemana)||89);
+  // [Etapa2-Preço] Preço vem da SALA (3 níveis: feriado/fds/semana). Null = sem preço definido.
+  const _precoSalaRes=precoSala(sId, dt);
+  if(_precoSalaRes!==null){
+    preco=_precoSalaRes;
   } else {
-    // Prioridade 3: fallback via precoAtual() — nunca retorna 0
-    preco=uId?precoAtual(uId):89;
+    // Sala sem preço definido → avisa e trava a seleção
+    toast('⚠️ Esta sala não tem preço definido para a data selecionada. Cadastre em Configurações → Salas.','warn');
+    _nres.preco=0;
+    const inpV=el('nresValorTotal');if(inpV)inpV.value='';
+    _nres.valorTotal=0;
+    nresAtualizarInfoSala();
+    return;
   }
 
   _nres.preco=preco; // persiste preço/pessoa no estado global
@@ -13671,17 +13690,16 @@ function nresCalcCaixaFinal(forcarRecalculo){
   const uId=_nres.unidadeId||el('nresUnidade')?.value;
   const sId=_nres.salaId||el('nresSala')?.value;
 
-  // [v64 FIX] Hierarquia de preço SEMPRE recalculada do zero para garantir display correto
+  // [Etapa2-Preço] Hierarquia de preço SEMPRE recalculada do zero — fonte: SALA
   const s=DB.salas.find(x=>String(x.id)===String(sId));
   let preco=0;
-  if(s&&s.precoBase&&parseFloat(s.precoBase)>0){
-    preco=parseFloat(s.precoBase);
-  } else if(uId){
-    preco=precoAtual(uId);
+  const _precoSalaCx=precoSala(sId, _nres.data||hoje());
+  if(_precoSalaCx!==null){
+    preco=_precoSalaCx;
   } else if(_nres.preco>0){
-    preco=_nres.preco;
+    preco=_nres.preco; // mantém o que foi definido na seleção de sala
   } else {
-    preco=89;
+    preco=0; // sala sem preço — não inventar valor
   }
   _nres.preco=preco;
 

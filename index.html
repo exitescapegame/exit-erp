@@ -3618,7 +3618,7 @@ async function sincTabela(tbl) {
         ? ''
         : `&unidade_id=eq.${UA.unidadeId}`;
       const rows = await supaFetch(`vendas?select=dados,unidade_id&order=criado_em.asc${filtroUnidade}`);
-      if (rows) DB.vendas = rows.map(r => r.dados);
+      if (rows) DB.vendas = rows.map(r => { const v=r.dados; if(v&&r.unidade_id)v.unidadeId=String(r.unidade_id); return v; });
     } else if (tbl === 'ocupacao') {
       // [RLS-v59] Filtra slots por unidade no realtime — nao-ADM nao recebe ocupacao de outras unidades
       const filtroOcup = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
@@ -3658,8 +3658,8 @@ async function sincTabela(tbl) {
       const filtroColab = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
         ? ''
         : `&unidade_id=eq.${UA.unidadeId}`;
-      const rows = await supaFetch(`colaboradores?select=dados${filtroColab}`);
-      if (rows) DB.colaboradores = rows.map(r => r.dados);
+      const rows = await supaFetch(`colaboradores?select=dados,unidade_id${filtroColab}`);
+      if (rows) DB.colaboradores = rows.map(r => { const c=r.dados; if(c){c.id=String(c.id);c.unidadeId=String(r.unidade_id||c.unidadeId);} return c; });
     } else if (tbl === 'clientes') {
       const rows = await supaFetch('clientes?select=dados');
       if (rows) DB.clientes = rows.map(r => r.dados);

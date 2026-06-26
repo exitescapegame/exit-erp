@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO CORE v1.2
+// EXIT GAMES — KEYO CORE v1.3
 // Arquivo: keyo-00-core.js
 // Injetar via: <script src="keyo-00-core.js"></script>
 // Inserir no index.html APÓS todo o ERP base, antes de </body>
@@ -94,7 +94,7 @@ let _kHistory = {};
   s.id = 'keyo-css';
   s.textContent = `
 /* ── KEYO: layout principal ── */
-#keyo-wrap{display:flex;height:calc(100vh - 3px);overflow:hidden;background:#f4f4fa}
+#keyo-wrap{display:flex;height:calc(100dvh - 3px);overflow:hidden;background:#f4f4fa}
 #keyo-agents{width:200px;flex-shrink:0;background:#0f0f1a;border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;overflow-y:auto}
 #keyo-agents-title{padding:14px 16px 8px;font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px}
 .keyo-agent-btn{display:flex;align-items:center;gap:9px;padding:10px 16px;cursor:pointer;border:none;background:none;width:100%;text-align:left;color:rgba(255,255,255,0.5);font-size:12px;font-family:inherit;border-left:3px solid transparent;transition:all .15s}
@@ -157,7 +157,7 @@ let _kHistory = {};
 // FIM ETAPA 1.1
 // ════════════════════════════════════════════════════════════════
 
-console.info('[KEYO-00] ✅ Etapa 1.1 — CSS e constantes carregados. (v1.2)');
+console.info('[KEYO-00] ✅ Etapa 1.1 — CSS e constantes carregados. (v1.3 — coluna KEYO com 100dvh: corrige corte de agentes abaixo da dobra)');
 console.info('[KEYO-00] KEYO_AGENTS:', KEYO_AGENTS.length, 'agentes');
 console.info('[KEYO-00] KEYO_EDGE_URL:', KEYO_EDGE_URL);
 

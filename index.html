@@ -4075,7 +4075,7 @@ function vS(){if(!UA||Date.now()>sessao.expiresAt){toast('Sessão expirada.','wa
 function tP(p){if(!UA)return false;return UA.permissoes.includes('tudo')||UA.permissoes.includes(p);}
 function isAdm(){return UA&&UA.cargoId===1;}
 // Retorna a unidade ativa no PDV (ADM pode ter trocado via seletor)
-function pdvUID(){return isAdm()?(window._pdvUnidade||UA.unidadeId):UA.unidadeId;}
+function pdvUID(){if(!UA)return null;return isAdm()?(window._pdvUnidade||UA.unidadeId):UA.unidadeId;}
 
 // [v74.92 C3] Nome/telefone da reserva SEMPRE atual: se há cliente cadastrado,
 // busca o dado vigente em DB.clientes; senão usa a cópia salva (walk-in). Resolve
@@ -23385,6 +23385,7 @@ console.log('[EXIT ERP v74.6] Bloqueio de cobrança adicional + mínimo 2 jogado
     _renderPage_v747();
 
     // Após render, corrige todos os slots que têm reserva ativa mas estão amarelos
+    if(!UA) return; // [v74-FIX] Protege contra renderPage chamada após logout
     requestAnimationFrame(function() {
       const hj = hoje();
       const pdvUId = typeof pdvUID==='function' ? pdvUID() : UA?.unidadeId;

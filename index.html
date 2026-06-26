@@ -1423,6 +1423,12 @@ tbody tr:hover td { background: #f4f4ff !important; }
         <div class="fg"><label>Mín. Jogadores</label><input type="number" id="mSlMn" value="2" min="1"></div>
         <div class="fg"><label>Máx. Jogadores</label><input type="number" id="mSlMx" value="6" min="1"></div>
       </div>
+      <div class="fg" style="margin-top:6px"><label style="font-weight:600">💰 Preço por pessoa (R$) — por sala</label></div>
+      <div class="ir3">
+        <div class="fg"><label>Semana</label><input type="number" id="mSlPrSem" min="0" step="0.01" placeholder="ex: 89"></div>
+        <div class="fg"><label>Fim de semana</label><input type="number" id="mSlPrFds" min="0" step="0.01" placeholder="ex: 119"></div>
+        <div class="fg"><label>Feriado</label><input type="number" id="mSlPrFer" min="0" step="0.01" placeholder="ex: 119"></div>
+      </div>
       <div class="ir">
         <div class="fg"><label>Classificação Indicativa</label><select id="mSlClass"><option value="Livre">Livre</option><option value="12+">12+</option><option value="14+">14+</option><option value="16+">16+</option><option value="18+">18+</option></select></div>
         <div class="fg"><label>Descrição / Enredo</label></div>
@@ -11377,6 +11383,7 @@ function abrirSala(id){
   el('mSlT').textContent=s?'✏️ Editar Sala':'🚪 Nova Sala';
   el('mSlId').value=s?.id||'';el('mSlN').value=s?.nome||'';el('mSlDf').value=s?.dificuldade||'Médio';
   el('mSlTm').value=s?.tempo||60;el('mSlEm').value=s?.emoji||'🚪';el('mSlMn').value=s?.minJog||2;el('mSlMx').value=s?.maxJog||6;el('mSlDesc').value=s?.descricao||'';el('mSlMau').checked=s?.manutencao||false;el('mSlUrl').value='';
+  el('mSlPrSem').value=(s&&s.precoSemana!=null)?s.precoSemana:'';el('mSlPrFds').value=(s&&s.precoFimSemana!=null)?s.precoFimSemana:'';el('mSlPrFer').value=(s&&s.precoFeriado!=null)?s.precoFeriado:'';
   if(el('mSlClass'))el('mSlClass').value=s?.classificacao||'Livre';
   const foto=s?(s.fotoBase64||s.fotoUrl):'';
   if(foto){el('mSlPrev').src=foto;el('mSlPrev').style.display='block';el('mSlPh').style.display='none';window._salaImgB64=s.fotoBase64||'';window._salaImgUrl=s.fotoUrl||'';}else{el('mSlPrev').style.display='none';el('mSlPh').style.display='flex';}
@@ -11408,7 +11415,10 @@ function salvarSala(){
     unidadeId,
     fotoBase64:window._salaImgB64||'',
     fotoUrl:window._salaImgUrl||'',
-    classificacao:ev('mSlClass')||''
+    classificacao:ev('mSlClass')||'',
+    precoSemana:    (function(v){return (v!==''&&v!=null&&!isNaN(parseFloat(v)))?parseFloat(v):null;})(ev('mSlPrSem')),
+    precoFimSemana: (function(v){return (v!==''&&v!=null&&!isNaN(parseFloat(v)))?parseFloat(v):null;})(ev('mSlPrFds')),
+    precoFeriado:   (function(v){return (v!==''&&v!=null&&!isNaN(parseFloat(v)))?parseFloat(v):null;})(ev('mSlPrFer'))
   };
 
   // ── Validação Back-end simulada (camada 2 de 2) ──

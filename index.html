@@ -1512,7 +1512,7 @@ tbody tr:hover td { background: #f4f4ff !important; }
       <div class="fg"><label>Observações</label><textarea id="mCltOb" rows="2"></textarea></div>
       <div style="background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:10px 12px;margin-top:8px">
         <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:12px;color:var(--text2);line-height:1.5">
-          <input type="checkbox" id="cliWaConsent" style="margin-top:2px;flex-shrink:0;accent-color:#25D366">
+          <input type="checkbox" id="cliWaConsent" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#25D366;cursor:pointer">
           <span>📱 Autorizo o recebimento de mensagens de confirmação, alteração e cancelamento via WhatsApp, conforme a LGPD.</span>
         </label>
         <div id="cliWaConsentInfo" style="font-size:10px;color:var(--text3);margin-top:4px;padding-left:22px;display:none"></div>
@@ -3889,7 +3889,7 @@ const DBD={
      horariosFimSemana:'13:00,14:30,16:00,17:30,19:00,20:30',
      horariosFeriado:'13:00,14:30,16:00,17:30,19:00,20:30',
      horarios:'14:00,15:30,17:00,18:30,20:00,21:30',
-     temSenior:true,temTabuleiro:true},
+     temSenior:false,temTabuleiro:true},
     {id:'2',nome:'EXIT SALVADOR',endereco:'Shopping Barra',horarioAbre:'11:00',horarioFecha:'23:00',
      precoSemana:89,precoFimSemana:119,precoFeriado:119,
      horariosSemana:'14:00,15:30,17:00,18:30,20:00,21:30',
@@ -3947,8 +3947,9 @@ DB.unidades.forEach(u=>{u.id=String(u.id);
   if(!u.horariosFeriado)u.horariosFeriado=u.horariosFimSemana||u.horarios;
   if(!u.precoFeriado)u.precoFeriado=u.precoFimSemana||119;
   if(!u.diasFimSemana)u.diasFimSemana=[0,6]; // Dom e Sáb por padrão
-  if(u.temSenior===undefined)u.temSenior=false;
-  if(u.temTabuleiro===undefined)u.temTabuleiro=false;
+  // [Fix] !!u.temSenior garante booleano mesmo se campo vier como null/ausente do Supabase
+  u.temSenior=u.temSenior===true;  // só true se explicitamente true
+  u.temTabuleiro=u.temTabuleiro===true;
 });
 DB.salas.forEach(s=>{s.id=String(s.id);s.unidadeId=String(s.unidadeId);if(!s.fotoBase64)s.fotoBase64='';if(!s.fotoUrl)s.fotoUrl='';});
 // [BLK1-5] FIX BUG 2: seed da sala 209 so roda se ela nunca foi excluida (tombstone check)

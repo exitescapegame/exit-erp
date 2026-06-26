@@ -8311,7 +8311,7 @@ function abrirFechamentoCaixa(){
     v.status==='confirmado' && v.data===hoje() && String(v.unidadeId)===uId
   );
 
-  const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,outros:0};
+  const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0};
   vendasSessao.forEach(v=>{
     if(v.pagamentos&&v.pagamentos.length){
       v.pagamentos.forEach(p=>{
@@ -8354,7 +8354,7 @@ function abrirFechamentoCaixa(){
   const m=document.createElement('div');m.className='mo';m.id='mFechamentoCaixa';
   document.body.appendChild(m);
 
-  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',outros:'🔄 Outros'};
+  const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito do cliente (vale)',outros:'🔄 Outros'};
   const meioRows=Object.entries(totaisMeio).map(([k,v])=>v>0||k==='dinheiro'?`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">${meioLabels[k]||k}</span>
@@ -11715,11 +11715,6 @@ function abrirNovaUnidade(){
     <div class="mb">
       <div class="fg"><label>Nome da Unidade</label><input type="text" id="nuNome" placeholder="Ex: EXIT FORTALEZA"></div>
       <div class="fg"><label>Endereço / Shopping</label><input type="text" id="nuEndereco" placeholder="Ex: Shopping Iguatemi"></div>
-      <div class="ir3">
-        <div class="fg"><label>Preço Semana (R$)</label><input type="number" id="nuPsem" value="89"></div>
-        <div class="fg"><label>Preço Fim de Semana (R$)</label><input type="number" id="nuPfds" value="119"></div>
-        <div class="fg"><label>Preço Feriado (R$)</label><input type="number" id="nuPfer" value="119"></div>
-      </div>
       <div class="fg"><label>Horários Semana (Seg–Sex)</label><input type="text" id="nuHorSem" value="14:00,15:30,17:00,18:30,20:00,21:30"></div>
       <div class="fg"><label>Horários Fim de Semana</label><input type="text" id="nuHorFds" value="13:00,14:30,16:00,17:30,19:00,20:30"></div>
       <div class="fg"><label>Horários Feriados</label><input type="text" id="nuHorFer" value="13:00,14:30,16:00,17:30,19:00,20:30"></div>
@@ -11734,7 +11729,7 @@ function abrirNovaUnidade(){
     </div>`;
     document.body.appendChild(m);
   }
-  el('nuNome').value='';el('nuEndereco').value='';el('nuPsem').value=89;el('nuPfds').value=119;el('nuPfer').value=119;
+  el('nuNome').value='';el('nuEndereco').value=''; // [Etapa2-Preço] campos de preço removidos — preço é por SALA
   el('nuHorSem').value='14:00,15:30,17:00,18:30,20:00,21:30';
   el('nuHorFds').value='13:00,14:30,16:00,17:30,19:00,20:30';
   el('nuHorFer').value='13:00,14:30,16:00,17:30,19:00,20:30';
@@ -11753,9 +11748,9 @@ function confirmarNovaUnidade(){
     nome,
     endereco:ev('nuEndereco').trim(),
     horarioAbre:'10:00',horarioFecha:'22:00',
-    precoSemana:parseFloat(ev('nuPsem'))||89,
-    precoFimSemana:parseFloat(ev('nuPfds'))||119,
-    precoFeriado:parseFloat(ev('nuPfer'))||119,
+    precoSemana:89, // [Etapa2-Preço] valor legado mantido p/ compatibilidade — preço real é por SALA
+    precoFimSemana:119,
+    precoFeriado:119,
     horarios:horSem,
     horariosSemana:horSem,
     horariosFimSemana:horFds,

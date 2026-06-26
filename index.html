@@ -3652,8 +3652,8 @@ async function sincTabela(tbl) {
       const filtroSala = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
         ? ''
         : `&unidade_id=eq.${UA.unidadeId}`;
-      const rows = await supaFetch(`salas?select=dados${filtroSala}`);
-      if (rows) DB.salas = rows.map(r => r.dados);
+      const rows = await supaFetch(`salas?select=dados,unidade_id${filtroSala}`);
+      if (rows) DB.salas = rows.map(r => { const s=r.dados; if(s&&r.unidade_id)s.unidadeId=String(r.unidade_id); return s; });
     } else if (tbl === 'colaboradores') {
       const filtroColab = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
         ? ''

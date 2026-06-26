@@ -4684,7 +4684,7 @@ function lancarCaixa(uId, tipo, valor, desc, metodo){
 function txOcupacao(uId){const salas=DB.salas.filter(s=>String(s.unidadeId)===String(uId)&&!s.manutencao);const h=horariosU(uId);const total=salas.length*h.length;if(!total)return 0;const oc=salas.reduce((s,sl)=>s+h.filter(hr=>getOc(sl.id,hr)==='ocupado').length,0);return Math.round((oc/total)*100);}
 
 // ── MODAL ─────────────────────────────
-function OM(id){const e=el(id);if(!e)return;e.classList.add('open');e.onclick=ev=>ev.target===e&&CM(id);if(id==='mRet'){const s=document.getElementById('retSenha');if(s)s.value='';const err=document.getElementById('retSenhaErr');if(err)err.style.display='none';}}
+function OM(id){const e=el(id);if(!e)return;e.classList.add('open');e.onclick=ev=>{if(ev.target===e)CM(id);};if(id==='mRet'){const s=document.getElementById('retSenha');if(s)s.value='';const err=document.getElementById('retSenhaErr');if(err)err.style.display='none';}}
 function CM(id){const e=el(id);if(e)e.classList.remove('open');}
 
 // ── SIDEBAR ───────────────────────────

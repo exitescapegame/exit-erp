@@ -2920,7 +2920,23 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     if (!DB.eventos) DB.eventos = [];
     if (!DB.caixaUnidades) DB.caixaUnidades = {};
     if (!DB.config) DB.config = dc(DBD.config);
-    else DB.config = Object.assign(dc(DBD.config), DB.config);
+    else {
+      // [BUG2-FIX] Deep merge: defaults do DBD preenchem apenas sub-campos AUSENTES no banco.
+      // Object.assign raso substituía sub-objetos inteiros (ex: config.tabuleiro) perdendo campos salvos.
+      function _deepMergeConfig(base, override) {
+        const result = Object.assign({}, base);
+        for (const k in override) {
+          if (override[k] !== null && typeof override[k] === 'object' && !Array.isArray(override[k]) &&
+              base[k] !== null && typeof base[k] === 'object' && !Array.isArray(base[k])) {
+            result[k] = _deepMergeConfig(base[k], override[k]);
+          } else {
+            result[k] = override[k];
+          }
+        }
+        return result;
+      }
+      DB.config = _deepMergeConfig(dc(DBD.config), DB.config);
+    }
     if (!DB.metas) DB.metas = dc(DBD.metas);
     if (!DB.feriados) DB.feriados = dc(DBD.feriados);
     if (!DB.cupons) DB.cupons = dc(DBD.cupons);
@@ -2946,6 +2962,7 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
       if (!DB.caixaUnidades[k]) DB.caixaUnidades[k] = {aberto:false,saldoAtual:0,entradas:0,saidas:0,historico:[]};
     });
     // Salva cache local após carga bem-sucedida
+    _DB_CARREGADO = true; // [BUG4-FIX] libera sDB() somente agora
     salvarCacheLocal();
     if(typeof obsCacheHit==='function') obsCacheHit(); // [v74.83] dados vieram da nuvem (hit)
     if(typeof obsLog==='function') obsLog('info','dados_carregados',{origem:'supabase'});
@@ -2955,6 +2972,7 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     const cache = carregarCacheLocal();
     if (cache) {
       DB = cache;
+      _DB_CARREGADO = true; // [BUG4-FIX] cache local é dados reais — libera sDB()
       console.warn('[EXIT ERP] Supabase indisponível. Carregado do cache local (' + (localStorage.getItem(SK_LOCAL_CACHE) ? JSON.parse(localStorage.getItem(SK_LOCAL_CACHE)).savedAt : '?') + ').');
       if (typeof toast === 'function') toast('⚠️ Modo offline: dados carregados do cache local.', 'warn');
     }
@@ -3677,8 +3695,14 @@ function _sDBCore() {
 }
 
 let _sDBSupabaseRunning = false; // guard contra chamadas concorrentes
+let _DB_CARREGADO = false; // [BUG4-FIX] flag: só permite sDB() após carga confirmada do Supabase
 
 async function sDBSupabase() {
+  // [BUG4-FIX] Guard: nunca salva se o banco ainda não foi carregado (evita sobrescrever dados reais com DBD defaults)
+  if (!_DB_CARREGADO) {
+    console.warn('[EXIT ERP] sDBSupabase: BLOQUEADO — banco ainda não foi carregado. sDB() ignorado.');
+    return;
+  }
   // Guard: se ja ha um save em progresso, aguarda ate 3s antes de desistir
   if (_sDBSupabaseRunning) {
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -3775,14 +3799,12 @@ async function sDBSupabase() {
     ));
   }
 
-  // Ajustes Financeiros (v47)
-  if (DB.ajustesFinanceiros?.length) {
-    // [RLS-v59] Garante que cada ajuste tem unidadeId antes de persistir
-    DB.ajustesFinanceiros.forEach(a => { if(!a.unidadeId && UA) a.unidadeId = String(UA.unidadeId); });
-    ops.push(supaFetch('config', 'POST', [
-      { chave: 'ajustesFinanceiros', valor: DB.ajustesFinanceiros }
-    ]));
-  }
+  // Ajustes Financeiros (v47) — [BUG3-FIX] sempre persiste, mesmo vazio, para evitar ghost data no banco
+  // [RLS-v59] Garante que cada ajuste tem unidadeId antes de persistir
+  (DB.ajustesFinanceiros||[]).forEach(a => { if(!a.unidadeId && UA) a.unidadeId = String(UA.unidadeId); });
+  ops.push(supaFetch('config', 'POST', [
+    { chave: 'ajustesFinanceiros', valor: DB.ajustesFinanceiros || [] }
+  ]));
 
   // Caixa por unidade
   const cxKeys = Object.keys(DB.caixaUnidades||{});
@@ -3851,6 +3873,7 @@ async function lDBSupabase() {
       pontos: cfg.pontos || [],
       manutencoes: cfg.manutencoes || [],
       mensagens: cfg.mensagens || [],
+      ajustesFinanceiros: cfg.ajustesFinanceiros || [], // [BUG1-FIX] campo era salvo mas nunca carregado do Supabase
       unidades: _unidadesDedup,
       salas: (saRows||[]).map(r => { const s=r.dados; if(s&&r.unidade_id)s.unidadeId=String(r.unidade_id); return s; }), // [RLS-v59] fonte de verdade: coluna unidade_id
       colaboradores: (coRows||[]).map(r => {

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v2.3
+// EXIT GAMES — KEYO UI v2.5
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
@@ -182,7 +182,11 @@ function _injetarItemDOM() {
 .keyo-scroll-up{top:0;box-shadow:0 4px 6px -4px rgba(0,0,0,.5)}
 .keyo-scroll-down{bottom:0;box-shadow:0 -4px 6px -4px rgba(0,0,0,.5)}
 /* Scrollbar fina e visível (antes era invisível em vários dispositivos) */
-#keyo-agents{scrollbar-width:thin;scrollbar-color:rgba(201,168,76,.4) transparent}
+#keyo-agents{scrollbar-width:thin;scrollbar-color:rgba(201,168,76,.5) transparent}
+#keyo-agents::-webkit-scrollbar{width:10px}
+#keyo-agents::-webkit-scrollbar-track{background:rgba(255,255,255,0.04)}
+#keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.5);border-radius:5px}
+#keyo-agents::-webkit-scrollbar-thumb:hover{background:rgba(201,168,76,.85)}
 #keyo-agents::-webkit-scrollbar{width:6px}
 #keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:3px}
 #keyo-agents::-webkit-scrollbar-track{background:transparent}
@@ -676,6 +680,19 @@ function _montarContextoAgente(agente) {
       tendencia.push(ym + ' = ' + fmtBRL(tot));
     }
 
+    // [v2.5] Salas reais lidas AO VIVO do app — nunca gravadas, sempre do cadastro atual.
+    const _precoUni = (typeof window.precoAtual === 'function') ? window.precoAtual(uniId) : null;
+    const salasLive = salas
+      .filter(s => s && !s.manutencao && (String(s.unidadeId) === uniId || s.unidadeId == null))
+      .map(s => {
+        const dur = s.tempo ? (s.tempo + ' min') : '';
+        const cap = (s.minJog && s.maxJog) ? (s.minJog + '–' + s.maxJog + ' jogadores') : '';
+        const dif = s.dificuldade || '';
+        return '• ' + (s.nome || 'Sala') +
+          [dur, cap, dif].filter(Boolean).map(x => ' — ' + x).join('');
+      })
+      .join('\n');
+
     const base = [
       '╔══ CONTEXTO REAL DA EXIT GAMES (use estes dados — não invente) ══╗',
       'EXIT GAMES BRASIL — escape rooms. Slogan: "Não criamos apenas jogos. Conectamos pessoas."',
@@ -691,6 +708,10 @@ function _montarContextoAgente(agente) {
       'Faturamento acumulado total: ' + fmtBRL(fatTotal),
       'Evolução do faturamento (4 meses): ' + tendencia.join(' · '),
       'Cancelamentos (histórico): ' + canceladas,
+      '─────────────────────────────────────────────',
+      'SALAS EM OPERAÇÃO (unidade ativa, lidas AO VIVO do app — use SEMPRE estes dados, nunca suponha duração, capacidade ou preço):',
+      (salasLive || '(nenhuma sala ativa cadastrada nesta unidade)'),
+      'Preço da sessão hoje, pela regra da unidade (semana/fim de semana/feriado): ' + (_precoUni != null ? fmtBRL(_precoUni) : '—') + '. Observação: o sistema cobra por sessão/unidade, não por sala.',
     ];
 
     // Contexto adicional por agente
@@ -903,6 +924,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.3 — Fase 3: contexto enriquecido (marca + 2 contas IG, tendência de faturamento 4 meses, bloco financeiro real contasPagar/Receber). Comportamento de envio inalterado.');
+console.info('[KEYO-01] ✅ UI v2.5 — Salas lidas ao vivo do app (nome, tempo, capacidade, dificuldade) + preço atual da unidade no contexto. KEYO para de chutar. Menu e Fase 3 preservados.');
 
 })();

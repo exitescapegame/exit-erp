@@ -1513,7 +1513,7 @@ tbody tr:hover td { background: #f4f4ff !important; }
       <div style="background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:10px 12px;margin-top:8px">
         <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:12px;color:var(--text2);line-height:1.5">
           <input type="checkbox" id="cliWaConsent" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#25D366;cursor:pointer">
-          <span style="pointer-events:none">📱 Autorizo o recebimento de mensagens de confirmação, alteração e cancelamento via WhatsApp, conforme a LGPD.</span>
+          <span>📱 Autorizo o recebimento de mensagens de confirmação, alteração e cancelamento via WhatsApp, conforme a LGPD.</span>
         </label>
         <div id="cliWaConsentInfo" style="font-size:10px;color:var(--text3);margin-top:4px;padding-left:22px;display:none"></div>
       </div>
@@ -2459,6 +2459,8 @@ function _limparSessaoCompleta() {
   // Cancela timers de sessão (se existirem)
   try{ if(typeof _sessaoPollInterval!=='undefined' && _sessaoPollInterval){ clearInterval(_sessaoPollInterval); _sessaoPollInterval=null; } }catch(e){}
   try{ if(typeof clearTimeout==='function'){ clearTimeout(_inativTimer); clearTimeout(_lockTimer); } }catch(e){}
+  // [v74.fix] Para o relógio do PDV — evita timer fantasma após logout
+  try{ if(typeof _clkInv!=='undefined' && _clkInv){ clearInterval(_clkInv); _clkInv=null; } }catch(e){}
   if(typeof obsLog==='function') obsLog('info','sessao_limpa',{action:'SESSAO_LIMPAR'});
 }
 
@@ -8908,15 +8910,13 @@ function _ajusteRenderDiff() {
   const novoJ = parseInt(el('ajNovoJ')?.value) || 0;
   const { jogadoresAnt, valorAnt, unidadeId } = _ajusteCtx;
 
-  // Recalcula preço com a data selecionada no modal
+  // [Etapa2-Preço] Recalcula preço pela SALA (mesma hierarquia do PDV e reservas)
   const dataAjuste = el('ajData')?.value || hoje();
-  const u = DB.unidades.find(x=>String(x.id)===String(unidadeId));
+  const sidAjuste = el('ajSalaSelect')?.value || _ajusteCtx.salaOrig;
   let preco = _ajusteCtx.preco;
-  if(u){
-    const dv = new Date(dataAjuste+'T12:00:00').getDay();
-    const iF = DB.feriados.some(f=>f.data===dataAjuste);
-    const diasFds = u.diasFimSemana||[0,6];
-    preco = iF?(u.precoFeriado||u.precoFimSemana||119):diasFds.includes(dv)?(u.precoFimSemana||89):(u.precoSemana||89);
+  const _precoSalaAj = precoSala(sidAjuste, dataAjuste);
+  if(_precoSalaAj !== null){
+    preco = _precoSalaAj;
     _ajusteCtx.preco = preco;
   }
   // Atualiza label do preço

@@ -11191,6 +11191,129 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
   </div>`;
 }
 
+// ── RELATÓRIO DE AVALIAÇÕES KEYO (pós-jogo + chat) ─────────────────────────
+// Padrão: retorna HTML síncrono com div vazio; setTimeout(0) dispara fetch e preenche.
+// Sem aspas aninhadas em onclick — usa data-attributes para passar valores.
+window._avalPeriodo = window._avalPeriodo || '7';
+
+function rAvaliacoes() {
+  setTimeout(_avalCarregar, 0);
+  
+  var periodo = window._avalPeriodo;
+  var btn7  = '<button class="btn bsm ' + (periodo==='7'  ? 'bp' : 'bg') + '" data-p="7"  onclick="_avalSetPeriodo(this)">Última semana</button>';
+  var btn30 = '<button class="btn bsm ' + (periodo==='30' ? 'bp' : 'bg') + '" data-p="30" onclick="_avalSetPeriodo(this)">Último mês</button>';
+  
+  return '<div class="ph"><div><div class="pt">⭐ Avaliações do Bot KEYO</div>' +
+    '<div class="ps">Pesquisas pós-jogo e atendimento WhatsApp</div></div>' +
+    '<div class="br">' + btn7 + btn30 + '</div></div>' +
+    '<div class="pb"><div id="_avalBox"><div class="card"><div class="empty">' +
+    '<div class="empty-ic">⏳</div><div>Carregando avaliações...</div></div></div></div>';
+}
+
+function _avalSetPeriodo(btn) {
+  window._avalPeriodo = btn.getAttribute('data-p');
+  renderPage();
+}
+
+async function _avalCarregar() {
+  var box = el('_avalBox');
+  if (!box) return;
+  
+  var dias  = parseInt(window._avalPeriodo) || 7;
+  var desde = new Date(Date.now() - dias * 86400000).toISOString();
+  
+  var rows;
+  try {
+    rows = await supaFetch(
+      'keyo_memoria?tipo=eq.keyo_avaliacao_chat' +
+      '&criado_em=gte.' + encodeURIComponent(desde) +
+      '&select=dados,criado_em&order=criado_em.desc&limit=500'
+    );
+  } catch(e) {
+    box.innerHTML = '<div class="card"><div class="empty">Erro ao carregar dados do Supabase.</div></div>';
+    return;
+  }
+  
+  var itens = (rows || []).map(function(r) {
+    return Object.assign({}, r.dados || {}, { _ts: r.criado_em });
+  });
+  
+  if (!itens.length) {
+    box.innerHTML = '<div class="card"><div class="empty"><div class="empty-ic">⭐</div>' +
+      '<div>Nenhuma avaliação no período selecionado.</div></div></div>';
+    return;
+  }
+  
+  // Métricas
+  var total = itens.length;
+  var soma  = 0;
+  var dist  = [0,0,0,0,0,0]; // índices 1–5
+  itens.forEach(function(x) {
+    var n = parseInt(x.nota);
+    if (n >= 1 && n <= 5) { soma += n; dist[n]++; }
+  });
+  var media   = soma / total;
+  var pct     = function(n) { return total ? Math.round(dist[n] / total * 100) : 0; };
+  var corMedia = media >= 4 ? 'var(--success)' : media >= 3 ? 'var(--accent)' : 'var(--danger)';
+  
+  // Cards de métricas
+  var cards =
+    '<div class="g2" style="margin-bottom:14px">' +
+      '<div class="met"><div class="ml">Média geral</div>' +
+        '<div class="mv" style="color:' + corMedia + ';font-size:22px">' + media.toFixed(1) + ' ⭐</div></div>' +
+      '<div class="met"><div class="ml">Total de avaliações</div>' +
+        '<div class="mv">' + total + '</div></div>' +
+      '<div class="met gr"><div class="ml">Nota 5 🤩</div>' +
+        '<div class="mv">' + pct(5) + '%</div></div>' +
+      '<div class="met rd"><div class="ml">Notas 1–2 ⚠️</div>' +
+        '<div class="mv">' + (pct(1)+pct(2)) + '%</div></div>' +
+    '</div>';
+  
+  // Barra de distribuição
+  var barras = '<div class="card" style="margin-bottom:12px"><div class="ct">Distribuição de notas</div>';
+  [5,4,3,2,1].forEach(function(n) {
+    var p   = pct(n);
+    var cor = n >= 4 ? 'var(--success)' : n === 3 ? 'var(--accent)' : 'var(--danger)';
+    barras +=
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<span style="width:32px;font-size:12px;font-weight:700">' + n + ' ⭐</span>' +
+        '<div style="flex:1;background:rgba(255,255,255,.06);border-radius:4px;height:14px;overflow:hidden">' +
+          '<div style="width:' + p + '%;height:100%;background:' + cor + ';border-radius:4px"></div>' +
+        '</div>' +
+        '<span style="width:60px;font-size:11px;color:var(--text2);text-align:right">' +
+          dist[n] + ' (' + p + '%)</span>' +
+      '</div>';
+  });
+  barras += '</div>';
+  
+  // Tabela individual
+  var notaEmoji = ['','😠','😕','😐','😊','🤩'];
+  var linhas = itens.map(function(x) {
+    var n    = parseInt(x.nota) || 0;
+    var data = x._ts
+      ? new Date(x._ts).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : '—';
+    var origem = x.origem === 'pos_jogo' ? '🎮 pós-jogo' : '💬 chat';
+    var corN = n >= 4 ? 'var(--success)' : n >= 3 ? 'var(--accent)' : n > 0 ? 'var(--danger)' : 'var(--text3)';
+    var notaTxt = n > 0 ? (n + '/5 ' + (notaEmoji[n]||'')) : '<span style="color:var(--text3)">aguardando</span>';
+    return '<tr>' +
+      '<td style="font-size:12px">' + san(data) + '</td>' +
+      '<td>' + san(x.nomeCliente||'—') + '</td>' +
+      '<td style="font-size:11px;color:var(--text3)">' + san(x.telefone||'—') + '</td>' +
+      '<td><span class="bdg b-gh">' + origem + '</span></td>' +
+      '<td style="font-weight:700;color:' + corN + '">' + notaTxt + '</td>' +
+    '</tr>';
+  }).join('');
+  
+  var tabela =
+    '<div class="card"><div class="ct">Registros individuais</div>' +
+    '<div class="tw"><table><thead><tr>' +
+      '<th>Data</th><th>Cliente</th><th>Telefone</th><th>Origem</th><th>Nota</th>' +
+    '</tr></thead><tbody>' + linhas + '</tbody></table></div></div>';
+  
+  box.innerHTML = cards + barras + tabela;
+}
+
 // ── FECHAMENTOS DE CAIXA — aba Financeiro ─────────────────────────
 function rFechamentosCaixa(){
   if(!isAdm()&&!tP('ver_financeiro')){return'<div class="card"><div class="empty">⛔ Acesso restrito.</div></div>';}

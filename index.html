@@ -5672,7 +5672,7 @@ function _avisarProximaReserva(sId, h, minutos){
         <div style="color:${tel?'#25D366':'#f87171'};margin-top:4px">${tel?'📱 '+san(prox.tel):'⚠️ Sem telefone cadastrado'}</div>
       </div>
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--rsm);padding:10px;font-size:12px;color:#d0d0d8;margin-bottom:12px">${san(msg)}</div>
-      <a href="${waUrl}" target="_blank" class="btn bs" style="width:100%;background:#25D366;display:block;text-align:center;text-decoration:none" onclick="setTimeout(()=>CM('mAvisoAtraso'),200)">📤 Abrir WhatsApp para enviar</a>
+      <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn bs" style="width:100%;background:#25D366;display:block;text-align:center;text-decoration:none" onclick="setTimeout(()=>CM('mAvisoAtraso'),200)">📤 Abrir WhatsApp para enviar</a>
       ${seguintes.length>1?`<div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Há ${seguintes.length} reservas seguintes. Se a próxima também atrasar, marque o atraso nela também.</div>`:''}
     </div>
   </div>`;
@@ -14281,7 +14281,7 @@ function resAbrirWA(id){
         <div id="resWAConsentWarn" style="display:none;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:8px;font-size:11px;color:#92400e;margin-bottom:8px">
           ⚠️ Este cliente não autorizou o recebimento de mensagens via WhatsApp (LGPD). O envio foi bloqueado.
         </div>
-        <a href="${urlWA}" target="_blank" onclick="return _resWACheckConsent(event,'${evt.clienteId||''}')"
+        <a href="${urlWA}" target="_blank" rel="noopener noreferrer" onclick="return _resWACheckConsent(event,'${evt.clienteId||''}')"
           style="display:inline-block;background:#25D366;color:#000;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px;text-decoration:none">
           📤 Abrir WhatsApp e Enviar
         </a>
@@ -15158,7 +15158,7 @@ function salvarEvento(){
 
       // Notifica PDV com código e link WA clicável (não usa window.open)
       const waBtn=urlWA
-        ?`<br><br><a href="${urlWA}" target="_blank" style="display:inline-block;margin-top:8px;background:#25D366;color:#000;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;text-decoration:none">📤 Enviar pelo WhatsApp</a>`
+        ?`<br><br><a href="${urlWA}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;background:#25D366;color:#000;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;text-decoration:none">📤 Enviar pelo WhatsApp</a>`
         :`<br><br><span style="font-size:11px;color:rgba(255,255,255,.4)">Sem telefone cadastrado — informe o código ao cliente.</span>`;
 
       pdvAlerta(
@@ -17113,7 +17113,9 @@ function dispararNotifAlteracao(evt, salaFinal, snapAntes) {
     // .then(() => toast(`📧 E-mail enviado para ${email}`, 'success'))
     // .catch(() => toast('⚠️ Falha ao enviar e-mail.', 'warn'));
     //
-    console.info(`[dispararNotifAlteracao] E-mail → ${email}`);
+    // [v74-SEC] S2: nunca expor e-mail completo do cliente no console
+    const _emailMascarado = email.replace(/^(.{2}).*(@.*)$/, '$1***$2');
+    console.info(`[dispararNotifAlteracao] E-mail → ${_emailMascarado}`);
   }
 }
 

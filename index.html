@@ -11697,7 +11697,8 @@ function rCfgU(){
     <div class="fg"><label>🌞 Domingo</label><input type="text" value="${san(u.horariosDomingo||u.horariosFimSemana||u.horarios)}" onchange="const x=normalizarHorarios(this.value);DB.unidades.find(f=>String(f.id)==='${u.id}').horariosDomingo=x.join(',');this.value=x.join(',');sDB()" placeholder="13:00,14:30,16:00,17:30,19:00,20:30"></div>
     <div class="fg"><label>🗓️ Feriados</label><input type="text" value="${san(u.horariosFeriado||u.horariosFimSemana||u.horarios)}" onchange="const x=normalizarHorarios(this.value);DB.unidades.find(f=>String(f.id)==='${u.id}').horariosFeriado=x.join(',');this.value=x.join(',');sDB()" placeholder="13:00,14:30,16:00,17:30,19:00,20:30"></div>
   </div>
-  <div style="display:flex;gap:20px;margin-top:6px">
+  <div style="display:flex;flex-wrap:wrap;gap:14px 20px;margin-top:6px">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><label class="tgl"><input type="checkbox" ${u.aceitaAgendamento!==false?'checked':''} onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').aceitaAgendamento=this.checked;sDB()"><span class="tgs"></span></label>📅 Aceita agendamento online</label>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><label class="tgl"><input type="checkbox" ${u.temSenior?'checked':''} onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').temSenior=this.checked;sDB()"><span class="tgs"></span></label>👴 Melhor Idade</label>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><label class="tgl"><input type="checkbox" ${u.temTabuleiro?'checked':''} onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').temTabuleiro=this.checked;sDB()"><span class="tgs"></span></label>🎲 Tabuleiro</label>
   </div>

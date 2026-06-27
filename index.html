@@ -4704,7 +4704,9 @@ const MENUS=[
   {id:'eventos',lbl:'Eventos',ic:'📅',perm:'ver_relatorios'},
   {id:'reservas',lbl:'Reservas',ic:'🎟️',perm:'ver_pdv',lrqBadge:true},
   {id:'gm',lbl:'Painel GM',ic:'🎮',perm:'ver_painel_gm',gmBadge:true},
-  {id:'comm',lbl:'Mensagens',ic:'💬',perm:'ver_pdv',comm:true}
+  {id:'comm',lbl:'Mensagens',ic:'💬',perm:'ver_pdv',comm:true},
+  {section:'Inteligência'},
+  {id:'avaliacoes',lbl:'⭐ Avaliações',ic:'⭐',perm:'ver_relatorios'}
 ];
 window.MENUS = MENUS; // expõe para módulos externos (KEYO)
 
@@ -4768,7 +4770,7 @@ function goTo(pg){
   // Fechar sidebar automaticamente em tablets ao navegar (fix #02)
   if(window.innerWidth<=1024) sbFechar();
 }
-function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
+function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM,avaliacoes:rAvaliacoes};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
 function bindPage(){
   if(PA==='pdv'){startClk();_agendaOnPageBind();}
   const ct=el('cpTp');if(ct)ct.onchange=updCpTipo;

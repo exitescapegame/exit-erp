@@ -5888,6 +5888,14 @@ function _v74_testesCriticos(){
     const totalV=100, pCred=40, pDin=60;
     add('Pagamento', 'Crédito não infla caixa (só dinheiro)', pDin===60 && (pCred+pDin)===totalV);
 
+    // ÁREA 2.5: FUNDO DE TROCO (L99 Etapa 1) — eletrônico nunca vira fundo de gaveta
+    const _calcSaldoFisico=(saldoInicial,dinheiro,saidas)=>Math.max(0,saldoInicial+dinheiro-saidas);
+    add('FundoTroco', 'Saldo físico ignora PIX/cartão (só conta dinheiro)', _calcSaldoFisico(0,50,0)===50);
+    add('FundoTroco', 'Fundo maior que dinheiro físico é rejeitado', !(200<=_calcSaldoFisico(0,50,0)));
+    add('FundoTroco', 'Fundo igual ao dinheiro físico é aceito', 50<=_calcSaldoFisico(0,50,0));
+    add('FundoTroco', 'Saídas reduzem o dinheiro físico disponível', _calcSaldoFisico(0,100,30)===70);
+    add('FundoTroco', 'Saldo físico nunca fica negativo', _calcSaldoFisico(0,10,50)===0);
+
     // ÁREA 3: DADOS
     const idStr = uid();
     add('Dados', 'IDs string não corrompem (sem parseInt→NaN)', isNaN(parseInt(idStr)) && String(idStr)===idStr);
@@ -8351,8 +8359,16 @@ function abrirFechamentoCaixa(){
   const totalSaidas=cx.saidas||0;
   const saldoEsperado=+(((cx.saldoInicial||0)+totalVendas-totalSaidas).toFixed(2));
 
+  // [v74-ETAPA1] Eletrônico (PIX/débito/crédito) NUNCA vira fundo de gaveta.
+  // saldoFisicoDisponivel = só o dinheiro que de fato passou pela gaveta física:
+  // fundo de ontem + vendas em DINHEIRO hoje − saídas/retiradas (saídas são sempre
+  // tratadas como dedução do físico, lado conservador: nunca permite fundo maior
+  // que o que realmente pode estar na gaveta).
+  const totalEletronico=+((totaisMeio.pix||0)+(totaisMeio.cartao_debito||0)+(totaisMeio.cartao_credito||0)+(totaisMeio.outros||0)).toFixed(2);
+  const saldoFisicoDisponivel=+(Math.max(0,(cx.saldoInicial||0)+(totaisMeio.dinheiro||0)-totalSaidas)).toFixed(2);
+
   // Salva no contexto global — sem passar pelo onclick
-  _fcCtx={uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio};
+  _fcCtx={uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel};
 
   let mOld=el('mFechamentoCaixa');if(mOld)mOld.remove();
   const m=document.createElement('div');m.className='mo';m.id='mFechamentoCaixa';
@@ -8387,18 +8403,23 @@ function abrirFechamentoCaixa(){
           <span style="font-weight:900;color:var(--success);font-size:18px;font-family:monospace">${fM(totalVendas)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:6px 0">
-          <span style="font-size:14px;font-weight:800">🏦 Saldo Final Esperado</span>
+          <span style="font-size:14px;font-weight:800">🏦 Saldo Final Esperado (todos os meios)</span>
           <span style="font-weight:900;color:var(--accent);font-size:20px;font-family:monospace">${fM(saldoEsperado)}</span>
         </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:6px;border-top:1px dashed rgba(201,168,76,.25)">
+          <span style="font-size:13px;font-weight:800;color:var(--success)">💵 Disponível em dinheiro (físico, na gaveta)</span>
+          <span style="font-weight:900;color:var(--success);font-size:16px;font-family:monospace">${fM(saldoFisicoDisponivel)}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">📲💳 Eletrônico (PIX/débito/crédito): ${fM(totalEletronico)} — já está na conta, não passa pela gaveta.</div>
       </div>
       <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:14px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;color:var(--info);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏦 Fundo de Troco para Amanhã</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Quanto deseja deixar no caixa como fundo de troco para amanhã?</p>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Quanto deseja deixar no caixa como fundo de troco para amanhã? (somente dinheiro físico — máximo ${fM(saldoFisicoDisponivel)})</p>
         <div class="fg" style="margin-bottom:8px">
           <label>Valor do Fundo (R$)</label>
-          <input type="number" id="fcFundo" min="0" step="0.01" value="${Math.min(200,saldoEsperado).toFixed(2)}" style="font-size:16px;font-weight:700;text-align:center;font-family:monospace">
+          <input type="number" id="fcFundo" min="0" max="${saldoFisicoDisponivel.toFixed(2)}" step="0.01" value="${Math.min(200,saldoFisicoDisponivel).toFixed(2)}" style="font-size:16px;font-weight:700;text-align:center;font-family:monospace">
         </div>
-        <div style="font-size:11px;color:var(--text2)">💡 Enviado ao financeiro: <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,saldoEsperado-Math.min(200,saldoEsperado)))}</strong></div>
+        <div style="font-size:11px;color:var(--text2)">💡 Dinheiro enviado ao financeiro (sangria): <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,saldoFisicoDisponivel-Math.min(200,saldoFisicoDisponivel)))}</strong></div>
       </div>
       <div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:12px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📧 Relatório</div>
@@ -8422,13 +8443,13 @@ function abrirFechamentoCaixa(){
   if(fcFundo&&fcRest){
     fcFundo.addEventListener('input',()=>{
       const f=parseFloat(fcFundo.value)||0;
-      fcRest.textContent=fM(Math.max(0,saldoEsperado-f));
+      fcRest.textContent=fM(Math.max(0,saldoFisicoDisponivel-f));
     });
   }
 }
 
 function _fcVisualizarRelatorio(){
-  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio}=_fcCtx;
+  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel}=_fcCtx;
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   const cx=getCx(uId);
   const now=new Date();
@@ -8457,9 +8478,12 @@ function _fcVisualizarRelatorio(){
         <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Saldo Abertura:</span><strong>${fM(cx.saldoInicial||0)}</strong></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Total Vendas:</span><strong style="color:#16a34a">${fM(totalVendas)}</strong></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Total Saídas:</span><strong style="color:#dc2626">- ${fM(totalSaidas)}</strong></div>
+        <hr style="border:none;border-top:1px dashed #999;margin:10px 0">
+        <div style="display:flex;justify-content:space-between;padding:4px 0"><span>💵 Dinheiro físico (gaveta):</span><strong style="color:#16a34a">${fM(saldoFisicoDisponivel)}</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0"><span>📲💳 Eletrônico (não passa pela gaveta):</span><strong>${fM(totalEletronico)}</strong></div>
         <hr style="border:none;border-top:2px solid #000;margin:10px 0">
         <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900">
-          <span>SALDO FINAL:</span><span style="color:#C9A84C">${fM(saldoEsperado)}</span>
+          <span>SALDO FINAL (todos os meios):</span><span style="color:#C9A84C">${fM(saldoEsperado)}</span>
         </div>
       </div>
     </div>
@@ -8471,7 +8495,7 @@ function _fcVisualizarRelatorio(){
 // [v74.55] Impressão do fechamento de caixa via #printArea (corrige folha em branco)
 function _fcImprimirRelatorio(){
   if(!_fcCtx){ toast('Abra o relatório de fechamento primeiro.','warn'); return; }
-  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio}=_fcCtx;
+  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel}=_fcCtx;
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   const cx=getCx(uId);
   const now=new Date();
@@ -8494,7 +8518,10 @@ function _fcImprimirRelatorio(){
     <div class="rcb-linha"><span>Total Vendas</span><span>${fM(totalVendas)}</span></div>
     <div class="rcb-linha"><span>Total Saidas</span><span>- ${fM(totalSaidas)}</span></div>
     <hr class="rcb-sep">
-    <div class="rcb-total"><span>SALDO FINAL</span><span>${fM(saldoEsperado)}</span></div>
+    <div class="rcb-linha"><span>Dinheiro fisico (gaveta)</span><span>${fM(saldoFisicoDisponivel)}</span></div>
+    <div class="rcb-linha"><span>Eletronico (nao passa pela gaveta)</span><span>${fM(totalEletronico)}</span></div>
+    <hr class="rcb-sep">
+    <div class="rcb-total"><span>SALDO FINAL (todos os meios)</span><span>${fM(saldoEsperado)}</span></div>
     <hr class="rcb-sep">
     <div class="rcb-rodape">EXIT GAMES — Inteligencia e Diversao.</div>
   </div>`;
@@ -8505,7 +8532,7 @@ function _fcImprimirRelatorio(){
 }
 
 function _fcExportarCSV(){
-  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio}=_fcCtx;
+  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel}=_fcCtx;
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   const cx=getCx(uId);
   const now=new Date();
@@ -8513,7 +8540,8 @@ function _fcExportarCSV(){
   let csv='data:text/csv;charset=utf-8,\uFEFF';
   csv+=`FECHAMENTO DE CAIXA — ${san(unidade?.nome||'')}\n`;
   csv+=`Data,${now.toLocaleDateString('pt-BR')}\nHora,${now.toLocaleTimeString('pt-BR')}\nOperador,${san(UA?.nome||'—')}\n\n`;
-  csv+=`Total Vendas,${totalVendas.toFixed(2)}\nTotal Saídas,${totalSaidas.toFixed(2)}\nSaldo Abertura,${(cx.saldoInicial||0).toFixed(2)}\nSaldo Final,${saldoEsperado.toFixed(2)}\n\n`;
+  csv+=`Total Vendas,${totalVendas.toFixed(2)}\nTotal Saídas,${totalSaidas.toFixed(2)}\nSaldo Abertura,${(cx.saldoInicial||0).toFixed(2)}\nSaldo Final (todos os meios),${saldoEsperado.toFixed(2)}\n`;
+  csv+=`Dinheiro físico (gaveta),${saldoFisicoDisponivel.toFixed(2)}\nEletrônico (não passa pela gaveta),${totalEletronico.toFixed(2)}\n\n`;
   csv+=`Data,Tipo,Descrição,Valor,Canal\n`;
   vendasSessao.forEach(v=>{
     const sala=DB.salas.find(s=>s.id==v.salaId);
@@ -8524,7 +8552,7 @@ function _fcExportarCSV(){
 }
 
 function _fcConfirmar(){
-  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio}=_fcCtx;
+  const {uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel}=_fcCtx;
   if(!uId){toast('Erro: contexto de fechamento perdido. Tente novamente.','error');return;}
   const cx=getCx(uId);
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
@@ -8532,8 +8560,9 @@ function _fcConfirmar(){
   const fundo=Math.max(0,parseFloat(fcFundoEl?.value)||0);
   const fcErro=el('fcErro');
 
-  if(fundo>saldoEsperado+0.01){
-    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o saldo final ('+fM(saldoEsperado)+').';fcErro.style.display='block';}
+  // [v74-ETAPA1] Fundo de troco só pode vir de dinheiro físico — nunca de PIX/cartão.
+  if(fundo>saldoFisicoDisponivel+0.01){
+    if(fcErro){fcErro.textContent='⛔ Fundo ('+fM(fundo)+') excede o dinheiro físico disponível ('+fM(saldoFisicoDisponivel)+'). Eletrônico (PIX/débito/crédito) não pode virar fundo de gaveta.';fcErro.style.display='block';}
     return;
   }
   if(fcErro) fcErro.style.display='none';
@@ -8541,6 +8570,7 @@ function _fcConfirmar(){
   const now=new Date();
   const hora=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const sessAtiva=getSessaoCaixaAtiva(uId);
+  const dinheiroEnviadoFinanceiro=Math.max(0,saldoFisicoDisponivel-fundo);
 
   // 1. Fecha sessão atual
   if(sessAtiva){
@@ -8548,6 +8578,7 @@ function _fcConfirmar(){
     sessAtiva.saldoFinal=saldoEsperado;sessAtiva.totalVendasPDV=totalVendas;
     sessAtiva.totalSaidas=totalSaidas;sessAtiva.meiosPagamento=totaisMeio;
     sessAtiva.fundoTransferido=fundo;
+    sessAtiva.saldoFisicoDisponivel=saldoFisicoDisponivel;sessAtiva.totalEletronico=totalEletronico;
   }
 
   // 2. Salva relatório
@@ -8557,7 +8588,8 @@ function _fcConfirmar(){
     data:hoje(),hora,operadorId:UA.id,operadorNome:UA.nome,
     saldoAbertura:cx.saldoInicial||0,totalVendas,totalSaidas,
     meiosPagamento:totaisMeio,saldoFinalEsperado:saldoEsperado,
-    fundoParaAmanha:fundo,saldoEnviadoFinanceiro:Math.max(0,saldoEsperado-fundo),
+    saldoFisicoDisponivel,totalEletronico,
+    fundoParaAmanha:fundo,saldoEnviadoFinanceiro:dinheiroEnviadoFinanceiro,
     criadoEm:agora()
   };
   DB.fechamentosCaixa.push(relatorio);
@@ -8580,12 +8612,12 @@ function _fcConfirmar(){
   if(!DB.notificacoesFinanceiro)DB.notificacoesFinanceiro=[];
   DB.notificacoesFinanceiro.push({
     id:uid(),unidadeId:uId,tipo:'fechamento_caixa',
-    mensagem:`Fechamento ${fD(hoje())} ${hora} — ${san(unidade?.nome||'')} | Vendas: ${fM(totalVendas)} | Saldo: ${fM(saldoEsperado)} | Fundo amanhã: ${fM(fundo)}`,
+    mensagem:`Fechamento ${fD(hoje())} ${hora} — ${san(unidade?.nome||'')} | Vendas: ${fM(totalVendas)} (dinheiro: ${fM(totaisMeio.dinheiro||0)} · eletrônico: ${fM(totalEletronico)}) | Fundo amanhã: ${fM(fundo)} | Sangria (dinheiro): ${fM(dinheiroEnviadoFinanceiro)}`,
     relatorioId:relatorio.id,criadoEm:agora(),lida:false
   });
 
   registrarAuditoria('FECHAMENTO_CAIXA',
-    `Caixa ${san(unidade?.nome||'')} fechado. Vendas: ${fM(totalVendas)} | Saldo: ${fM(saldoEsperado)} | Fundo: ${fM(fundo)}`,
+    `Caixa ${san(unidade?.nome||'')} fechado. Vendas: ${fM(totalVendas)} | Dinheiro físico: ${fM(saldoFisicoDisponivel)} | Eletrônico: ${fM(totalEletronico)} | Fundo: ${fM(fundo)} | Sangria: ${fM(dinheiroEnviadoFinanceiro)}`,
     UA.id,{relatorioId:relatorio.id,critico:true});
 
   sDB();
@@ -8594,10 +8626,10 @@ function _fcConfirmar(){
   CM('mFechamentoCaixa');
   renderPage();
   pdvAlerta(
-    `<b>✅ Caixa fechado!</b><br><br>Total Vendas: <b style="color:var(--success)">${fM(totalVendas)}</b><br>Saldo Final: <b style="color:var(--accent)">${fM(saldoEsperado)}</b><br>Fundo amanhã: <b>${fM(fundo)}</b><br>Enviado ao financeiro: <b>${fM(Math.max(0,saldoEsperado-fundo))}</b>`,
+    `<b>✅ Caixa fechado!</b><br><br>Total Vendas: <b style="color:var(--success)">${fM(totalVendas)}</b><br>💵 Dinheiro físico: <b style="color:var(--success)">${fM(saldoFisicoDisponivel)}</b><br>📲💳 Eletrônico: <b>${fM(totalEletronico)}</b><br>Fundo amanhã: <b>${fM(fundo)}</b><br>Sangria (dinheiro ao financeiro): <b>${fM(dinheiroEnviadoFinanceiro)}</b>`,
     '🔒 CAIXA FECHADO','🔒'
   );
-  toast(`✅ Caixa fechado! Saldo: ${fM(saldoEsperado)}`,'success');
+  toast(`✅ Caixa fechado! Dinheiro físico: ${fM(saldoFisicoDisponivel)}`,'success');
 }
 
 // ── Override de abrirCx para solicitar Fundo de Troco ─────────────────

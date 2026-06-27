@@ -2965,6 +2965,7 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     });
     // Salva cache local após carga bem-sucedida
     _DB_CARREGADO = true; // [BUG4-FIX] libera sDB() somente agora
+    window._TINHA_UNIDADES = (DB.unidades||[]).length > 0; // [BLINDAGEM ANTI-WIPE] baseline: havia unidades na carga
     salvarCacheLocal();
     if(typeof obsCacheHit==='function') obsCacheHit(); // [v74.83] dados vieram da nuvem (hit)
     if(typeof obsLog==='function') obsLog('info','dados_carregados',{origem:'supabase'});
@@ -2975,11 +2976,14 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     if (cache) {
       DB = cache;
       _DB_CARREGADO = true; // [BUG4-FIX] cache local é dados reais — libera sDB()
+      window._TINHA_UNIDADES = (DB.unidades||[]).length > 0; // [BLINDAGEM ANTI-WIPE] baseline: havia unidades no cache
       console.warn('[EXIT ERP] Supabase indisponível. Carregado do cache local (' + (localStorage.getItem(SK_LOCAL_CACHE) ? JSON.parse(localStorage.getItem(SK_LOCAL_CACHE)).savedAt : '?') + ').');
       if (typeof toast === 'function') toast('⚠️ Modo offline: dados carregados do cache local.', 'warn');
     }
     // Se não há cache, DB permanece com os defaults do DBD (comportamento original)
   }
+  // [BLINDAGEM ANTI-WIPE v87] Captura o estado real só se a carga foi confirmada.
+  if (_DB_CARREGADO && typeof _capturarBaseline === 'function') _capturarBaseline();
   return true;
 }
 
@@ -3699,10 +3703,55 @@ function _sDBCore() {
 let _sDBSupabaseRunning = false; // guard contra chamadas concorrentes
 let _DB_CARREGADO = false; // [BUG4-FIX] flag: só permite sDB() após carga confirmada do Supabase
 
+// [BLINDAGEM ANTI-WIPE v87] Memória do estado REAL no momento da carga.
+// Serve para impedir que uma carga parcial/RLS sobrescreva a nuvem com vazio.
+window._BASE_TINHA_UNIDADES = window._BASE_TINHA_UNIDADES || false;
+window._BASE_CFG = window._BASE_CFG || null;
+function _capturarBaseline() {
+  // Chamado APENAS após carga confirmada (dados reais em DB). Registra o que veio populado.
+  window._BASE_TINHA_UNIDADES = Array.isArray(DB.unidades) && DB.unidades.length > 0;
+  const chaves = ['jogosTabuleiro','contasPagar','contasReceber','eventos','sessoesTabuleiro',
+    'termosTabuleiro','alertsGM','chatGM','sessoesSenior','pontos','manutencoes','mensagens'];
+  const base = {};
+  chaves.forEach(k => { base[k] = Array.isArray(DB[k]) && DB[k].length > 0; });
+  window._BASE_CFG = base;
+}
+// Decide se um array global pode ser gravado. Se tinha conteúdo na carga e agora está
+// vazio, NÃO grava [] por cima (preserva a nuvem). Retorna null para sinalizar "pular".
+function _cfgGuard(chave, arr) {
+  arr = Array.isArray(arr) ? arr : [];
+  const tinhaNaCarga = window._BASE_CFG && window._BASE_CFG[chave] === true;
+  if (tinhaNaCarga && arr.length === 0) {
+    console.warn('[BLINDAGEM v87] "' + chave + '" tinha dados na carga e agora está vazio — NÃO sobrescreve a nuvem.');
+    return null;
+  }
+  return arr;
+}
+
 async function sDBSupabase() {
   // [BUG4-FIX] Guard: nunca salva se o banco ainda não foi carregado (evita sobrescrever dados reais com DBD defaults)
   if (!_DB_CARREGADO) {
     console.warn('[EXIT ERP] sDBSupabase: BLOQUEADO — banco ainda não foi carregado. sDB() ignorado.');
+    return;
+  }
+  // [BLINDAGEM ANTI-WIPE v87] Tripwire catastrófico: se a carga trouxe unidades mas agora
+  // DB.unidades/DB.salas estão vazios, o estado em memória está corrompido. NUNCA persiste
+  // (evita zerar o banco inteiro). Só bloqueia gravação; jamais apaga.
+  if (window._BASE_TINHA_UNIDADES === true &&
+      (!Array.isArray(DB.unidades) || DB.unidades.length === 0 ||
+       !Array.isArray(DB.salas) || DB.salas.length === 0)) {
+    console.error('[BLINDAGEM v87] Save BLOQUEADO: unidades/salas vazias após carga populada. Perda de dados evitada.');
+    if (typeof toast === 'function') toast('⚠️ Salvamento bloqueado: estado de dados inconsistente. Recarregue a página (F5).', 'error');
+    return;
+  }
+  // [BLINDAGEM ANTI-WIPE] Tranca de catástrofe: se a carga trouxe unidades e agora
+  // DB.unidades (ou DB.salas) está vazio, o estado em memória está corrompido.
+  // Abortar o save inteiro impede que QUALQUER código futuro zere o banco na nuvem.
+  // Só bloqueia gravação — nunca apaga nada. (A limpeza manual do ADM não esvazia
+  // unidades/salas, então não é afetada por esta tranca.)
+  if (window._TINHA_UNIDADES && (!Array.isArray(DB.unidades) || DB.unidades.length === 0 || !Array.isArray(DB.salas) || DB.salas.length === 0)) {
+    console.error('[BLINDAGEM ANTI-WIPE] Save BLOQUEADO: havia unidades/salas na carga, mas o estado em memória está vazio. Perda de dados evitada — recarregue a página.');
+    if (typeof toast === 'function') toast('⚠️ Salvamento bloqueado: estado de dados inconsistente. Recarregue a página para proteger seus dados.', 'error');
     return;
   }
   // Guard: se ja ha um save em progresso, aguarda ate 3s antes de desistir
@@ -3721,26 +3770,25 @@ async function sDBSupabase() {
 
   const ops = [];
 
-  // Config
-  ops.push(supaFetch('config', 'POST', [
+  // Config — objetos sempre persistem; arrays globais passam pelo _cfgGuard (anti-wipe v87)
+  const _cfgRows = [
     { chave: 'config', valor: DB.config },
     { chave: 'metas', valor: DB.metas },
     { chave: 'feriados', valor: DB.feriados },
     { chave: 'cupons', valor: DB.cupons },
-    { chave: 'cargos', valor: DB.cargos },
-    { chave: 'jogosTabuleiro', valor: DB.jogosTabuleiro||[] },
-    { chave: 'contasPagar', valor: DB.contasPagar||[] },
-    { chave: 'contasReceber', valor: DB.contasReceber||[] },
-    { chave: 'eventos', valor: DB.eventos||[] },
-    { chave: 'sessoesTabuleiro', valor: DB.sessoesTabuleiro||[] },
-    { chave: 'termosTabuleiro', valor: DB.termosTabuleiro||[] },
-    { chave: 'alertsGM', valor: DB.alertsGM||[] },
-    { chave: 'chatGM', valor: DB.chatGM||[] },
-    { chave: 'sessoesSenior', valor: DB.sessoesSenior||[] },
-    { chave: 'pontos', valor: DB.pontos||[] },
-    { chave: 'manutencoes', valor: DB.manutencoes||[] },
-    { chave: 'mensagens', valor: DB.mensagens||[] }
-  ]));
+    { chave: 'cargos', valor: DB.cargos }
+  ];
+  const _cfgArrays = {
+    jogosTabuleiro: DB.jogosTabuleiro, contasPagar: DB.contasPagar, contasReceber: DB.contasReceber,
+    eventos: DB.eventos, sessoesTabuleiro: DB.sessoesTabuleiro, termosTabuleiro: DB.termosTabuleiro,
+    alertsGM: DB.alertsGM, chatGM: DB.chatGM, sessoesSenior: DB.sessoesSenior, pontos: DB.pontos,
+    manutencoes: DB.manutencoes, mensagens: DB.mensagens
+  };
+  for (const _k in _cfgArrays) {
+    const _v = _cfgGuard(_k, _cfgArrays[_k]);
+    if (_v !== null) _cfgRows.push({ chave: _k, valor: _v });
+  }
+  ops.push(supaFetch('config', 'POST', _cfgRows));
 
   // Unidades
   ops.push(supaFetch('unidades', 'POST',
@@ -3841,6 +3889,15 @@ async function lDBSupabase() {
     ]);
 
     if (!unRows || unRows.length === 0) return null; // Banco vazio = primeira vez
+
+    // [BLINDAGEM ANTI-WIPE] Há unidades mas o fetch da tabela config voltou vazio/nulo:
+    // a carga está PARCIAL (RLS, rede ou token). Não prosseguir — devolver null faz o
+    // boot cair no cache local (dados reais) ou manter _DB_CARREGADO=false (save bloqueado).
+    // Isso impede que reservas/contas (guardadas em config) sejam sobrescritas com [].
+    if (!cfgRows || cfgRows.length === 0) {
+      console.error('[BLINDAGEM ANTI-WIPE] Carga parcial detectada: unidades OK porém config vazio. Carga abortada para preservar dados na nuvem.');
+      return null;
+    }
 
     const cfg = {};
     (cfgRows||[]).forEach(r => { cfg[r.chave] = r.valor; });
@@ -5842,7 +5899,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v85] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅');
+  console.log('🔒 [INTEGRIDADE v87] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE ativa)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}

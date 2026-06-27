@@ -8054,7 +8054,7 @@ function updPontoSt(){
       st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
     } else {
       const dur=Date.now()-new Date(p.entrada).getTime();
-      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${p.entradaHora} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
+      st.innerHTML=`<span style="color:var(--success)">✅ Em serviço desde ${san(p.entradaHora)} — ${fDur(dur)}</span><br><small style="color:var(--text3)">Confirme para registrar saída</small>`;
     }
   }else{st.innerHTML='<span style="color:var(--text2)">Registrar entrada</span>';}
 }
@@ -11473,7 +11473,7 @@ function rPonto(){
           </div>
           <div style="font-size:10px;color:var(--text2)">
             ${em
-              ? `<span style="color:var(--success)">● Em serviço desde ${pa[0]?.entradaHora}</span>`
+              ? `<span style="color:var(--success)">● Em serviço desde ${san(pa[0]?.entradaHora||'')}</span>`
               : thj>0
                 ? `⏱ ${fDur(thj)} hoje`
                 : '<span style="color:var(--text3)">Sem registro</span>'}
@@ -14196,7 +14196,7 @@ function resAbrirJogadores(eventoId){
   _resCtx={eventoId};
   const sala=DB.salas.find(s=>Array.isArray(evt.salaIds)?evt.salaIds.includes(String(s.id)):String(s.id)===String(evt.salaId));
   el('mResJogTit').textContent=`👥 ${san(evt.nomeReserva||'Reserva')}`;
-  el('mResJogInfo').innerHTML=`${san(sala?.nome||evNomeSalas(evt))} · ${fD(evt.data)} ${evt.hora?'às '+evt.hora:''} · ${evt.qtdPessoas||'—'} pessoas`;
+  el('mResJogInfo').innerHTML=`${san(sala?.nome||evNomeSalas(evt))} · ${fD(evt.data)} ${evt.hora?'às '+san(evt.hora):''} · ${evt.qtdPessoas||'—'} pessoas`;
   el('resJogTel').value='';el('resJogNome').value='';el('resJogBuscaResult').textContent='';
   _resRenderJogadores(evt);
   OM('mResJogadores');
@@ -21067,7 +21067,7 @@ function _v74_abrirModalDevolucao(opts) {
   const evt = (DB.eventos||[]).find(e=>e.id===opts.eventoId);
   const infoEl = el('v74DevInfoCliente');
   if (infoEl && evt) {
-    infoEl.innerHTML = `Cliente: <strong>${san(evt.nomeReserva||'—')}</strong> · Reserva: <strong>${fD(evt.data)} ${evt.hora||''}</strong>`;
+    infoEl.innerHTML = `Cliente: <strong>${san(evt.nomeReserva||'—')}</strong> · Reserva: <strong>${fD(evt.data)} ${san(evt.hora||'')}</strong>`;
   }
 
   // Listener de método
@@ -21949,7 +21949,7 @@ if (_crvValidar_v742_orig) {
       inp.disabled = true;
       inp.className = 'reserva-confirm-input err';
       const msg = el('crvMsg');
-      if (msg) msg.innerHTML = '<span style="color:var(--danger)">⛔ Código expirado — reserva encerrada às ' + evt.hora + '. Contate o gerente.</span>';
+      if (msg) msg.innerHTML = '<span style="color:var(--danger)">⛔ Código expirado — reserva encerrada às ' + san(evt.hora) + '. Contate o gerente.</span>';
       return;
     }
     _crvValidar_v742_orig(inp);

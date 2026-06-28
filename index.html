@@ -2268,7 +2268,7 @@ function _limparTimerSeguro(nome){
 }
 function _timerStatus(){ return Object.keys(_TIMERS).map(n=>({nome:n, tipo:_TIMERS[n].tipo, ativoMs: Date.now()-_TIMERS[n].criadoEm})); }
 
-const INATIVIDADE_MS = 5 * 60 * 1000;    // [v38] 5 min → logout completo por inatividade
+const INATIVIDADE_MS = 20 * 60 * 1000;    // [v90] 20 min → logout completo por inatividade (era 5 min)
 const LOCK_PDV_MS    =  8 * 60 * 1000;   //  8 min → bloqueio de tela PDV (re-PIN)
 const LOCK_GM_MS     =  5 * 60 * 1000;   //  5 min → bloqueio de tela GM (re-PIN)
 let _telaBloqueada = false;
@@ -5910,7 +5910,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v89] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA)');
+  console.log('🔒 [INTEGRIDADE v91] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -25821,6 +25821,85 @@ function runFinancialTests() {
 // ── Fim de runFinancialTests() ────────────────────────────────────────────
 
 </script>
+  <!-- ═══ WATCHDOG DE CONEXÃO ERP↔SUPABASE (v91) — 100% ADITIVO / REVERSÍVEL ═══ -->
+  <script>
+/* Objetivo (pedido do Tiago): manter ERP e Supabase sempre sincronizados; se a
+   conexão cair, ficar tentando buscar sozinho e recuperar o que mudou enquanto
+   esteve fora. NÃO altera sDB/lDBSupabase/blindagem anti-wipe — só CHAMA funções
+   que já existem (sincTabela, iniciarRealtime, setConexaoStatus, renderPage), que
+   já têm filtro de unidade (RLS) e try/catch. Remover este <script> volta ao
+   estado anterior, sem efeito colateral.
+   Re-sincroniza em: (1) reconexão do WebSocket, (2) rede do aparelho voltou,
+   (3) aba reaberta / PC acordou, (4) rotina de segurança a cada 3 min. */
+(function _conexaoWatchdog(){
+  'use strict';
+  if (window.__CONEXAO_WATCHDOG_V91__) return;
+  window.__CONEXAO_WATCHDOG_V91__ = true;
+
+  var TABELAS = ['config','unidades','salas','colaboradores','clientes','vendas','ocupacao','caixa_unidades'];
+  var _emResync = false;
+  var _ultRS = null;
+
+  function _digitando(){
+    var ae = document.activeElement;
+    return !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName));
+  }
+
+  async function _resync(motivo){
+    if (_emResync) return;
+    if (typeof sincTabela !== 'function') return;       // app ainda não carregou
+    if (typeof UA === 'undefined' || !UA) return;        // só depois do login
+    if (navigator.onLine === false) return;              // sem rede: não adianta
+    _emResync = true;
+    try {
+      for (var i=0;i<TABELAS.length;i++){
+        try { await sincTabela(TABELAS[i]); } catch(_e){}
+      }
+      // Re-render só se NÃO atrapalhar (usuário digitando). Modais ficam fora do
+      // #pc, então um re-render do #pc não os fecha.
+      if (typeof renderPage === 'function' && typeof UA !== 'undefined' && UA && !_digitando()) {
+        try { renderPage(); } catch(_e){}
+      }
+      if (typeof setConexaoStatus === 'function') setConexaoStatus(true);
+      console.info('[CONEXAO] 🔄 Re-sincronizado ('+motivo+').');
+    } finally { _emResync = false; }
+  }
+  window._forcarResync = function(){ return _resync('manual'); }; // disponível no console
+
+  // (1) Detecta (re)conexão do WebSocket SEM alterar iniciarRealtime
+  setInterval(function(){
+    try {
+      var ws = (typeof _realtimeWS !== 'undefined') ? _realtimeWS : null;
+      var rs = ws ? ws.readyState : null;               // 1 = OPEN
+      if (rs === 1 && _ultRS !== 1) _resync('reconexão');
+      _ultRS = rs;
+    } catch(_e){}
+  }, 4000);
+
+  // (2) Rede do aparelho voltou
+  window.addEventListener('online', function(){
+    if (typeof setConexaoStatus === 'function') setConexaoStatus(false);
+    try {
+      var ws = (typeof _realtimeWS !== 'undefined') ? _realtimeWS : null;
+      if ((!ws || ws.readyState > 1) && typeof iniciarRealtime === 'function') iniciarRealtime();
+    } catch(_e){}
+    setTimeout(function(){ _resync('rede restaurada'); }, 1500);
+  });
+  window.addEventListener('offline', function(){
+    if (typeof setConexaoStatus === 'function') setConexaoStatus(false);
+  });
+
+  // (3) Aba voltou a ficar visível (PC acordou / trocou de aba)
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') _resync('aba reativada');
+  });
+
+  // (4) Rede de segurança: a cada 3 min (silencioso se estiver digitando)
+  setInterval(function(){ _resync('rotina 3min'); }, 3*60*1000);
+
+  console.info('[CONEXAO] 🛡️ Watchdog de reconexão v91 ativo — resync em reconexão, rede restaurada, aba reativada e a cada 3 min.');
+})();
+  </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->
   <script src="keyo-00-core.js"></script>
   <script src="keyo-01-ui.js"></script>

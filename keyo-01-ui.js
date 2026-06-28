@@ -190,6 +190,15 @@ function _injetarItemDOM() {
 #keyo-agents::-webkit-scrollbar{width:6px}
 #keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:3px}
 #keyo-agents::-webkit-scrollbar-track{background:transparent}
+/* ── [FIX v2.6] ROLAGEM REAL DO PAINEL DE AGENTES ──────────────────────────
+   Causa-raiz: #keyo-agents é um item flex SEM min-height:0. Em flexbox, sem
+   isso o item não encolhe abaixo do conteúdo e o overflow-y:auto NUNCA dispara
+   — a lista transborda e o pai #keyo-wrap (overflow:hidden) corta os agentes de
+   baixo (Jurídico/RH) e os módulos, sem barra de rolagem. Em telas curtas / no
+   tablet o corte é maior. min-height:0 é a correção padrão e devolve a rolagem.
+   100% ADITIVO e REVERSÍVEL: apague este bloco para voltar ao estado anterior. */
+#keyo-wrap{min-height:0}
+#keyo-agents{min-height:0}
 `;
   document.head.appendChild(s);
 })();

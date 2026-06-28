@@ -4767,7 +4767,8 @@ const MENUS=[
   {id:'gm',lbl:'Painel GM',ic:'🎮',perm:'ver_painel_gm',gmBadge:true},
   {id:'comm',lbl:'Mensagens',ic:'💬',perm:'ver_pdv',comm:true},
   {section:'Inteligência'},
-  {id:'avaliacoes',lbl:'⭐ Avaliações',ic:'⭐',perm:'ver_relatorios'}
+  {id:'avaliacoes',lbl:'⭐ Avaliações',ic:'⭐',perm:'ver_relatorios'},
+  {id:'marketing',lbl:'🎨 Criar Imagem',ic:'🎨',perm:'tudo'}
 ];
 window.MENUS = MENUS; // expõe para módulos externos (KEYO)
 
@@ -4831,7 +4832,7 @@ function goTo(pg){
   // Fechar sidebar automaticamente em tablets ao navegar (fix #02)
   if(window.innerWidth<=1024) sbFechar();
 }
-function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM,avaliacoes:rAvaliacoes};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
+function renderPage(){const e=el('pc');if(!e)return;if(PA==='liberacao')PA='reservas';const pages={pdv:rPDV,liberacao:rReservas,dashboard:rDash,vendas:rVendas,clientes:rClientes,financeiro:rFin,ponto:rPonto,salas:rSalas,staff:rStaff,config:rConfig,eventos:rEventos,reservas:rReservas,gm:rGM,avaliacoes:rAvaliacoes,marketing:rMarketing};if(PA==='comm'){el('pc').innerHTML='';abrirComm();return;}e.innerHTML=(pages[PA]||rDash)();bindPage();}
 function bindPage(){
   if(PA==='pdv'){startClk();_agendaOnPageBind();}
   const ct=el('cpTp');if(ct)ct.onchange=updCpTipo;
@@ -5904,7 +5905,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v88] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening)');
+  console.log('🔒 [INTEGRIDADE v89] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -11304,6 +11305,132 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
       }).join('')}
     </tbody></table></div>
   </div>`;
+}
+
+// ── CRIAR IMAGEM IA (Exit Games Marketing) ────────────────────────────────
+function rMarketing(){
+  return `<div style="max-width:700px;margin:0 auto;padding:24px 16px">
+    <h2 style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px">🎨 Criar Imagem com IA</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Gere artes para eventos, aniversários e posts da Exit Games usando inteligência artificial.</p>
+
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:20px">
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Tipo de arte</label>
+        <select id="mktTipo" style="width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rsm);font-size:13px;color:var(--text)" onchange="mktAtualizarPrompt()">
+          <option value="aniversario">🎂 Aniversário / Evento corporativo</option>
+          <option value="reserva">🔐 Confirmação de reserva</option>
+          <option value="post">📣 Post promocional</option>
+          <option value="livre">✏️ Descrição livre</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px" id="mktNomeDiv">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Nome / detalhe do evento</label>
+        <input id="mktNome" type="text" placeholder="Ex: João — 30 anos, tema terror" style="width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rsm);font-size:13px;color:var(--text);box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Prompt para IA <span style="font-weight:400;color:var(--text3)">(edite à vontade)</span></label>
+        <textarea id="mktPrompt" rows="4" style="width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rsm);font-size:13px;color:var(--text);resize:vertical;box-sizing:border-box" placeholder="Descreva a imagem..."></textarea>
+      </div>
+      <button onclick="mktGerarImagem()" id="mktBtnGerar" style="background:var(--accent);color:#000;font-weight:700;font-size:13px;padding:10px 24px;border:none;border-radius:var(--rsm);cursor:pointer;width:100%">✨ Gerar Imagem</button>
+    </div>
+
+    <div id="mktResultado" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;text-align:center">
+      <div id="mktLoading" style="display:none;color:var(--text2);font-size:13px;padding:20px 0">⏳ Gerando imagem, aguarde...</div>
+      <div id="mktImgWrap" style="display:none">
+        <img id="mktImg" src="" alt="Imagem gerada" style="max-width:100%;border-radius:var(--r);margin-bottom:14px">
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <a id="mktDownload" download="exit-games-arte.png" style="background:var(--accent);color:#000;font-weight:700;font-size:12px;padding:8px 18px;border-radius:var(--rsm);text-decoration:none">⬇️ Baixar</a>
+          <button onclick="mktGerarImagem()" style="background:var(--bg3);color:var(--text);font-size:12px;padding:8px 18px;border:1px solid var(--border2);border-radius:var(--rsm);cursor:pointer">🔄 Gerar outra</button>
+        </div>
+      </div>
+      <div id="mktErro" style="display:none;color:var(--danger);font-size:13px"></div>
+    </div>
+  </div>`;
+}
+
+const _MKT_PROMPTS={
+  aniversario: (nome)=>`Arte para escape room de aniversário${nome?', '+nome:''}, estilo cinematográfico, iluminação dramática, cores escuras com dourado e vermelho, atmosfera de mistério e suspense, sem texto na imagem`,
+  reserva: ()=>`Cartão de confirmação de escape room, porta com cadeado misterioso, luz dramática e quente, estilo cinematográfico noir, sem texto na imagem`,
+  post: ()=>`Arte promocional para escape room, grupo de pessoas explorando sala enigmática, iluminação baixa e intensa, cinematográfico e imersivo, cores escuras com acentos em âmbar, sem texto na imagem`,
+  livre: ()=>''
+};
+
+function mktAtualizarPrompt(){
+  const tipo=el('mktTipo').value;
+  const nome=el('mktNome')?el('mktNome').value:'';
+  const nd=el('mktNomeDiv');
+  if(nd)nd.style.display=(tipo==='livre'?'none':'block');
+  const ta=el('mktPrompt');
+  if(ta&&tipo!=='livre')ta.value=_MKT_PROMPTS[tipo](nome)||'';
+}
+
+async function mktGerarImagem(){
+  const prompt=el('mktPrompt')&&el('mktPrompt').value.trim();
+  if(!prompt){toast('Digite uma descrição para a imagem','warn');return;}
+  const btn=el('mktBtnGerar');
+  const res=el('mktResultado');
+  const load=el('mktLoading');
+  const wrap=el('mktImgWrap');
+  const erro=el('mktErro');
+  if(btn)btn.disabled=true;
+  if(res)res.style.display='block';
+  if(load)load.style.display='block';
+  if(wrap)wrap.style.display='none';
+  if(erro)erro.style.display='none';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:1000,
+        messages:[{role:'user',content:[
+          {type:'text',text:`Você é um especialista em prompts para geração de imagens. O usuário quer gerar uma imagem para a Exit Games Brasil (empresa de escape room). 
+
+Prompt do usuário: "${prompt}"
+
+Melhore este prompt para um gerador de imagens como DALL-E ou Stable Diffusion. Seja específico sobre estilo, iluminação, composição. Retorne APENAS o prompt melhorado em inglês, sem explicações.`}
+        ]}]}
+      )
+    });
+    const data=await resp.json();
+    const promptEN=data.content&&data.content[0]&&data.content[0].text?data.content[0].text.trim():prompt;
+    // Usa fal.ai se configurado, senão usa placeholder visual
+    const falKey=window._FAL_KEY||(DB&&DB.config&&DB.config.falApiKey)||null;
+    if(falKey){
+      const imgResp=await fetch('https://fal.run/fal-ai/flux/schnell',{
+        method:'POST',
+        headers:{'Authorization':'Key '+falKey,'Content-Type':'application/json'},
+        body:JSON.stringify({prompt:promptEN,image_size:'landscape_4_3',num_images:1,num_inference_steps:4})
+      });
+      const imgData=await imgResp.json();
+      const url=imgData.images&&imgData.images[0]&&imgData.images[0].url;
+      if(url){
+        el('mktImg').src=url;
+        el('mktDownload').href=url;
+        if(load)load.style.display='none';
+        if(wrap)wrap.style.display='block';
+      }else throw new Error('Sem URL de imagem');
+    }else{
+      // Sem fal.ai: mostra prompt otimizado e instrução
+      if(load)load.style.display='none';
+      if(erro){
+        erro.style.display='block';
+        erro.style.color='var(--text2)';
+        erro.innerHTML=`<div style="text-align:left;padding:12px;background:var(--bg3);border-radius:var(--rsm)">
+          <div style="font-weight:700;margin-bottom:8px;color:var(--text)">✅ Prompt otimizado para você usar em DALL-E, Midjourney ou similar:</div>
+          <div style="font-size:12px;font-family:monospace;color:var(--accent);word-break:break-word">${san(promptEN)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:10px">Para gerar imagens diretamente aqui, configure sua chave fal.ai em Config. → campo <b>falApiKey</b>.</div>
+        </div>`;
+      }
+    }
+  }catch(e){
+    if(load)load.style.display='none';
+    if(erro){erro.style.display='block';erro.style.color='var(--danger)';erro.textContent='Erro: '+e.message;}
+    toast('Erro ao gerar imagem','err');
+  }finally{
+    if(btn)btn.disabled=false;
+  }
 }
 
 // ── RELATÓRIO DE AVALIAÇÕES KEYO (pós-jogo + chat) ─────────────────────────

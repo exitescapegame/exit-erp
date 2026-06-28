@@ -182,6 +182,33 @@ let _igCache = {
 
 /* ── IG: banner de erro de API ── */
 .ig-api-erro{background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 16px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* ── IG: thread DM (conversa individual) ── */
+#ig-dm-thread{display:flex;flex-direction:column;height:100%}
+#ig-dm-thread-header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;border-bottom:1px solid #e8e8f0;flex-shrink:0}
+#ig-dm-thread-back{background:none;border:none;cursor:pointer;font-size:18px;color:#555566;padding:4px 6px;border-radius:6px}
+#ig-dm-thread-back:hover{background:#f0f0fa}
+#ig-dm-thread-user{font-size:14px;font-weight:700;color:#111118}
+#ig-dm-thread-sub{font-size:11px;color:#888899}
+#ig-dm-thread-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f4f4fa}
+.ig-dm-bubble{max-width:72%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5}
+.ig-dm-bubble.deles{background:#fff;border:1px solid #e8e8f0;border-radius:14px 14px 14px 2px;align-self:flex-start;color:#111118}
+.ig-dm-bubble.meu{background:#C9A84C;border-radius:14px 14px 2px 14px;align-self:flex-end;color:#000;font-weight:500}
+.ig-dm-bubble-meta{font-size:10px;color:#bbb;margin-top:4px}
+.ig-dm-bubble.deles .ig-dm-bubble-meta{text-align:left}
+.ig-dm-bubble.meu .ig-dm-bubble-meta{text-align:right}
+#ig-dm-thread-footer{padding:12px 16px;background:#fff;border-top:1px solid #e8e8f0;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+#ig-dm-thread-sugerir-bar{display:flex;gap:6px}
+#ig-dm-thread-input-bar{display:flex;gap:8px;align-items:flex-end}
+#ig-dm-thread-txt{flex:1;border:1px solid #d8d8e8;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;resize:none;min-height:40px;max-height:120px;transition:border .15s;line-height:1.4}
+#ig-dm-thread-txt:focus{border-color:#C9A84C}
+.ig-dm-send-btn{background:#C9A84C;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#000;white-space:nowrap;height:40px}
+.ig-dm-send-btn:hover{background:#b8962e}
+.ig-dm-ia-btn{background:none;border:1px solid #7C6FCD;border-radius:8px;padding:6px 12px;font-size:12px;color:#7C6FCD;cursor:pointer;font-family:inherit;transition:all .15s;flex:1}
+.ig-dm-ia-btn:hover{background:#7C6FCD;color:#fff}
+.ig-dm-wpp-btn{background:#25D366;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:#fff;cursor:pointer;font-family:inherit;flex:1}
+.ig-dm-wpp-btn:hover{background:#1da850}
+.ig-dm-wpp-btn:disabled{background:#ccc;cursor:default}
 `;
   document.head.appendChild(s);
 })();
@@ -474,10 +501,203 @@ function _igRenderMensagens(lista) {
   corpo.innerHTML = `<div class="ig-dm-lista">${items}</div>`;
 }
 
-window._igAbrirDM = function (convId, username) {
-  window.toast('Abrindo conversa com @' + username + '…', 'info');
-  // Abre o Instagram diretamente na conversa
-  window.open('https://www.instagram.com/direct/inbox/', '_blank');
+// ════════════════════════════════════════════════════════════════
+// THREAD DM — tela de conversa individual com resposta inline
+// ════════════════════════════════════════════════════════════════
+
+// [FIX] _igAbrirDM: antes redirecionava para instagram.com (inútil).
+// Agora abre a thread inline dentro do ERP com histórico + resposta.
+window._igAbrirDM = async function (convId, username) {
+  const corpo = document.getElementById('keyo-ig-corpo');
+  if (!corpo) return;
+
+  // Mostra loading imediato
+  corpo.innerHTML = `
+<div id="ig-dm-thread">
+  <div id="ig-dm-thread-header">
+    <button id="ig-dm-thread-back" onclick="window._igVoltar()" title="Voltar">←</button>
+    <div>
+      <div id="ig-dm-thread-user">@${username}</div>
+      <div id="ig-dm-thread-sub">Carregando conversa…</div>
+    </div>
+  </div>
+  <div id="ig-dm-thread-msgs" style="flex:1;overflow-y:auto;padding:16px">
+    <div class="ig-loading"><div class="ig-loading-dot"></div><div class="ig-loading-dot"></div><div class="ig-loading-dot"></div><span>Carregando…</span></div>
+  </div>
+</div>`;
+
+  // Guarda estado para o botão Voltar
+  window._igDmAtual = { convId, username };
+
+  // Busca histórico de mensagens da conversa
+  let msgs = [];
+  let telefone = '';
+  try {
+    const data = await _igAPI('thread_dm', { conversation_id: convId });
+    msgs = data.mensagens || [];
+    telefone = data.telefone || '';
+  } catch (e) {
+    // Se a Edge Function ainda não suporta thread_dm, usa lista vazia
+    console.warn('[KEYO-IG] thread_dm não suportado ainda:', e.message);
+  }
+
+  // Render da thread
+  _igRenderThread(convId, username, msgs, telefone);
+};
+
+function _igRenderThread(convId, username, msgs, telefone) {
+  const corpo = document.getElementById('keyo-ig-corpo');
+  if (!corpo) return;
+
+  const bolhas = msgs.length
+    ? msgs.map(m => {
+        const deles = m.from !== 'page'; // mensagens do cliente
+        const hora  = m.created_time
+          ? new Date(m.created_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        const texto = (m.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `
+<div style="display:flex;flex-direction:column;align-items:${deles ? 'flex-start' : 'flex-end'}">
+  <div class="ig-dm-bubble ${deles ? 'deles' : 'meu'}">${texto}</div>
+  <div class="ig-dm-bubble-meta">${deles ? '@' + username + ' · ' : ''}${hora}</div>
+</div>`;
+      }).join('')
+    : '<div class="ig-vazio"><div class="ig-vazio-icon">💬</div><div class="ig-vazio-text">Inicie a conversa com uma mensagem.</div></div>';
+
+  // Botão WhatsApp — só mostra se tiver telefone
+  const wppBtn = telefone
+    ? `<button class="ig-dm-wpp-btn" onclick="window._igAbrirWhatsApp('${convId}','${username}','${telefone}')">📱 Abrir no WhatsApp</button>`
+    : `<button class="ig-dm-wpp-btn" disabled title="Telefone não encontrado no cadastro">📱 Sem WhatsApp</button>`;
+
+  corpo.innerHTML = `
+<div id="ig-dm-thread">
+  <div id="ig-dm-thread-header">
+    <button id="ig-dm-thread-back" onclick="window._igVoltar()" title="Voltar">←</button>
+    <div style="flex:1">
+      <div id="ig-dm-thread-user">@${username}</div>
+      <div id="ig-dm-thread-sub">DM · Instagram${telefone ? ' · 📱 ' + telefone : ' · sem WhatsApp cadastrado'}</div>
+    </div>
+  </div>
+  <div id="ig-dm-thread-msgs">${bolhas}</div>
+  <div id="ig-dm-thread-footer">
+    <div id="ig-dm-thread-sugerir-bar">
+      <button class="ig-dm-ia-btn" onclick="window._igSugerirRespostaDM('${convId}','${username}')">🤖 Keyo sugere resposta</button>
+      ${wppBtn}
+    </div>
+    <div id="ig-dm-thread-input-bar">
+      <textarea id="ig-dm-thread-txt" placeholder="Responda pelo Instagram…" rows="1"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();window._igEnviarDM('${convId}','${username}')}"
+      ></textarea>
+      <button class="ig-dm-send-btn" onclick="window._igEnviarDM('${convId}','${username}')">Enviar IG</button>
+    </div>
+  </div>
+</div>`;
+
+  // Scroll para o final
+  const msgs_el = document.getElementById('ig-dm-thread-msgs');
+  if (msgs_el) setTimeout(() => { msgs_el.scrollTop = msgs_el.scrollHeight; }, 50);
+}
+
+// Volta para a lista de DMs
+window._igVoltar = function () {
+  window._igDmAtual = null;
+  _igNavAba('mensagens');
+};
+
+// Envia resposta pela API do Instagram
+window._igEnviarDM = async function (convId, username) {
+  const txt = (document.getElementById('ig-dm-thread-txt') || {}).value?.trim();
+  if (!txt) { window.toast('Digite uma mensagem', 'warn'); return; }
+
+  const btn = document.querySelector('.ig-dm-send-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  try {
+    await _igAPI('responder_dm', { conversation_id: convId, text: txt });
+    window.toast('✅ Mensagem enviada pelo Instagram!', 'ok');
+    // Recarrega a thread para mostrar a mensagem enviada
+    await window._igAbrirDM(convId, username);
+  } catch (e) {
+    window.toast('Erro ao enviar: ' + e.message, 'erro');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar IG'; }
+  }
+};
+
+// Sugere resposta com IA (tom do Keyo) e encaminha para WhatsApp se tiver
+window._igSugerirRespostaDM = async function (convId, username) {
+  const modal     = document.getElementById('keyo-ig-modal-overlay');
+  const modalTxt  = document.getElementById('keyo-ig-modal-texto');
+  if (!modal || !modalTxt) return;
+
+  modalTxt.textContent = '🤖 Gerando sugestão…';
+  modal.className = 'open';
+  modal.dataset.dmConvId  = convId;
+  modal.dataset.dmUser    = username;
+
+  // Pega as últimas mensagens do cliente visíveis na thread
+  const bolhas = document.querySelectorAll('#ig-dm-thread-msgs .ig-dm-bubble.deles');
+  const historico = Array.from(bolhas).slice(-3).map(b => b.textContent.trim()).join(' / ');
+  const unid = _IG_UNIDADES.find(u => u.id === _igUnidade);
+
+  const prompt = `Você é Keyo, atendente virtual da ${unid?.nome || 'EXIT GAMES'} — escape room do Nordeste.
+Persona: gente boa, animado, acolhedor, com leveza e humor na medida certa.
+Responda à mensagem do Instagram de @${username} de forma humana e calorosa — como se fosse um amigo que adora escape room.
+
+Últimas mensagens do cliente: "${historico || 'sem histórico visível'}"
+
+Regras:
+- Máximo 3 frases curtas (tom de WhatsApp/DM, não de email)
+- Use o nome do cliente (@${username}) ao cumprimentar se fizer sentido
+- 1-2 emojis, nunca em toda frase
+- Se fizer sentido, convide a reservar ou pergunte a data
+- Se o cliente não tem WhatsApp cadastrado, mantenha o atendimento pelo Instagram naturalmente
+- Em português do Brasil`;
+
+  try {
+    const resp = await fetch(_IG_EDGE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _IG_ANON },
+      body: JSON.stringify({ agente: 'mkt', mensagem: prompt, historico: [], unidade_id: _igUnidade }),
+    });
+    const data = await resp.json();
+    const sugestao = data.resposta || data.message || data.content?.[0]?.text || 'Sugestão não disponível.';
+    modalTxt.textContent = sugestao;
+  } catch (e) {
+    modalTxt.textContent = 'Não foi possível gerar sugestão. ' + e.message;
+  }
+};
+
+// Substitui os botões do modal para funcionar também com DMs
+window._igModalUsar = function () {
+  const modal  = document.getElementById('keyo-ig-modal-overlay');
+  const texto  = document.getElementById('keyo-ig-modal-texto')?.textContent || '';
+  const comId  = modal?.dataset.comId;
+  const dmConv = modal?.dataset.dmConvId;
+
+  if (comId) {
+    // Comentário
+    const input = document.getElementById('ig-reply-' + comId);
+    if (input) input.value = texto;
+    window.toast('Sugestão aplicada no campo de resposta', 'ok');
+  } else if (dmConv) {
+    // DM
+    const txt = document.getElementById('ig-dm-thread-txt');
+    if (txt) { txt.value = texto; txt.dispatchEvent(new Event('input')); }
+    window.toast('Sugestão aplicada — revise e clique em Enviar IG', 'ok');
+  }
+  if (modal) modal.className = '';
+};
+
+// Abre WhatsApp com o telefone do cliente (continua conversa fora do IG)
+window._igAbrirWhatsApp = function (convId, username, telefone) {
+  if (!telefone) { window.toast('Sem telefone cadastrado para este usuário', 'warn'); return; }
+  const tel  = telefone.replace(/\D/g, '');
+  const unid = _IG_UNIDADES.find(u => u.id === _igUnidade);
+  const msg  = encodeURIComponent(
+    `Olá! 😊 Sou do ${unid?.nome || 'EXIT GAMES'}. Vi sua mensagem no Instagram e vim continuar o atendimento por aqui! Como posso te ajudar?`
+  );
+  window.open(`https://wa.me/55${tel}?text=${msg}`, '_blank');
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -571,17 +791,7 @@ window._igModalCopiar = function () {
   navigator.clipboard.writeText(texto).then(() => window.toast('Copiado!', 'ok'));
 };
 
-window._igModalUsar = function () {
-  const modal   = document.getElementById('keyo-ig-modal-overlay');
-  const texto   = document.getElementById('keyo-ig-modal-texto')?.textContent || '';
-  const comId   = modal?.dataset.comId;
-  if (comId) {
-    const input = document.getElementById('ig-reply-' + comId);
-    if (input) input.value = texto;
-  }
-  if (modal) modal.className = '';
-  window.toast('Sugestão aplicada no campo de resposta', 'ok');
-};
+// [FIX] _igModalUsar unificado na seção THREAD DM acima
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS DE RENDER

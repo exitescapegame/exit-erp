@@ -5123,7 +5123,7 @@ function rPDV(){
     }),
     ...aniversHoje.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:14px">🎂</span>
-      <div style="flex:1"><div style="font-size:11px;font-weight:700;color:#b8962e">${san(c.nome)}</div><div style="font-size:10px;color:var(--text3)">${c.telefone||''}</div></div>
+      <div style="flex:1"><div style="font-size:11px;font-weight:700;color:#b8962e">${san(c.nome)}</div><div style="font-size:10px;color:var(--text3)">${san(c.telefone||'')}</div></div>
       <span class="bdg b-wn" style="font-size:9px;background:rgba(201,168,76,.15);color:#b8962e">Aniversário</span>
     </div>`)
   ];
@@ -5904,7 +5904,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v87] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE ativa)');
+  console.log('🔒 [INTEGRIDADE v88] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -16618,7 +16618,7 @@ function _waExecutarEnvio(tipo,motivo,v,cli,sala){
   sDB();CM('mWhatsApp');
   const tipoLabel=(WA_TEMPLATES[tipo]?.label)||tipo;
   toast(`WhatsApp ${tipoLabel} enviado!`,'success');
-  pdvAlerta(`Notificação de <b>${tipoLabel}</b> enviada via WhatsApp para <b>${cli?.nome||'Cliente'}</b>.<br>Sala: ${sala?.nome||'—'} • ${v.horario||'—'}`,'📱 WHATSAPP ENVIADO','📱');
+  pdvAlerta(`Notificação de <b>${tipoLabel}</b> enviada via WhatsApp para <b>${san(cli?.nome||'Cliente')}</b>.<br>Sala: ${san(sala?.nome||'—')} • ${v.horario||'—'}`,'📱 WHATSAPP ENVIADO','📱');
   registrarAuditoria('WA_ENVIADO',`Notificação "${tipoLabel}" enviada a ${cli?.nome||'Avulso'} (${waNum}) — Sala: ${sala?.nome||'—'} ${v.horario||''}`,UA?.id);
 }
 function salvarTemplateWA(tipo,texto){
@@ -22635,7 +22635,7 @@ function _v744_imprimirComprovante(eventoId) {
   const falta= Math.max(0,(evt.valorTotal||0)-pgos);
 
   const jogadoresLista = (evt.jogadores||[]).length
-    ? (evt.jogadores||[]).map((j,i)=>`<li>${i+1}. ${j.nome||j}${j.telefone?' — '+j.telefone:''}</li>`).join('')
+    ? (evt.jogadores||[]).map((j,i)=>`<li>${i+1}. ${san(j.nome||j)}${j.telefone?' — '+san(j.telefone):''}</li>`).join('')
     : '<li>—</li>';
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">

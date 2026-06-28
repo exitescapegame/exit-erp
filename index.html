@@ -3379,9 +3379,12 @@ async function supaFetch(path, method='GET', body=null) {
   // [v74.82] MODO LOCAL: se o Supabase não está configurado, não tenta a rede (evita erros no Console)
   if (window._SUPA_DESLIGADO) { return null; }
   // [v74.85] AUTH POR UNIDADE: usa o token da sessão de unidade quando existe (isolamento via RLS).
-  const _sessaoValida = window._unidadeSession && window._unidadeSession.access_token && (!window._unidadeSession.expires_at || Date.now() < window._unidadeSession.expires_at);
-  if (!_sessaoValida && window._unidadeSession) { window._unidadeSession = null; try { localStorage.removeItem('exit_unidade_session'); } catch(e){} }
-  const _authToken = _sessaoValida ? window._unidadeSession.access_token : SUPA_KEY;
+  // [FIX-JWT] Renova token expirado antes de usar; se falhar, usa SUPA_KEY diretamente
+  if (window._unidadeSession && window._unidadeSession.expires_at && Date.now() >= window._unidadeSession.expires_at) {
+    const _renovado = await unidadeRenovarToken().catch(()=>false);
+    if (!_renovado) { window._unidadeSession = null; try { localStorage.removeItem('exit_unidade_session'); } catch(e){} }
+  }
+  const _authToken = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
   const opts = {
     method,
     headers: {

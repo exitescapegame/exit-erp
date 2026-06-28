@@ -1351,7 +1351,7 @@ tbody tr:hover td { background: #f4f4ff !important; }
     <div id="mContaUnitBadge" style="display:none;padding:6px 14px 0;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.3px"></div>
     <div class="mb">
       <input type="hidden" id="cpId">
-      <div class="fg"><label>Descrição</label><input type="text" id="cpD" placeholder="Ex: Aluguel Shopping Jardins"></div>
+      <div class="fg"><label>Descrição</label><input type="text" id="cpD" placeholder="Ex: Aluguel do mês"></div>
       <div class="ir">
         <div class="fg"><label>Categoria</label>
           <select id="cpCat">
@@ -3711,7 +3711,7 @@ function _capturarBaseline() {
   // Chamado APENAS após carga confirmada (dados reais em DB). Registra o que veio populado.
   window._BASE_TINHA_UNIDADES = Array.isArray(DB.unidades) && DB.unidades.length > 0;
   const chaves = ['jogosTabuleiro','contasPagar','contasReceber','eventos','sessoesTabuleiro',
-    'termosTabuleiro','alertsGM','chatGM','sessoesSenior','pontos','manutencoes','mensagens'];
+    'termosTabuleiro','alertsGM','chatGM','sessoesSenior','pontos','manutencoes','mensagens','ajustesFinanceiros'];
   const base = {};
   chaves.forEach(k => { base[k] = Array.isArray(DB[k]) && DB[k].length > 0; });
   window._BASE_CFG = base;
@@ -3849,12 +3849,16 @@ async function sDBSupabase() {
     ));
   }
 
-  // Ajustes Financeiros (v47) — [BUG3-FIX] sempre persiste, mesmo vazio, para evitar ghost data no banco
+  // Ajustes Financeiros (v47) — [BLINDAGEM v87] passa pelo _cfgGuard: se tinha dados na carga
+  // e agora está vazio, NÃO sobrescreve a nuvem com [] (substitui o antigo "sempre persiste").
   // [RLS-v59] Garante que cada ajuste tem unidadeId antes de persistir
   (DB.ajustesFinanceiros||[]).forEach(a => { if(!a.unidadeId && UA) a.unidadeId = String(UA.unidadeId); });
-  ops.push(supaFetch('config', 'POST', [
-    { chave: 'ajustesFinanceiros', valor: DB.ajustesFinanceiros || [] }
-  ]));
+  const _ajGuard = _cfgGuard('ajustesFinanceiros', DB.ajustesFinanceiros);
+  if (_ajGuard !== null) {
+    ops.push(supaFetch('config', 'POST', [
+      { chave: 'ajustesFinanceiros', valor: _ajGuard }
+    ]));
+  }
 
   // Caixa por unidade
   const cxKeys = Object.keys(DB.caixaUnidades||{});
@@ -3965,7 +3969,7 @@ function dc(o){return JSON.parse(JSON.stringify(o));}
 const DBD={
   config:{logo:{tipo:'texto',texto:'EX',corFundo:'#EAB308',corTexto:'#000'},senhaMaster:hp('1234'),taxaShopping:15,senior:{precoHora:15,ativo:true},tabuleiro:{entradaPadrao:25,ativo:true}},
   unidades:[
-    {id:'1',nome:'EXIT ARACAJU',endereco:'Shopping Jardins',horarioAbre:'10:00',horarioFecha:'22:00',
+    {id:'1',nome:'EXIT ARACAJU',endereco:'',horarioAbre:'10:00',horarioFecha:'22:00',
      precoSemana:89,precoFimSemana:119,precoFeriado:119,
      horariosSemana:'14:00,15:30,17:00,18:30,20:00,21:30',
      horariosFimSemana:'13:00,14:30,16:00,17:30,19:00,20:30',
@@ -5890,7 +5894,8 @@ const _V74_FUNCOES_CRITICAS = [
   '_dispararConsentLGPD','enviarWhatsApp','_waVerificarConsentimento',
   'abrirRelatorioShopping','_dadosShopping',
   'obsLog','obsErro','obsHealthCheck','obsMedir',
-  'sDB','san','uid','fM','fD','registrarAuditoria','salvarCliente'
+  'sDB','san','uid','fM','fD','registrarAuditoria','salvarCliente',
+  'sDBSupabase','_cfgGuard','_capturarBaseline' // [BLINDAGEM v87] alarme: se sumirem, a proteção anti-wipe foi removida
 ];
 function _v74_verificarIntegridade(){
   const faltando=_V74_FUNCOES_CRITICAS.filter(fn=>typeof window[fn]!=='function');
@@ -5903,6 +5908,25 @@ function _v74_verificarIntegridade(){
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
+
+// [BLINDAGEM v87] Resumo de saúde no boot — READ-ONLY (não altera nada).
+// Toda vez que você atualizar o ERP, abra o console (F12) e confira esta linha:
+// se as contagens baterem com o esperado, os dados sobreviveram à atualização.
+function _v87_resumoSaude(){
+  try{
+    const c = (a)=> (Array.isArray(a)?a.length:0);
+    const carregado = (typeof _DB_CARREGADO!=='undefined') ? _DB_CARREGADO : '?';
+    const blindagem = (window._BASE_TINHA_UNIDADES===true) ? 'ativa (baseline ok)' : 'baseline vazio';
+    console.log(
+      '📊 [SAÚDE v87] carregado='+carregado+
+      ' | unidades='+c(DB.unidades)+' salas='+c(DB.salas)+
+      ' vendas='+c(DB.vendas)+' reservas(eventos)='+c(DB.eventos)+
+      ' clientes='+c(DB.clientes)+
+      ' | anti-wipe: '+blindagem
+    );
+  }catch(e){ /* read-only: nunca quebra o boot */ }
+}
+try{ setTimeout(_v87_resumoSaude,2500); }catch(e){}
 
 // [v74.80] AUTOTESTE FUNCIONAL DO SISTEMA — protege contra regressões.
 // [v74.84] SUÍTE DE TESTES CRÍTICOS — autenticação, pagamentos, dados, lógica central

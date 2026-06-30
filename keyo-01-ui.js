@@ -190,15 +190,21 @@ function _injetarItemDOM() {
 #keyo-agents::-webkit-scrollbar{width:6px}
 #keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:3px}
 #keyo-agents::-webkit-scrollbar-track{background:transparent}
-/* ── [FIX v2.6] ROLAGEM REAL DO PAINEL DE AGENTES ──────────────────────────
-   Causa-raiz: #keyo-agents é um item flex SEM min-height:0. Em flexbox, sem
-   isso o item não encolhe abaixo do conteúdo e o overflow-y:auto NUNCA dispara
-   — a lista transborda e o pai #keyo-wrap (overflow:hidden) corta os agentes de
-   baixo (Jurídico/RH) e os módulos, sem barra de rolagem. Em telas curtas / no
-   tablet o corte é maior. min-height:0 é a correção padrão e devolve a rolagem.
+/* ── [FIX v2.7] ROLAGEM REAL DO PAINEL DE AGENTES ──────────────────────────
+   Sintoma: só ~4,5 agentes aparecem (KEYO..Financeiro), Jurídico/RH somem e
+   MÓDULOS aparece logo abaixo, sem barra de rolagem.
+   Causa-raiz: dentro de #keyo-agents (flex column de altura fixa), os filhos
+   #keyo-agents-list e #keyo-agents-modulos têm flex-shrink:1 (padrão). Quando
+   falta altura, o flexbox os ENCOLHE; como #keyo-agents-list tem overflow:hidden,
+   ele CORTA os agentes em vez de o painel rolar.
+   Correção: min-height:0 no painel (permite rolar) + flex-shrink:0 nos filhos
+   (eles mantêm a altura natural e forçam o painel #keyo-agents a rolar via
+   overflow-y:auto, que já existe).
    100% ADITIVO e REVERSÍVEL: apague este bloco para voltar ao estado anterior. */
 #keyo-wrap{min-height:0}
 #keyo-agents{min-height:0}
+#keyo-agents-list{flex-shrink:0}
+#keyo-agents-modulos{flex-shrink:0}
 `;
   document.head.appendChild(s);
 })();

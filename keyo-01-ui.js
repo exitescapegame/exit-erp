@@ -205,6 +205,11 @@ function _injetarItemDOM() {
 #keyo-agents{min-height:0}
 #keyo-agents-list{flex-shrink:0}
 #keyo-agents-modulos{flex-shrink:0}
+/* barra de rolagem BEM visível (dourada), pra deixar claro que o painel rola */
+#keyo-agents{scrollbar-width:auto;scrollbar-color:#C9A84C rgba(255,255,255,0.10)}
+#keyo-agents::-webkit-scrollbar{width:10px}
+#keyo-agents::-webkit-scrollbar-thumb{background:#C9A84C;border-radius:5px;border:2px solid #0f0f1a}
+#keyo-agents::-webkit-scrollbar-track{background:rgba(255,255,255,0.08)}
 `;
   document.head.appendChild(s);
 })();

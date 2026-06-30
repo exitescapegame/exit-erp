@@ -174,6 +174,15 @@ const TIPOS = [
   },
 ];
 
+// [FEAT in-loco] Adiciona a opção "In loco (casa do cliente)" a TODOS os tipos.
+// Aditivo: só acrescenta um local; não remove nem altera os existentes.
+// 'sede' (ou o primeiro local) continua sendo o padrão de cada tipo.
+TIPOS.forEach(function (t) {
+  if (!t.locais.some(function (l) { return l.id === 'domicilio'; })) {
+    t.locais.push({ id: 'domicilio', nome: 'In loco (casa do cliente)' });
+  }
+});
+
 // ════════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════════
@@ -288,6 +297,11 @@ function _html() {
         <button class="m14-local-btn${_local===l.id?' selected':''}" onclick="window.m14_local('${l.id}')">${l.nome}</button>`).join('')}
       </div>
     </div>
+    <div id="m14-endereco-wrap" style="display:${_local==='domicilio'?'block':'none'};margin-top:10px">
+      <div class="m14-campo"><label>Endereço do cliente (onde será o evento)</label>
+        <input type="text" id="m14-endereco" placeholder="Rua, nº, bairro, cidade">
+      </div>
+    </div>
   </div>
 
   <div class="m14-card">
@@ -368,6 +382,8 @@ function _setTipo(t) {
     <button class="m14-subtipo-btn${_subtipo===s.id?' selected':''}" onclick="window.m14_subtipo('${s.id}')">${s.nome}</button>`).join('');
   if (lr) lr.innerHTML = tipoAt.locais.map(l => `
     <button class="m14-local-btn${_local===l.id?' selected':''}" onclick="window.m14_local('${l.id}')">${l.nome}</button>`).join('');
+  const ew = document.getElementById('m14-endereco-wrap');
+  if (ew) ew.style.display = (_local === 'domicilio') ? 'block' : 'none';
 }
 
 function _setSubtipo(s) {
@@ -382,6 +398,8 @@ function _setLocal(l) {
   document.querySelectorAll('.m14-local-btn').forEach(b => {
     b.classList.toggle('selected', b.getAttribute('onclick').includes(`'${l}'`));
   });
+  const ew = document.getElementById('m14-endereco-wrap');
+  if (ew) ew.style.display = (l === 'domicilio') ? 'block' : 'none';
 }
 
 function _statusBar(txt) {
@@ -399,6 +417,7 @@ async function _gerar() {
   const dataVal     = document.getElementById('m14-data')?.value || '';
   const obs         = document.getElementById('m14-obs')?.value.trim() || '';
   const unidadeId   = document.getElementById('m14-unidade')?.value;
+  const endereco    = document.getElementById('m14-endereco')?.value.trim() || '';
 
   if (!cliente) {
     if (typeof window.toast === 'function') window.toast('Informe o nome do cliente/empresa', 'warn');
@@ -444,6 +463,7 @@ EVENTO SOLICITADO:
 - Tipo: ${tipoObj?.nome || _tipo}
 - Modalidade: ${subObj?.nome || ''}
 - Local de realização: ${localObj?.nome || ''}
+${_local==='domicilio' && endereco ? `- Endereço do evento (in loco, casa do cliente): ${endereco}` : ''}
 - Cliente/Empresa: ${cliente}
 ${responsavel ? `- Responsável: ${responsavel}` : ''}
 - Número de pessoas: ${pessoas}
@@ -459,7 +479,8 @@ INSTRUÇÕES OBRIGATÓRIAS:
 - Cite valores realistas e competitivos com base no mercado pesquisado.
 - Estruture: saudação personalizada → experiência exit games → proposta específica para ${subObj?.nome||tipoObj?.nome} → salas sugeridas → investimento detalhado → diferenciais exclusivos → próximos passos com CTA claro.
 - Tom: profissional e caloroso, nunca burocrático. Máximo 450 palavras.
-- Se o local for fora da sede (hotel/empresa/evento), mencione a logística de deslocamento como diferencial.`;
+- Se o local for fora da sede (hotel/empresa/evento), mencione a logística de deslocamento como diferencial.${_local==='domicilio' ? `
+- IMPORTANTE: o atendimento in loco (na casa do cliente) NÃO tem taxa de deslocamento — mantenha o MESMO preço por pessoa, sem qualquer acréscimo por ir até o local.` : ''}`;
 
   try {
     const resp = await fetch(window.KEYO_EDGE_URL, {

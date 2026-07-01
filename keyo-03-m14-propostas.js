@@ -193,8 +193,8 @@ function _unidades() {
   return (window.DB && window.DB.unidades && window.DB.unidades.length)
     ? window.DB.unidades
     : [
-        { id: '1', nome: 'EXIT ARACAJU — Shopping Jardins',  precoSemana: 35, precoFimSemana: 45 },
-        { id: '2', nome: 'EXIT SALVADOR — Shopping Barra',   precoSemana: 35, precoFimSemana: 45 },
+        { id: '1', nome: 'EXIT ARACAJU',  endereco: '', precoSemana: 35, precoFimSemana: 45 },
+        { id: '2', nome: 'EXIT SALVADOR', endereco: '', precoSemana: 35, precoFimSemana: 45 },
       ];
 }
 function _fmtDataHoje() {
@@ -315,7 +315,7 @@ function _html() {
       <div class="m14-campo"><label>Data sugerida</label><input type="date" id="m14-data" value="${new Date().toISOString().slice(0,10)}"></div>
       <div class="m14-campo"><label>Unidade</label>
         <select id="m14-unidade">
-          ${uns.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')}
+          ${uns.map(u => `<option value="${u.id}">${san(u.nome)}${u.endereco ? ' — ' + san(u.endereco) : ''}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -468,7 +468,7 @@ ${_local==='domicilio' && endereco ? `- Endereço do evento (in loco, casa do cl
 ${responsavel ? `- Responsável: ${responsavel}` : ''}
 - Número de pessoas: ${pessoas}
 - Data sugerida: ${dataFmt}
-- Unidade EXIT responsável: ${unidade?.nome || 'EXIT GAMES'}
+- Unidade EXIT responsável: ${unidade?.nome || 'EXIT GAMES'}${unidade?.endereco ? ` (${unidade.endereco})` : ''}
 ${obs ? `- Observações: ${obs}` : ''}
 - Salas disponíveis: ${salas.slice(0,4).map(s => `${s.emoji||''} ${s.nome} (${s.minJog}-${s.maxJog} pessoas, ${s.tempo}min, ${s.dificuldade})`).join(', ') || 'Diversas salas temáticas disponíveis'}
 - Preço base: semana R$${unidade?.precoSemana||35}/pessoa | fim de semana R$${unidade?.precoFimSemana||45}/pessoa

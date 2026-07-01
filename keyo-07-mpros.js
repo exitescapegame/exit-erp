@@ -1885,38 +1885,16 @@ async function _chamarCientistaCompleto(dados, projetoAnterior, pedidoAjuste) {
     ? Number(dados.numPuzzles)
     : Math.max(3, Math.round(Number(dados?.tempoMin || 60) / 9));
 
-  // Para refinamentos ou projetos pequenos (≤5 puzzles), usa chamada única
-  if (projetoAnterior || qtd <= 5) {
+  // Refinamento de um projeto já existente: é um ajuste, cabe em 1 chamada.
+  if (projetoAnterior) {
     const { sistema, usuario } = _promptCientista(dados, projetoAnterior, pedidoAjuste);
     return await _chamarCientista(sistema, usuario);
   }
 
-  // Para projetos grandes (6+ puzzles): divide em 2 chamadas sequenciais
-  const statusEl = document.getElementById('cri-resultado');
-
-  // — PARTE 1: seções 1–5 —
-  if (statusEl) statusEl.innerHTML = `<div class="cri-painel cri-loading">🔬 Parte 1/2 — Construindo conceito, narrativa e cenografia...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
-
-  const { sistema } = _promptCientista(dados);
-  const usuarioParte1 = `Elabore as SEÇÕES 1 a 5 do PROJETO EXECUTIVO de uma sala de escape com os seguintes parâmetros:
-- Tema: ${dados.tema}
-- Duração: ${dados.tempoMin} minutos
-- Puzzles: ${qtd} (serão detalhados na etapa seguinte)
-- Jogadores: ${dados.jogadores}
-- Dificuldade: ${dados.dificuldade}
-${dados.instrucoes ? `- Instrução específica: ${dados.instrucoes}` : ''}
-
-Entregue APENAS as seções 1, 2, 3, 4 e 5 com toda a profundidade exigida. Termine exatamente na seção 5. Não comece os puzzles ainda.`;
-
-  const parte1 = await _chamarCientista(sistema, usuarioParte1);
-  if (!parte1) throw new Error('Parte 1 retornou vazia');
-
-  // — PARTE 2: seção 6 (puzzles) + seções 7–14 —
-  if (statusEl) statusEl.innerHTML = `<div class="cri-painel cri-loading">🔬 Parte 2/2 — Projetando os ${qtd} puzzles e detalhes operacionais...<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
-
-  function _templatePuzzlesFull(n) {
+  // Template dos itens de UM intervalo de puzzles (ini..fim).
+  function _templatePuzzlesRange(ini, fim) {
     let t = '';
-    for (let i = 1; i <= n; i++) {
+    for (let i = ini; i <= fim; i++) {
       t += `\n### Puzzle ${i} — [Nome] · MECÂNICO ou ELETRÔNICO\n` +
         `- **Posição na sala:** onde fisicamente está localizado\n` +
         `- **O que o jogador vê ao se aproximar:** descrição sensorial completa\n` +
@@ -1932,47 +1910,83 @@ Entregue APENAS as seções 1, 2, 3, 4 e 5 com toda a profundidade exigida. Term
     return t;
   }
 
-  const usuarioParte2 = `Continuação do projeto da sala abaixo. Você já entregou as seções 1–5. Agora entregue as SEÇÕES 6 a 14.
+  const statusEl = document.getElementById('cri-resultado');
+  const _status = (t) => {
+    if (statusEl) statusEl.innerHTML = `<div class="cri-painel cri-loading">${t}<div class="cri-dots" style="margin-top:10px"><span></span><span></span><span></span></div></div>`;
+  };
 
-CONTEXTO DA SALA (seções 1–5 já criadas):
-${parte1.slice(0, 3000)}
+  const { sistema } = _promptCientista(dados);
 
----
-AGORA ENTREGUE:
+  // ── (A) SEÇÕES 1–5 ──
+  _status('🔬 Parte 1 — conceito, narrativa e cenografia...');
+  const usuarioP1 = `Elabore as SEÇÕES 1 a 5 do PROJETO EXECUTIVO de uma sala de escape com estes parâmetros:
+- Tema: ${dados.tema}
+- Duração: ${dados.tempoMin} minutos
+- Puzzles: ${qtd} (serão detalhados nas etapas seguintes)
+- Jogadores: ${dados.jogadores}
+- Dificuldade: ${dados.dificuldade}
+${dados.instrucoes ? `- Instrução específica: ${dados.instrucoes}` : ''}
 
-## 6. Puzzles — OBRIGATÓRIO: EXATAMENTE ${qtd} puzzles — NÃO CRIE MAIS NEM MENOS
-ATENÇÃO: você DEVE criar TODOS os ${qtd} puzzles numerados abaixo. NÃO pare antes do Puzzle ${qtd}. NÃO pule nenhum.
-${_templatePuzzlesFull(qtd)}
+Entregue APENAS as seções 1, 2, 3, 4 e 5, com toda a profundidade exigida. Termine exatamente na seção 5. NÃO comece os puzzles ainda.`;
+  const parte1 = await _chamarCientista(sistema, usuarioP1);
+  if (!parte1) throw new Error('Parte 1 retornou vazia');
+  const _contexto = parte1.slice(0, 2500);
+
+  // ── (B) PUZZLES em lotes pequenos (cada lote = 1 chamada → evita truncar) ──
+  const LOTE = 3;
+  let puzzlesTxt = '## 6. Puzzles\n';
+  for (let ini = 1; ini <= qtd; ini += LOTE) {
+    const fim = Math.min(ini + LOTE - 1, qtd);
+    _status(`🔬 Parte 2 — projetando puzzles ${ini}${fim > ini ? '–' + fim : ''} de ${qtd}...`);
+    const usuarioPz = `Você está detalhando os puzzles de uma sala de escape já concebida.
+
+CONTEXTO (seções 1–5 já criadas):
+${_contexto}
+
+Projete APENAS os puzzles ${ini} a ${fim} (de um total de ${qtd} na sala). NÃO crie outros números. Para CADA puzzle, preencha TODOS os itens abaixo, completos e sem ambiguidade:
+${_templatePuzzlesRange(ini, fim)}
+
+Comece direto em "### Puzzle ${ini}" e vá até "### Puzzle ${fim}" totalmente detalhado. NÃO escreva introdução, cabeçalho de seção, nem outras seções.`;
+    const lote = await _chamarCientista(sistema, usuarioPz);
+    if (lote) puzzlesTxt += '\n' + lote.trim() + '\n';
+  }
+
+  // ── (C) SEÇÕES 7–14 ──
+  _status('🔬 Parte 3 — fluxo, orçamento, operação e comercial...');
+  const usuarioP3 = `Você está finalizando o projeto executivo de uma sala de escape já concebida (as seções 1–5 e os ${qtd} puzzles já foram criados).
+
+CONTEXTO (seções 1–5):
+${_contexto}
+
+Agora entregue APENAS as SEÇÕES 7 a 14, cada uma com profundidade de projeto executivo. NÃO reescreva os puzzles.
 
 ## 7. Fluxo e Mapa da Experiência
-Diagrama textual: ENTRADA → [gatilho 1] → Puzzle 1 → ... → Puzzle final → SAÍDA. Inclua ramificações paralelas, momentos de revelação, pontos de tensão, onde o GM pode intervir.
+Diagrama textual: ENTRADA → gatilhos → puzzles em ordem → SAÍDA, com ramificações, revelações e pontos de intervenção do GM.
 
 ## 8. Curva de Dificuldade
-Como a dificuldade evolui. Puzzles de aquecimento, pico de tensão, como a sala "respira". Justifique com game design.
+Como a dificuldade evolui (aquecimento, pico, respiro), justificada por game design.
 
 ## 9. Trilha Sonora e Design de Áudio
-Fases musicais, efeitos sonoros programados com momento exato, equipamento recomendado.
+Fases musicais, efeitos com momento exato, equipamento recomendado.
 
 ## 10. Lista de Materiais Completa
-Por categoria: cenografia, fechaduras, eletrônicos, adereços, consumíveis — com quantidade, especificação e faixa de preço.
+Por categoria (cenografia, fechaduras, eletrônicos, adereços, consumíveis) com quantidade, especificação e faixa de preço.
 
 ## 11. Orçamento Total Estimado
-Tabela com subtotal por categoria e total geral. Econômico / padrão / premium.
+Tabela com subtotal por categoria e total geral: econômico / padrão / premium.
 
 ## 12. Operação e Game Master
-Posição de monitoramento, câmeras, sistema de dicas (3 por puzzle difícil), protocolo de emergência, tempo de reset.
+Monitoramento, câmeras, sistema de dicas, protocolo de emergência, tempo de reset.
 
 ## 13. Potencial Comercial e Público-Alvo
-Perfil ideal, argumento de venda, precificação para Aracaju/SE e Salvador/BA, potencial de recompra.
+Perfil ideal, argumento de venda, precificação para Aracaju/SE e Salvador/BA, recompra.
 
 ## 14. Fontes e Referências de Pesquisa
-Sites especializados, comunidades, livros/artigos de game design, salas de referência mundial.`;
+Sites, comunidades, livros/artigos de game design, salas de referência.`;
+  const parte3 = await _chamarCientista(sistema, usuarioP3);
 
-  const parte2 = await _chamarCientista(sistema, usuarioParte2);
-  if (!parte2) throw new Error('Parte 2 retornou vazia');
-
-  // Une as duas partes
-  return parte1.trim() + '\n\n' + parte2.trim();
+  // ── Une tudo: 1–5 + puzzles (seção 6) + 7–14 ──
+  return [parte1.trim(), puzzlesTxt.trim(), (parte3 || '').trim()].filter(Boolean).join('\n\n');
 }
 
 // ── Extrai título do projeto (primeira linha com #) ──────────────

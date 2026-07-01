@@ -9781,6 +9781,7 @@ function rDash(){
   const td=isAdm()?fatDia(null):fatDia(UA.unidadeId);
   const tm=isAdm()?fatMes(null):fatMes(UA.unidadeId);
   const vhj=rlsVendas().filter(v=>v.status!=='cancelado'&&v.data===hoje()).length;
+  const jhj=rlsVendas().filter(v=>v.status!=='cancelado'&&v.data===hoje()).reduce((s,v)=>s+(Number(v.qtdJogadores)||0),0);
   const uHtml=unidsVisiveis.map(u=>{
     const ud=fatDia(u.id),um=fatMes(u.id),meta=DB.metas.unidades?.[u.id]||0,perc=meta?Math.min(100,Math.round((um/meta)*100)):0,occ=txOcupacao(u.id);
     const staff=DB.colaboradores.filter(c=>c.ativo&&String(c.unidadeId)===String(u.id));
@@ -9812,7 +9813,7 @@ function rDash(){
       <div class="met yw"><div class="ml">Faturamento Hoje</div><div class="mv">${fM(td)}</div></div>
       <div class="met bl"><div class="ml">Faturamento Mês</div><div class="mv">${fM(tm)}</div></div>
       <div class="met gr"><div class="ml">Vendas Hoje</div><div class="mv">${vhj}</div></div>
-      <div class="met pu"><div class="ml">Clientes</div><div class="mv">${DB.clientes.length}</div></div>
+      <div class="met pu"><div class="ml">Jogadores Hoje</div><div class="mv">${jhj}</div></div>
     </div>
     ${caixasHtml}
     ${uHtml}
@@ -10369,6 +10370,27 @@ function _semanaAnterior(){
   const domAnt=new Date(segDesta); domAnt.setDate(segDesta.getDate()-1);
   const fmt=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   return { ini:fmt(segAnt), fim:fmt(domAnt) };
+}
+// [SEL-SEMANA] Semana (segunda a domingo) que contém a data âncora
+function _semanaDe(anchorISO){
+  const d=new Date((anchorISO||hoje())+'T12:00:00');
+  const dw=d.getDay();
+  const diffSeg=(dw===0?-6:1-dw);
+  const seg=new Date(d); seg.setDate(d.getDate()+diffSeg);
+  const dom=new Date(seg); dom.setDate(seg.getDate()+6);
+  const fmt=(x)=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+  return { ini:fmt(seg), fim:fmt(dom) };
+}
+// [SEL-SEMANA] Período atualmente selecionado (default = semana anterior)
+function _relShopPeriodo(){
+  return window._relShopSemanaIni ? _semanaDe(window._relShopSemanaIni) : _semanaAnterior();
+}
+// [SEL-SEMANA] Navega semanas (delta em dias, ±7)
+function _relShopMudarSemana(delta){
+  const p=_relShopPeriodo();
+  const d=new Date(p.ini+'T12:00:00'); d.setDate(d.getDate()+delta);
+  window._relShopSemanaIni=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  if(typeof abrirRelatorioShopping==='function') abrirRelatorioShopping();
 }
 // Calcula jogadores e valor vendido da unidade no período (vendas de jogo, sem duplicar reserva)
 function _dadosShopping(uId, ini, fim){
@@ -11072,7 +11094,7 @@ function _enviarRelatorioDiario(uId){
 // [v74.70] Abre o Relatório Semanal do Shopping (editável, imprimível, enviável por e-mail)
 function abrirRelatorioShopping(){
   const cfg=_cfgShopping();
-  const {ini,fim}=_semanaAnterior();
+  const {ini,fim}=_relShopPeriodo();
   const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
   // Se ADM sem unidade selecionada, soma todas
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
@@ -11109,6 +11131,15 @@ function abrirRelatorioShopping(){
           <div><label style="font-size:10px;color:#888">E-mail destino</label><input type="text" id="shopEmail" value="${san(cfg.emailDestino)}" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;color:#1a1a2e;background:#fff"></div>
         </div>
         <button class="btn bg bxs" style="margin-top:8px" onclick="_salvarCfgShopping()">💾 Salvar configuração</button>
+      </div>
+
+      <!-- [SEL-SEMANA] Seletor de semana -->
+      <div style="background:#eef2ff;border-radius:8px;padding:10px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:#666">📅 Semana</span>
+        <button class="btn bg bxs" onclick="_relShopMudarSemana(-7)">◀ Anterior</button>
+        <input type="date" value="${ini}" onchange="window._relShopSemanaIni=this.value;abrirRelatorioShopping()" style="padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;color:#1a1a2e;background:#fff">
+        <button class="btn bg bxs" onclick="_relShopMudarSemana(7)">Próxima ▶</button>
+        <span style="font-size:11px;color:#666;margin-left:auto">${fD(ini)} a ${fD(fim)}</span>
       </div>
 
       <!-- Relatório (área imprimível) -->
@@ -11169,7 +11200,7 @@ function _imprimirRelShopping(){
 }
 function _enviarRelShoppingEmail(){
   const cfg=_cfgShopping();
-  const {ini,fim}=_semanaAnterior();
+  const {ini,fim}=_relShopPeriodo();
   const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
   let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;

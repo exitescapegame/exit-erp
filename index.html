@@ -1565,6 +1565,19 @@ tbody tr:hover td { background: #f4f4ff !important; }
         <div style="font-size:13px;font-weight:600;color:var(--danger)" id="cancelDesc">—</div>
       </div>
       <input type="hidden" id="cancelId">
+      <div class="fg"><label>Motivo do cancelamento</label>
+        <select id="cancelMotivo" onchange="var w=document.getElementById('cancelMotivoOutroWrap');if(w)w.style.display=this.value==='Outro'?'block':'none'">
+          <option value="">Selecione o motivo…</option>
+          <option value="Erro de digitação">Erro de digitação</option>
+          <option value="Cliente desistiu">Cliente desistiu</option>
+          <option value="Duplicidade / venda repetida">Duplicidade / venda repetida</option>
+          <option value="Pagamento não concluído">Pagamento não concluído</option>
+          <option value="Outro">Outro (descrever)</option>
+        </select>
+      </div>
+      <div class="fg" id="cancelMotivoOutroWrap" style="display:none"><label>Descreva o motivo</label>
+        <input type="text" id="cancelMotivoOutro" placeholder="Descreva o motivo" maxlength="120">
+      </div>
       <div class="fg"><label>Digite seu PIN para confirmar</label>
         <input type="password" id="cancelPin" maxlength="6" inputmode="numeric" placeholder="••••••" onkeydown="if(event.key==='Enter')executarCancel()">
       </div>
@@ -6724,8 +6737,15 @@ function _pdvAbrirGestaoReserva(eventoId, sId, h) {
 
 function abrirCancelComSenha(vendaId){
   window._cancelTentativas = 0; // [v74-SEC] reseta contador ao abrir modal
+  window._cancelMotivoAtual = ''; // [MOTIVO] limpa motivo anterior
+  try{ var _ms=el('cancelMotivo'); if(_ms)_ms.value=''; var _mo=el('cancelMotivoOutro'); if(_mo)_mo.value=''; var _mw=document.getElementById('cancelMotivoOutroWrap'); if(_mw)_mw.style.display='none'; }catch(_){}
   el('cancelId').value=vendaId;el('cancelPin').value='';el('cancelErr').style.display='none';const v=DB.vendas.find(x=>x.id===vendaId);const s=v?DB.salas.find(x=>x.id==v.salaId):null;el('cancelDesc').textContent=s?`${s.emoji||'🚪'} ${s.nome} — ${v.horario||''} • ${fM(v.valorTotal)}`:(v?`#${v.id} • ${fM(v.valorTotal)}`:'');OM('mCancelSenha');}
 function executarCancel(){
+  // [MOTIVO] Motivo obrigatório antes de qualquer coisa
+  var _mot=(ev('cancelMotivo')||'').trim();
+  if(_mot==='Outro') _mot=(ev('cancelMotivoOutro')||'').trim();
+  if(!_mot){ var _e=el('cancelErr'); if(_e){_e.textContent='⛔ Selecione o motivo do cancelamento.'; _e.style.display='block';} return; }
+  window._cancelMotivoAtual=_mot;
   // [v74-SEC] Rate limit — máx 5 tentativas de PIN no modal de cancelamento
   if (!window._cancelTentativas) window._cancelTentativas = 0;
   if (window._cancelTentativas >= 5) {
@@ -6770,7 +6790,7 @@ function _executarCancelConfirmado(id){
   // [BLK1-4b] Alteração retroativa exige ADM + motivo obrigatório
   if(v.data && v.data < hoje()){
     if(!isAdm()){toast('Apenas o Administrador pode cancelar vendas de dias anteriores.','error');return;}
-    const motivo=prompt('📋 Alteração retroativa — informe o motivo (obrigatório):');
+    const motivo = window._cancelMotivoAtual || prompt('📋 Alteração retroativa — informe o motivo (obrigatório):');
     if(!motivo||!motivo.trim()){toast('Motivo obrigatório para alterações retroativas.','error');return;}
     v.motivoAlteracao=motivo.trim();
     registrarAuditoria('CANCEL_RETROATIVO',`Venda ${id} de ${v.data} cancelada retroativamente. Motivo: ${motivo.trim()}`,UA.id);
@@ -6778,6 +6798,8 @@ function _executarCancelConfirmado(id){
 
   // Muda status — isso já exclui a venda de fatDia/fatMes/relatórios
   v.status='cancelado';v.canceladoPor=UA.id;v.canceladoEm=agora();
+  v.motivoCancelamento = window._cancelMotivoAtual || v.motivoAlteracao || 'Não informado'; // [MOTIVO]
+  const _ehErroDigitacao = (v.motivoCancelamento === 'Erro de digitação'); // [ERRO-DIG] apaga a entrada, sem devolução
 
   // FIX BUG 3: Desfaz pontos de fidelidade SOMENTE se a venda foi paga
   if(vendaFoiPaga && v.clienteId){
@@ -6790,18 +6812,34 @@ function _executarCancelConfirmado(id){
     const cx=getCx(v.unidadeId||UA.unidadeId);
     cx.entradas=Math.max(0,cx.entradas-v.valorTotal);
     cx.saldoAtual=Math.max(0,cx.saldoAtual-v.valorTotal);
-    cx.saidas+=v.valorTotal;
-    cx.historico.push({
-      tipo:'saida',
-      desc:`Estorno cancelamento #${id.slice(-6)}`,
-      valor:v.valorTotal,
-      hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
-    });
-    registrarAuditoria('VENDA_CANCELADA',`Venda ${id} - Estorno de ${fM(v.valorTotal)} por ${UA.nome}`,UA.id,{
-      antes:{id,status:'confirmado',valorTotal:v.valorTotal,salaId:v.salaId,horario:v.horario,data:v.data,pagamentos:v.pagamentos},
-      depois:{id,status:'cancelado',canceladoPor:UA.id,canceladoEm:v.canceladoEm,estorno:v.valorTotal}
-    });
-    toast('Venda cancelada e valor estornado.','warn');
+    if(_ehErroDigitacao){
+      // [ERRO-DIG] "como se nunca tivesse existido": remove a entrada do caixa,
+      // sem gerar saída/estorno e sem devolução. Apaga também a linha do histórico.
+      try{
+        const _hi = cx.historico.map((h,ix)=>({h,ix}))
+          .filter(o=>o.h && o.h.tipo==='entrada' && Math.abs((o.h.valor||0)-v.valorTotal)<0.01 && /venda/i.test(o.h.desc||''))
+          .pop();
+        if(_hi) cx.historico.splice(_hi.ix,1);
+      }catch(_){}
+      registrarAuditoria('VENDA_ERRO_DIGITACAO',`Venda ${id} removida por erro de digitação (${fM(v.valorTotal)}) por ${UA.nome} — entrada apagada do caixa, sem devolução.`,UA.id,{
+        antes:{id,status:'confirmado',valorTotal:v.valorTotal,salaId:v.salaId,horario:v.horario,data:v.data,pagamentos:v.pagamentos},
+        depois:{id,status:'cancelado',canceladoPor:UA.id,canceladoEm:v.canceladoEm,removidoComoErro:true}
+      });
+      toast('Venda removida (erro de digitação) — entrada apagada do caixa, sem devolução.','warn');
+    } else {
+      cx.saidas+=v.valorTotal;
+      cx.historico.push({
+        tipo:'saida',
+        desc:`Estorno cancelamento #${id.slice(-6)}`,
+        valor:v.valorTotal,
+        hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+      });
+      registrarAuditoria('VENDA_CANCELADA',`Venda ${id} - Estorno de ${fM(v.valorTotal)} por ${UA.nome}. Motivo: ${v.motivoCancelamento||'—'}`,UA.id,{
+        antes:{id,status:'confirmado',valorTotal:v.valorTotal,salaId:v.salaId,horario:v.horario,data:v.data,pagamentos:v.pagamentos},
+        depois:{id,status:'cancelado',canceladoPor:UA.id,canceladoEm:v.canceladoEm,estorno:v.valorTotal}
+      });
+      toast('Venda cancelada e valor estornado.','warn');
+    }
   } else {
     // Venda sem pagamento registrado: apenas aborta, sem movimentação financeira
     registrarAuditoria('VENDA_ABORTADA',`Venda ${id} abortada sem pagamento por ${UA.nome}`,UA.id);
@@ -6848,7 +6886,7 @@ function _executarCancelConfirmado(id){
 
   // [v74.31] Se a venda tinha pagamento, abre o formulário de DEVOLUÇÃO para registrar o reembolso
   const _vTinhaPgto = v.pagamentos && v.pagamentos.length>0 && v.valorTotal>0;
-  if(_vTinhaPgto && typeof _v74_abrirModalDevolucao==='function'){
+  if(_vTinhaPgto && !_ehErroDigitacao && typeof _v74_abrirModalDevolucao==='function'){
     setTimeout(()=>{
       _v74_abrirModalDevolucao({
         eventoId: v.eventoId || v.id,

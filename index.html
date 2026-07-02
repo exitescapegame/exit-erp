@@ -11095,7 +11095,7 @@ function _enviarRelatorioDiario(uId){
 function abrirRelatorioShopping(){
   const cfg=_cfgShopping();
   const {ini,fim}=_relShopPeriodo();
-  const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
+  const uId=isAdm()?(window._relShopUnidade?parseInt(window._relShopUnidade):null):UA.unidadeId;
   // Se ADM sem unidade selecionada, soma todas
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
   let m=el('mRelShopping'); if(m) m.remove();
@@ -11132,6 +11132,15 @@ function abrirRelatorioShopping(){
         </div>
         <button class="btn bg bxs" style="margin-top:8px" onclick="_salvarCfgShopping()">💾 Salvar configuração</button>
       </div>
+
+      <!-- [SEL-UNIDADE] Seletor de unidade (ADM) -->
+      ${isAdm()?`<div style="background:#f0fff4;border-radius:8px;padding:10px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:#666">🏢 Unidade</span>
+        <select onchange="window._relShopUnidade=this.value;abrirRelatorioShopping()" style="padding:6px;border:1px solid #ccc;border-radius:6px;font-size:12px;color:#1a1a2e;background:#fff;flex:1;min-width:180px">
+          <option value="" ${!window._relShopUnidade?'selected':''}>Todas as unidades (consolidado)</option>
+          ${DB.unidades.map(u=>`<option value="${u.id}" ${String(window._relShopUnidade)===String(u.id)?'selected':''}>${san(u.nome)}</option>`).join('')}
+        </select>
+      </div>`:''}
 
       <!-- [SEL-SEMANA] Seletor de semana -->
       <div style="background:#eef2ff;border-radius:8px;padding:10px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -11201,7 +11210,7 @@ function _imprimirRelShopping(){
 function _enviarRelShoppingEmail(){
   const cfg=_cfgShopping();
   const {ini,fim}=_relShopPeriodo();
-  const uId=isAdm()?(window._fu?parseInt(window._fu):null):UA.unidadeId;
+  const uId=isAdm()?(window._relShopUnidade?parseInt(window._relShopUnidade):null):UA.unidadeId;
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
   let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
   let totJ=0, totV=0;

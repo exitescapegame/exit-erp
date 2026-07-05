@@ -2706,6 +2706,8 @@ async function doLoginSeguro() {
   if (typeof goTo === 'function') goTo(typeof tP === 'function' && tP('ver_pdv') ? 'pdv' : 'dashboard');
   if (typeof toast === 'function') toast(`Bem-vindo, ${c.nome}! 👋`, 'success');
   if (pinEl) pinEl.value = '';
+  // [FEATURE-PAGAMENTO-REMOTO] Verifica se este colaborador tem pagamento aguardando aprovação
+  if (typeof _verificarPagamentosPendentes === 'function') _verificarPagamentosPendentes();
   // [v43] Verifica manutenções ativas ao fazer login (alerta ADM)
   if (typeof _checarManutencoesAoLogin === 'function') _checarManutencoesAoLogin();
   // [B4] Sincroniza locks do Supabase logo após login
@@ -5953,7 +5955,7 @@ const _V74_FUNCOES_CRITICAS = [
   'nresAbrir','nresSalvar','nresAddJogador','resNovaReserva','nresWAAll',
   'dispararMsgGameMaster','slotClick','_statusVisualSlot','_abrirGestaoAtraso','_atrasoMarcar','_avisarProximaReserva','_jogoEfetivar','_clienteNaoApareceu',
   '_abrirAnalisesADM','rFin','rFolha','rRelFin',
-  '_registrarReciboAuto','_abrirReciboAssinatura','_pagarColaborador','_confirmarPagColab',
+  '_registrarReciboAuto','_abrirReciboAssinatura','_pagarColaborador','_aprovarPagamento','_verificarPagamentosPendentes',
   '_toggleMultiJogadores','_multiAddJogador',
   '_dispararConsentLGPD','enviarWhatsApp','_waVerificarConsentimento',
   'abrirRelatorioShopping','_dadosShopping',
@@ -10396,91 +10398,150 @@ function rFolha(){
 }
 
 // [v74.79] PAGAMENTO DE COLABORADOR com recibo + assinatura digital
-function _pagarColaborador(colabId, valor){
+// [FEATURE-PAGAMENTO-REMOTO] Cria uma SOLICITAÇÃO DE PAGAMENTO pendente, em vez de
+// pedir o PIN na hora (que só funciona presencialmente). O colaborador aprova depois,
+// com o próprio PIN, na próxima vez que fizer login — de qualquer lugar.
+async function _pagarColaborador(colabId, valor){
   const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(colabId));
   if(!c){ toast('Colaborador não encontrado.','error'); return; }
-  window._pagColabCtx={ colabId, colabNome:c.nome, valor:+(valor||0).toFixed(2), unidadeId:c.unidadeId };
-  let m=el('mPagColab'); if(m) m.remove();
-  m=document.createElement('div'); m.className='mo open'; m.id='mPagColab';
+  if(!confirm(`Enviar solicitação de pagamento de ${fM(valor)} para ${c.nome}?\n\nO valor só sai do caixa depois que ${c.nome} aprovar com o PIN pessoal dele (no próximo login).`)) return;
+
+  const solicitacao=_registrarReciboAuto('colaborador',{
+    refId:colabId, valor:+(valor||0).toFixed(2), colaboradorNome:c.nome,
+    descricao:`Pagamento de prestação de serviços — ${hoje().slice(0,7)}`, unidadeId:c.unidadeId, formaPagamento:'folha'
+  });
+  solicitacao.statusAprovacao='aguardando_aprovacao';
+  solicitacao.solicitadoPorId=UA?.id; solicitacao.solicitadoPorNome=UA?.nome; solicitacao.solicitadoEm=agora();
+  sDB();
+
+  registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO',`Solicitação de pagamento de ${fM(valor)} para ${c.nome}, aguardando aprovação dele`,UA?.id,solicitacao);
+  toast(`📤 Solicitação enviada! ${c.nome} vai aprovar com o PIN dele no próximo login.`,'success');
+
+  // Notifica o colaborador por e-mail (se tiver e-mail cadastrado) que há um pagamento esperando aprovação
+  _notificarColabPagamentoPendente(c, valor);
+}
+// [FEATURE-PAGAMENTO-REMOTO] Envia um e-mail avisando o colaborador que há um
+// pagamento aguardando a aprovação dele (não é o recibo final — é só o aviso).
+async function _notificarColabPagamentoPendente(c, valor){
+  try{
+    if(!c.email) return; // sem e-mail cadastrado, não há como avisar remotamente
+    const r = await fetch(SUPA_URL + '/functions/v1/send-payment-receipt', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPA_KEY, 'apikey':SUPA_KEY },
+      body: JSON.stringify({
+        colaboradorNome: c.nome, colaboradorEmail: c.email, unidadeEmail:'', unidadeNome:'',
+        valor, mesReferencia: hoje().slice(0,7),
+        dataHoraFormatada: `${fD(hoje())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
+        textoJuridico: `Este é um AVISO de pagamento pendente — ainda não é o recibo final. Acesse o sistema EXIT e faça login com seu PIN pessoal para revisar e aprovar este pagamento de ${fM(valor)}.`,
+        pagoPor: UA?.nome||'', assunto_customizado:'aviso_pendente'
+      })
+    });
+    if(!r.ok) console.warn('[aviso-pendente] falha ao enviar:', await r.text());
+  }catch(e){ console.warn('[aviso-pendente] erro:', e); }
+}
+function _imprimirPagColab(){
+  const area=el('printArea'); const conteudo=el('aprovPagPrintArea');
+  if(!area||!conteudo){ toast('Área de impressão não encontrada.','error'); return; }
+  area.innerHTML=`<div style="padding:20px;font-family:monospace;max-width:320px">${conteudo.innerHTML}</div>`;
+  setTimeout(()=>{window.print();setTimeout(()=>{if(area)area.innerHTML='';},1800);},120);
+}
+// [FEATURE-PAGAMENTO-REMOTO] Verifica, logo após o login, se este colaborador tem
+// algum pagamento AGUARDANDO A APROVAÇÃO DELE. Se tiver, mostra o modal de aprovação.
+function _verificarPagamentosPendentes(){
+  if(!UA) return;
+  const pendentes=(DB.recibos||[]).filter(r=>r.categoria==='colaborador' && r.statusAprovacao==='aguardando_aprovacao' && String(r.refId)===String(UA.id));
+  if(!pendentes.length) return;
+  // Mostra o mais antigo primeiro
+  const rec=pendentes.sort((a,b)=>(a.solicitadoEm||'').localeCompare(b.solicitadoEm||''))[0];
+  setTimeout(()=>_abrirAprovacaoPagamento(rec),600); // pequeno delay para não brigar com outros alertas de login
+}
+// [FEATURE-PAGAMENTO-REMOTO] Modal onde o PRÓPRIO colaborador revisa e aprova
+// (ou recusa) o pagamento, com o PIN pessoal dele.
+function _abrirAprovacaoPagamento(rec){
+  const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(rec.refId));
+  if(!c) return;
+  window._aprovPagCtx={ recId:rec.id };
+  let m=el('mAprovPag'); if(m) m.remove();
+  m=document.createElement('div'); m.className='mo open'; m.id='mAprovPag';
   document.body.appendChild(m);
-  const uni=(DB.unidades||[]).find(u=>String(u.id)===String(c.unidadeId));
+  const uni=(DB.unidades||[]).find(u=>String(u.id)===String(rec.unidadeId));
   m.innerHTML=`<div class="md" style="max-width:460px">
-    <div class="mh"><span class="mti">💵 Pagamento de Colaborador</span><button class="mc" onclick="CM('mPagColab')">×</button></div>
+    <div class="mh" style="background:linear-gradient(135deg,#7c3aed,#a855f7)"><span class="mti" style="color:#fff">💰 Pagamento Aguardando sua Aprovação</span></div>
     <div class="mb">
-      <div id="pagColabPrintArea" style="border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--bg2)">
+      <div id="aprovPagPrintArea" style="border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--bg2)">
         <div style="text-align:center;border-bottom:2px solid var(--accent);padding-bottom:10px;margin-bottom:12px">
           <div style="font-size:18px;font-weight:900">EXIT GAMES</div>
           <div style="font-size:12px;color:var(--text2)">${san(uni?.nome||'')} • Recibo de Pagamento de Colaborador</div>
         </div>
         <div style="font-size:13px;line-height:1.8">
           <div><strong>Colaborador:</strong> ${san(c.nome)}</div>
-          <div><strong>Referente a:</strong> Prestação de serviços — ${hoje().slice(0,7)}</div>
-          <div style="font-size:18px;font-weight:900;color:var(--success);margin-top:8px">VALOR: ${fM(valor)}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:6px">${fD(hoje())} • Pago por: ${san(UA?.nome||'')}</div>
+          <div><strong>Referente a:</strong> ${san(rec.descricao||'')}</div>
+          <div style="font-size:18px;font-weight:900;color:var(--success);margin-top:8px">VALOR: ${fM(rec.valor)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">Solicitado por: ${san(rec.solicitadoPorNome||'')} em ${rec.solicitadoEm?fD(rec.solicitadoEm.slice(0,10)):''}</div>
         </div>
-        <div id="pagColabAssArea" style="display:none;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);font-size:11px;color:var(--text2)"></div>
       </div>
       <div style="margin-top:14px;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:var(--rsm);padding:12px">
-        <div style="font-size:12px;font-weight:700;color:#a855f7;margin-bottom:6px">✍️ Assinatura Digital do Colaborador</div>
+        <div style="font-size:12px;font-weight:700;color:#a855f7;margin-bottom:6px">✍️ Sua Assinatura Digital</div>
         <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:10px">${san(TEXTO_JURIDICO_RECIBO)}</div>
-        <div class="fg" style="margin:0"><label>PIN do colaborador (${san(c.nome)})</label>
-          <input type="password" id="pagColabPin" inputmode="numeric" maxlength="8" placeholder="••••" style="letter-spacing:4px;text-align:center;font-size:18px">
+        <div class="fg" style="margin:0"><label>Digite SEU PIN pessoal para confirmar o recebimento</label>
+          <input type="password" id="aprovPagPin" inputmode="numeric" maxlength="8" placeholder="••••" style="letter-spacing:4px;text-align:center;font-size:18px">
         </div>
-        <div id="pagColabErr" style="display:none;color:var(--danger);font-size:12px;margin-top:6px"></div>
+        <div id="aprovPagErr" style="display:none;color:var(--danger);font-size:12px;margin-top:6px"></div>
       </div>
     </div>
     <div class="mf" style="flex-wrap:wrap;gap:8px">
       <button class="btn bg" onclick="_imprimirPagColab()">🖨️ Imprimir</button>
-      <button class="btn bs" style="background:#a855f7" onclick="_confirmarPagColab()">✍️ Confirmar e Assinar</button>
-      <button class="btn bg" onclick="CM('mPagColab')">Cancelar</button>
+      <button class="btn bg" onclick="_recusarPagamento()">✖ Recusar</button>
+      <button class="btn bs" style="background:#a855f7" onclick="_aprovarPagamento()">✍️ Aprovar e Assinar</button>
     </div>
   </div>`;
-  setTimeout(()=>el('pagColabPin')?.focus(),150);
+  setTimeout(()=>el('aprovPagPin')?.focus(),150);
 }
-function _imprimirPagColab(){
-  const area=el('printArea'); const conteudo=el('pagColabPrintArea');
-  if(!area||!conteudo){ toast('Área de impressão não encontrada.','error'); return; }
-  area.innerHTML=`<div style="padding:20px;font-family:monospace;max-width:320px">${conteudo.innerHTML}</div>`;
-  setTimeout(()=>{window.print();setTimeout(()=>{if(area)area.innerHTML='';},1800);},120);
+async function _recusarPagamento(){
+  const ctx=window._aprovPagCtx; if(!ctx) return;
+  if(!confirm('Tem certeza que quer recusar este pagamento? O solicitante será avisado.')) return;
+  const rec=(DB.recibos||[]).find(r=>r.id===ctx.recId);
+  if(rec){ rec.statusAprovacao='recusado'; rec.recusadoEm=agora();
+    registrarAuditoria('PAGAMENTO_COLABORADOR_RECUSADO',`${rec.colaboradorNome} recusou o pagamento de ${fM(rec.valor)}`,UA?.id,rec);
+    sDB();
+  }
+  toast('Pagamento recusado.','warn');
+  CM('mAprovPag');
 }
-async function _confirmarPagColab(){
-  const ctx=window._pagColabCtx; if(!ctx){ return; }
-  const pin=(el('pagColabPin')?.value||'').trim();
-  const err=el('pagColabErr');
+async function _aprovarPagamento(){
+  const ctx=window._aprovPagCtx; if(!ctx) return;
+  const pin=(el('aprovPagPin')?.value||'').trim();
+  const err=el('aprovPagErr');
   const showErr=(t)=>{ if(err){err.textContent=t;err.style.display='block';} };
-  if(pin.length<4){ showErr('⛔ Digite o PIN do colaborador (mínimo 4 dígitos).'); return; }
-  // O PIN deve ser do PRÓPRIO colaborador que está recebendo
-  const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(ctx.colabId));
+  if(pin.length<4){ showErr('⛔ Digite seu PIN (mínimo 4 dígitos).'); return; }
+  if(!UA){ showErr('⛔ Sessão expirada. Faça login novamente.'); return; }
+  const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(UA.id));
   let pinOk=false;
   if(c && c.pinHashSec && c.pinSalt){
     try{ pinOk=await verificarPin(pin, c.pinHashSec, c.pinSalt); }catch(e){}
   }
-  if(!pinOk){ showErr(`⛔ PIN incorreto. Deve ser o PIN pessoal de ${san(c?.nome||'colaborador')}.`); return; }
-  // Registra o recibo assinado no banco (categoria: colaborador)
-  const rec=_registrarReciboAuto('colaborador',{
-    refId:ctx.colabId, valor:ctx.valor, colaboradorNome:c.nome,
-    descricao:`Pagamento de prestação de serviços — ${hoje().slice(0,7)}`, unidadeId:ctx.unidadeId, formaPagamento:'folha'
-  });
+  if(!pinOk){ showErr('⛔ PIN incorreto.'); return; }
+
+  const rec=(DB.recibos||[]).find(r=>r.id===ctx.recId);
+  if(!rec){ showErr('⛔ Solicitação não encontrada (pode já ter sido processada).'); return; }
+  if(rec.statusAprovacao!=='aguardando_aprovacao'){ showErr('⛔ Esta solicitação já foi processada.'); return; }
+
+  // Finaliza: assina, marca aprovado, e SÓ AGORA deduz o caixa
   rec.assinado=true; rec.textoJuridico=TEXTO_JURIDICO_RECIBO; rec.versao='REC-2026.1';
   rec.assinadoPorId=c.id; rec.assinadoPorNome=c.nome; rec.assinaturaDataHora=agora();
+  rec.statusAprovacao='aprovado';
   rec.userAgent=(typeof navigator!=='undefined'?navigator.userAgent.slice(0,150):'');
-  // Lança como saída no caixa (pagamento da empresa)
-  const cx=getCx(ctx.unidadeId||UA.unidadeId);
+
+  const cx=getCx(rec.unidadeId);
   if(cx && cx.aberto){
-    cx.saidas+=ctx.valor; cx.saldoAtual=Math.max(0,cx.saldoAtual-ctx.valor);
-    cx.historico.push({tipo:'saida',desc:`Pagamento colaborador: ${c.nome}`,valor:ctx.valor,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+    cx.saidas+=rec.valor; cx.saldoAtual=Math.max(0,cx.saldoAtual-rec.valor);
+    cx.historico.push({tipo:'saida',desc:`Pagamento colaborador: ${c.nome}`,valor:rec.valor,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   }
-  registrarAuditoria('PAGAMENTO_COLABORADOR_ASSINADO',`Pagamento de ${fM(ctx.valor)} a ${c.nome} assinado digitalmente (PIN próprio)`,UA?.id,rec);
+  registrarAuditoria('PAGAMENTO_COLABORADOR_APROVADO',`${c.nome} aprovou e assinou o pagamento de ${fM(rec.valor)}`,UA?.id,rec);
   sDB();
-  const assArea=el('pagColabAssArea');
-  if(assArea){ assArea.style.display='block'; assArea.innerHTML=`✍️ <strong>Recebido e assinado</strong> por <strong>${san(c.nome)}</strong><br>${fD(hoje())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} • ID: ${rec.id.slice(-8)}`; }
-  if(err) err.style.display='none';
-  el('pagColabPin').value='';
-  toast(`✅ Pagamento de ${fM(ctx.valor)} a ${c.nome} confirmado e assinado!`,'success');
-  // [FEATURE-RECIBO-EMAIL] Envia o recibo assinado por e-mail (colaborador + unidade),
-  // sem bloquear a UI — se falhar, não desfaz o pagamento (já registrado/assinado acima).
-  _enviarReciboColabPorEmail(c, ctx, rec);
-  setTimeout(()=>{ CM('mPagColab'); if(typeof renderPage==='function') renderPage(); }, 1500);
+  toast(`✅ Pagamento de ${fM(rec.valor)} aprovado e assinado!`,'success');
+  _enviarReciboColabPorEmail(c, {valor:rec.valor, unidadeId:rec.unidadeId}, rec);
+  CM('mAprovPag');
 }
 // [FEATURE-RECIBO-EMAIL] Chama a Edge Function que envia o recibo por e-mail.
 // Best-effort: nunca lança erro pro usuário (o pagamento já foi confirmado e assinado

@@ -3039,14 +3039,17 @@ function mostrarTelaDesbloqueio() {
     </div>
     <div id="secLoginUnidade" style="margin-bottom:16px;padding:14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:8px">
       <div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:8px">
-        🏢 Login da Unidade
+        🏢 Login na Nuvem (Unidade ou ADM)
       </div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:10px">
-        Entre com o email e senha desta unidade (ex: balcão de Salvador). O ADM vê todas as unidades.
+        Entre com o e-mail e senha do Supabase — de uma unidade (ex: balcão de Salvador) OU da conta ADM
+        (ex: exit.escapegame@gmail.com). <strong>Se você é ADM e quer salvar configurações (Financeiro,
+        Shopping, etc.), preencha aqui com a conta ADM — sem isso, alterações de configuração não são
+        confirmadas na nuvem.</strong>
       </div>
-      <input type="email" id="unidadeEmail" placeholder="Email da unidade" autocomplete="username"
+      <input type="email" id="unidadeEmail" placeholder="E-mail (unidade ou ADM)" autocomplete="username"
         style="margin-bottom:6px" onkeydown="if(event.key==='Enter')document.getElementById('unidadeSenha')?.focus()">
-      <input type="password" id="unidadeSenha" placeholder="Senha da unidade" autocomplete="current-password"
+      <input type="password" id="unidadeSenha" placeholder="Senha (unidade ou ADM)" autocomplete="current-password"
         style="margin-bottom:8px" onkeydown="if(event.key==='Enter')tentarDesbloquear()">
     </div>
     <div id="loginNormal" style="display:none">`;
@@ -11332,12 +11335,40 @@ function abrirRelatorioShopping(){
     </div>
   </div>`;
 }
-function _salvarCfgShopping(){
+// [FIX-SALVAR-CONFIRMA] Grava uma chave de config no Supabase e confirma pelo status HTTP
+// real (r.ok), sem depender do corpo da resposta — que vem vazio com Prefer:return=minimal
+// e por isso NÃO pode ser usado para distinguir sucesso de falha (ambos retornam null).
+async function _salvarConfigComConfirmacao(chave, valor){
+  if (window._SUPA_DESLIGADO) return true; // modo local: nada pra confirmar na nuvem
+  try {
+    const _authToken = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
+    const r = await fetch(SUPA_URL + '/rest/v1/config', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + _authToken,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify([{ chave, valor }])
+    });
+    return r.ok;
+  } catch(e){
+    return false;
+  }
+}
+async function _salvarCfgShopping(){
   const cfg=_cfgShopping();
   cfg.nomeShopping=(el('shopNome')?.value||'Shopping').trim();
   cfg.emailDestino=(el('shopEmail')?.value||'exit.financeiro@gmail.com').trim();
-  sDB();
-  toast('✅ Configuração do relatório salva!','success');
+  sDB(); // mantém o comportamento existente: salva local + dispara sync geral em segundo plano
+  toast('💾 Salvando e confirmando na nuvem...','info');
+  // [FIX-SALVAR-CONFIRMA] ANTES: mostrava "salvo com sucesso" sempre, mesmo se a nuvem
+  // rejeitasse silenciosamente a gravação (rede instável, RLS, etc.) — o usuário nunca
+  // sabia se o valor realmente persistiu. Agora aguardamos a confirmação real.
+  const ok = await _salvarConfigComConfirmacao('config', DB.config);
+  if(ok) toast('✅ Configuração salva e confirmada na nuvem!','success');
+  else toast('⚠️ Salvou no seu navegador, mas NÃO confirmou na nuvem. Verifique sua internet e clique em Salvar de novo.','error');
   abrirRelatorioShopping(); // re-renderiza com os novos dados
 }
 function _imprimirRelShopping(){

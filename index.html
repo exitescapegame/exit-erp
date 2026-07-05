@@ -10417,7 +10417,7 @@ function rFolha(){
   const totFolha=ls.reduce((s,l)=>s+l.prev,0);
   return`<div class="met yw" style="margin-bottom:14px"><div class="ml">Previsão Folha — ${mes}</div><div class="mv">${fM(totFolha)}</div></div>
   <div class="tw"><table><thead><tr><th>Colaborador</th><th>Cargo</th><th>Unidade</th><th>Dias</th><th>Horas</th><th>R$/hora</th><th>Previsão</th><th>Ação</th></tr></thead><tbody>
-    ${ls.map(l=>`<tr><td>${san(l.c.nome)}</td><td>${san(l.cg?.nome||'')}</td><td>${san(l.u?.nome||'')}</td><td>${l.dias}</td><td style="color:var(--accent)">${l.hrs.toFixed(1)}h</td><td>${fM(l.c.valorHora||0)}</td><td style="font-weight:700;color:${l.prev>0?'var(--success)':'var(--text2)'}">${fM(l.prev)}</td><td>${l.prev>0&&(isAdm()||tP('pagar_folha'))?`<button class="btn bs bxs" onclick="_pagarColaborador('${l.c.id}',${l.prev})">💵 Pagar</button>`:'—'}</td></tr>`).join('')}
+    ${ls.map(l=>`<tr><td>${san(l.c.nome)}</td><td>${san(l.cg?.nome||'')}</td><td>${san(l.u?.nome||'')}</td><td>${l.dias}</td><td style="color:var(--accent)">${l.hrs.toFixed(1)}h</td><td>${fM(l.c.valorHora||0)}</td><td style="font-weight:700;color:${l.prev>0?'var(--success)':'var(--text2)'}">${fM(l.prev)}</td><td>${(isAdm()||tP('pagar_folha'))?`<button class="btn bs bxs" onclick="_pagarColaborador('${l.c.id}',${l.prev})">💵 Pagar</button>`:'—'}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
 

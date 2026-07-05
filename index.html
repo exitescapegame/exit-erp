@@ -10428,21 +10428,28 @@ function rFolha(){
 async function _pagarColaborador(colabId, valor){
   const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(colabId));
   if(!c){ toast('Colaborador não encontrado.','error'); return; }
-  if(!confirm(`Enviar solicitação de pagamento de ${fM(valor)} para ${c.nome}?\n\nO valor só sai do caixa depois que ${c.nome} aprovar com o PIN pessoal dele (no próximo login).`)) return;
+
+  // [FEATURE-VALOR-EDITAVEL] Permite ajustar o valor antes de enviar a solicitação
+  // (útil para testes com valor pequeno, ou ajustes pontuais fora do cálculo automático).
+  const valorDigitado=prompt(`Valor a solicitar para ${c.nome} (R$):`, (+(valor||0).toFixed(2)).toString());
+  if(valorDigitado===null) return; // cancelou
+  const valorFinal=parseFloat(valorDigitado.replace(',','.'));
+  if(isNaN(valorFinal)||valorFinal<=0){ toast('Valor inválido.','error'); return; }
+
+  if(!confirm(`Enviar solicitação de pagamento de ${fM(valorFinal)} para ${c.nome}?\n\nO valor só sai do caixa depois que ${c.nome} aprovar com o PIN pessoal dele (no próximo login).`)) return;
 
   const solicitacao=_registrarReciboAuto('colaborador',{
-    refId:colabId, valor:+(valor||0).toFixed(2), colaboradorNome:c.nome,
+    refId:colabId, valor:valorFinal, colaboradorNome:c.nome,
     descricao:`Pagamento de prestação de serviços — ${hoje().slice(0,7)}`, unidadeId:c.unidadeId, formaPagamento:'folha'
   });
   solicitacao.statusAprovacao='aguardando_aprovacao';
   solicitacao.solicitadoPorId=UA?.id; solicitacao.solicitadoPorNome=UA?.nome; solicitacao.solicitadoEm=agora();
   sDB();
 
-  registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO',`Solicitação de pagamento de ${fM(valor)} para ${c.nome}, aguardando aprovação dele`,UA?.id,solicitacao);
+  registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO',`Solicitação de pagamento de ${fM(valorFinal)} para ${c.nome}, aguardando aprovação dele`,UA?.id,solicitacao);
   toast(`📤 Solicitação enviada! ${c.nome} vai aprovar com o PIN dele no próximo login.`,'success');
 
-  // Notifica o colaborador por e-mail (se tiver e-mail cadastrado) que há um pagamento esperando aprovação
-  _notificarColabPagamentoPendente(c, valor);
+  _notificarColabPagamentoPendente(c, valorFinal);
 }
 // [FEATURE-PAGAMENTO-REMOTO] Envia um e-mail avisando o colaborador que há um
 // pagamento aguardando a aprovação dele (não é o recibo final — é só o aviso).

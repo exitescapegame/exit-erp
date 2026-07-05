@@ -8461,11 +8461,22 @@ function garantirSessaoCaixa(uId){
   let sess=getSessaoCaixaAtiva(k);
   if(!sess){
     const cx=getCx(k);
+    // [FIX-DINHEIRO-SOME 4] ANTES: abertaEm=agora() aqui, que é o instante em que esta
+    // função é chamada pela primeira vez (ex: só quando alguém abre o Fechamento).
+    // Se o caixa já foi aberto mais cedo (ou até em código antigo, antes de um deploy
+    // no meio do dia) e a sessão nunca foi criada, isso fazia TODAS as vendas do dia
+    // ficarem "de fora" da sessão — excluídas do detalhamento por método de pagamento,
+    // mesmo contando certo no total geral (cx.entradas). Agora, ao precisar criar uma
+    // sessão retroativamente, usamos o INÍCIO do dia do caixa (dataCaixa) como abertaEm,
+    // garantindo que nenhuma venda já feita hoje seja excluída por engano.
+    const _abertaEmSeguro = cx.dataCaixa
+      ? new Date(cx.dataCaixa+'T00:00:00').toISOString()
+      : agora();
     sess={
       id:uid(),
       unidadeId:k,
       status:'ABERTO',
-      abertaEm:agora(),
+      abertaEm:_abertaEmSeguro,
       abertaPor:UA?.id||null,
       saldoAbertura:cx.saldoInicial||0,
       totalVendasPDV:0,
@@ -8491,17 +8502,18 @@ function abrirFechamentoCaixa(){
 
   const vendasSessao=DB.vendas.filter(v=>{
     if(v.status!=='confirmado'||String(v.unidadeId)!==uId) return false;
-    // [FIX-DINHEIRO-SOME 2/3] Escopo pela SESSÃO DE CAIXA ATUAL (abertaEm), não pela
-    // data da venda nem por "hoje()". Isso corrige dois problemas:
-    //  a) vendas com data retroativa (Fluxo Intenso/avulsa) entram corretamente,
-    //     pois o pagamento foi recebido DENTRO da sessão aberta agora;
-    //  b) vendas de uma sessão ANTERIOR já fechada hoje (caixa fechado e reaberto
-    //     no mesmo dia) NÃO são recontadas na sessão nova — evita "dinheiro fantasma".
+    // [FIX-DINHEIRO-SOME 5] REGRA DE NEGÓCIO CONFIRMADA: o CAIXA é diário — mostra
+    // só o que pertence ao dia de HOJE (campo v.data, a data da reserva/sessão).
+    // Vendas com data retroativa (ex.: Fluxo Intenso lançado com data de dias
+    // anteriores) NÃO entram no caixa físico de hoje, mesmo que o registro tenha
+    // sido processado agora — esses valores aparecem nos RELATÓRIOS (shopping,
+    // financeiro), que já filtram corretamente por v.data.
+    if(v.data!==hoje()) return false;
+    // Dentro do dia de hoje, ainda escopamos pela SESSÃO DE CAIXA atual (abertaEm),
+    // para não recontar dinheiro de uma sessão já fechada e reaberta hoje mesmo
+    // ("dinheiro fantasma" — ver fix anterior).
     if(v.criadoEm && _sessAtual && _sessAtual.abertaEm) return v.criadoEm >= _sessAtual.abertaEm;
-    const _dataReal = _dataLocalDe(v.criadoEm);
-    if(_dataReal) return _dataReal===hoje();
-    // Fallback para vendas antigas sem criadoEm: mantém comportamento anterior
-    return v.data===hoje();
+    return true;
   });
 
   const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0};

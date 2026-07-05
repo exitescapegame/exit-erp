@@ -7989,7 +7989,7 @@ async function confirmarVenda(){ // [B4] async for slot lock
     const _creditoUsado = (pgFinal||[]).filter(p=>p.metodo==='credito_cliente').reduce((s,p)=>s+p.valor,0);
     const _entradaCaixa = +Math.max(0, val - _creditoUsado).toFixed(2); // dinheiro real referente a esta venda
     cx.entradas+=_entradaCaixa; cx.saldoAtual+=_entradaCaixa;
-    cx.historico.push({tipo:'entrada',desc:'Venda Escape Room'+(_creditoUsado>0?` (${fM(_creditoUsado)} em crédito)`:''),valor:_entradaCaixa,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+    cx.historico.push({tipo:'entrada',desc:'Venda Escape Room'+(_creditoUsado>0?` (${fM(_creditoUsado)} em crédito)`:''),valor:_entradaCaixa,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),_vendaId:venda.id});
   }
   const ag=el('avulsaGroup');if(ag)ag.style.display='none';
   _liberarGuard(); // libera lock antes de fechar modal
@@ -8549,8 +8549,14 @@ function abrirFechamentoCaixa(){
   const idsVendasNoHistorico=new Set(vendasSessao.map(v=>v.id));
   _historicoSessaoAtual.forEach(h=>{
     if(h.tipo!=='entrada'||h._estornado)return;
-    // Só adiciona se não for uma venda já contabilizada acima
+    // Só adiciona se não for uma venda já contabilizada acima em vendasSessao.
+    // [FIX-DINHEIRO-SOME 6] Duas checagens, para cobrir tanto lançamentos novos
+    // (com _vendaId, a partir desta correção) quanto os já existentes antes dela:
+    // 1) por _vendaId (mais preciso, quando disponível)
+    // 2) por padrão de descrição 'Venda Escape Room' (cobre lançamentos antigos,
+    //    já que TODA venda de escape room grava essa descrição exata no histórico)
     if(h._vendaId&&idsVendasNoHistorico.has(h._vendaId))return;
+    if((h.desc||'').startsWith('Venda Escape Room'))return;
     if(h._ehEstorno)return;
     const met=h.metodo||'outros';
     if(totaisMeio[met]!==undefined) totaisMeio[met]+=h.valor||0;
@@ -8582,6 +8588,17 @@ function abrirFechamentoCaixa(){
       <span style="font-size:13px">${meioLabels[k]||k}</span>
       <span style="font-weight:700;color:var(--success);font-size:13px;font-family:monospace">${fM(v)}</span>
     </div>`:'').join('');
+  // [FEATURE-LEGENDA] Legenda explicando cada forma de pagamento, especialmente "Outros"
+  // — que pode confundir sem contexto (aparece só quando algo não se encaixa nas
+  // categorias padrão: ex. lançamento manual sem forma definida, ou correção antiga).
+  const _legendaMeios=`
+    <div style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.03);border-radius:8px;font-size:11px;color:var(--text3);line-height:1.6">
+      <strong style="color:var(--text2)">O que é cada forma de pagamento:</strong><br>
+      💵 <strong>Dinheiro</strong> — passa pela gaveta física, conta pro fundo de troco.<br>
+      📲 <strong>PIX</strong> / 💳 <strong>Débito</strong> / <strong>Crédito</strong> — caem direto na conta, não passam pela gaveta.<br>
+      🎟️ <strong>Crédito do cliente</strong> — vale/crédito já usado antes (não é dinheiro novo entrando agora).<br>
+      🔄 <strong>Outros</strong> — pagamento sem forma definida ou não reconhecida pelo sistema (ex.: lançamento manual antigo). ${totaisMeio.outros>0?'<strong style="color:var(--danger)">Se esse valor não for zero, vale conferir qual lançamento caiu aqui.</strong>':'Vazio agora — nenhum lançamento caiu fora das categorias.'}
+    </div>`;
 
   m.innerHTML=`<div class="md md-lg" style="max-width:560px">
     <div class="mh" style="background:linear-gradient(135deg,#0f0f1a,#1a1a2e);border-bottom:1px solid rgba(201,168,76,.2)">
@@ -8613,6 +8630,7 @@ function abrirFechamentoCaixa(){
           <span style="font-weight:900;color:var(--success);font-size:16px;font-family:monospace">${fM(saldoFisicoDisponivel)}</span>
         </div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px">📲💳 Eletrônico (PIX/débito/crédito): ${fM(totalEletronico)} — já está na conta, não passa pela gaveta.</div>
+        ${_legendaMeios}
       </div>
       <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:14px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;color:var(--info);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏦 Fundo de Troco para Amanhã</div>

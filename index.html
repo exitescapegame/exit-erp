@@ -10488,6 +10488,35 @@ function _dadosShopping(uId, ini, fim){
   const valor=vendas.reduce((s,v)=>s+(v.valorTotal||0),0);
   return { jogadores, valor, qtdVendas:vendas.length };
 }
+// [FEATURE-SHOP-DIARIO] Lista todas as datas (YYYY-MM-DD) entre ini e fim, inclusive.
+function _diasEntre(ini, fim){
+  const dias=[];
+  let d=new Date(ini+'T00:00:00');
+  const dFim=new Date(fim+'T00:00:00');
+  let _guard=0; // proteção contra loop infinito em caso de datas inválidas
+  while(d<=dFim && _guard<400){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    dias.push(`${y}-${m}-${dd}`);
+    d.setDate(d.getDate()+1);
+    _guard++;
+  }
+  return dias;
+}
+// [FEATURE-SHOP-DIARIO] Nome curto do dia da semana em PT-BR, a partir de uma data YYYY-MM-DD
+function _diaSemanaLabel(dataStr){
+  const nomes=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const d=new Date(dataStr+'T00:00:00');
+  return nomes[d.getDay()]||'';
+}
+// [FEATURE-SHOP-DIARIO] Expande/recolhe as linhas de detalhe diário (por classe CSS)
+function _toggleShopDet(cls){
+  const rows=document.querySelectorAll('.'+cls);
+  if(!rows.length) return;
+  const estaEscondido = rows[0].style.display==='none';
+  rows.forEach(r=>{ r.style.display = estaEscondido ? 'table-row' : 'none'; });
+  const btn=document.getElementById('btn_'+cls);
+  if(btn) btn.textContent = estaEscondido ? '− detalhes' : '+ detalhes';
+}
 
 // [v74.51] GOVERNANÇA DE RETIRADA DE SÓCIOS (Regra L99) — helpers de cálculo
 // Garante config de governança com defaults seguros
@@ -11188,14 +11217,36 @@ function abrirRelatorioShopping(){
 
   const linhasUnidade = unidadesAlvo.map(u=>{
     const d=_dadosShopping(u.id, ini, fim);
+    const _cls=`shopDetU_${u.id}`;
+    const _diasHtml = _diasEntre(ini,fim).map(dia=>{
+      const dd=_dadosShopping(u.id, dia, dia);
+      return `<tr class="${_cls}" style="display:none;border-bottom:1px solid #eee;background:#fafafd">
+        <td style="padding:6px 8px 6px 26px;font-size:12px;color:#888">↳ ${fD(dia)} · ${_diaSemanaLabel(dia)}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:center;color:#888">${dd.jogadores}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:right;color:#888">${fM(dd.valor)}</td>
+      </tr>`;
+    }).join('');
     return `<tr style="border-bottom:1px solid #e0e0e8">
-      <td style="padding:8px;font-size:13px;color:#1a1a2e">${san(u.nome)}</td>
+      <td style="padding:8px;font-size:13px;color:#1a1a2e">${san(u.nome)}
+        <button id="btn_${_cls}" onclick="_toggleShopDet('${_cls}')" style="margin-left:6px;font-size:10px;padding:2px 7px;border:1px solid #ccc;border-radius:10px;background:#f5f5fa;cursor:pointer;color:#666">+ detalhes</button>
+      </td>
       <td style="padding:8px;font-size:13px;text-align:center;color:#1a1a2e">${d.jogadores}</td>
       <td style="padding:8px;font-size:13px;text-align:right;font-weight:700;color:#16a34a">${fM(d.valor)}</td>
-    </tr>`;
+    </tr>${_diasHtml}`;
   }).join('');
   const totJ=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,ini,fim).jogadores,0);
   const totV=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,ini,fim).valor,0);
+  // [FEATURE-SHOP-DIARIO] Quebra diária do TOTAL consolidado (soma de todas as unidades-alvo por dia)
+  const _clsTot='shopDetTOTAL';
+  const _diasHtmlTotal=_diasEntre(ini,fim).map(dia=>{
+    const jD=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,dia,dia).jogadores,0);
+    const vD=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,dia,dia).valor,0);
+    return `<tr class="${_clsTot}" style="display:none;border-top:1px solid #eee;background:#fcfaf0">
+      <td style="padding:6px 10px;font-size:12px;font-weight:700;color:#8a7530">↳ ${fD(dia)} · ${_diaSemanaLabel(dia)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:center;font-weight:700;color:#8a7530">${jD}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;font-weight:700;color:#8a7530">${fM(vD)}</td>
+    </tr>`;
+  }).join('');
 
   // Logo EXIT (usa config de logo do sistema)
   const lg=DB.config?.logo||{tipo:'texto',texto:'EXIT',corFundo:'#EAB308',corTexto:'#000'};
@@ -11255,11 +11306,16 @@ function abrirRelatorioShopping(){
             <th style="padding:8px;text-align:right;font-size:11px;color:#666">Valor Vendido</th>
           </tr></thead>
           <tbody>${linhasUnidade}</tbody>
-          <tfoot><tr style="border-top:2px solid #1a1a2e;background:#faf8f0">
-            <td style="padding:10px;font-size:13px;font-weight:800;color:#1a1a2e">TOTAL</td>
+          <tfoot>
+          <tr style="border-top:2px solid #1a1a2e;background:#faf8f0">
+            <td style="padding:10px;font-size:13px;font-weight:800;color:#1a1a2e">TOTAL
+              <button id="btn_${_clsTot}" onclick="_toggleShopDet('${_clsTot}')" style="margin-left:6px;font-size:10px;padding:2px 7px;border:1px solid #C9A84C;border-radius:10px;background:#fff;cursor:pointer;color:#8a7530">+ detalhes</button>
+            </td>
             <td style="padding:10px;font-size:13px;font-weight:800;text-align:center;color:#1a1a2e">${totJ}</td>
             <td style="padding:10px;font-size:14px;font-weight:900;text-align:right;color:#16a34a">${fM(totV)}</td>
-          </tr></tfoot>
+          </tr>
+          ${_diasHtmlTotal}
+          </tfoot>
         </table>
         <div style="margin-top:14px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px">
           Emitido em ${fD(hoje())} · EXIT GAMES — Inteligência e Diversão

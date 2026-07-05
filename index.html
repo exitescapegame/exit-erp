@@ -1454,6 +1454,8 @@ tbody tr:hover td { background: #f4f4ff !important; }
         <div class="fg"><label>Cargo</label><select id="mClCg" onchange="updInfoCargo()"></select></div>
         <div class="fg"><label>Unidade</label><select id="mClUn"></select></div>
       </div>
+      <div class="fg"><label>E-mail (para recibos de pagamento) <span style="color:var(--text3);font-weight:400">— opcional</span></label>
+        <input type="email" id="mClEmail" placeholder="email@exemplo.com"></div>
       <!-- Info do cargo selecionado -->
       <div id="mClInfoCargo" style="display:none;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:var(--rsm);padding:10px;margin-bottom:10px;font-size:11px;color:var(--text2)"></div>
       <div class="ir">
@@ -2779,6 +2781,7 @@ async function salvarColabSeguro() {
       cargoId: parseInt(typeof ev === 'function' ? ev('mClCg') : 0),
       unidadeId: String(typeof ev === 'function' ? ev('mClUn') : ''), // [v45] String direto — parseInt quebrava IDs não-numéricos (ex: "mpn5jhsjipuuy2erv5n"→NaN)
       valorHora: parseFloat(typeof ev === 'function' ? ev('mClHr') : 0) || 0,
+      email: (typeof ev === 'function' ? ev('mClEmail') : '').trim(),
       ativo: document.getElementById('mClAt')?.checked !== false
     };
 
@@ -3890,6 +3893,17 @@ async function sDBSupabase() {
     ));
   }
 
+  // [FEATURE-RECIBOS-CLOUD] Recibos (pagamentos de colaborador, vendas, etc.) — ANTES
+  // existiam só no navegador (DB.recibos nunca era sincronizado). Isso significava que
+  // um recibo assinado digitalmente podia sumir se o cache do navegador fosse limpo.
+  if ((DB.recibos||[]).length) {
+    ops.push(supaFetch('recibos', 'POST',
+      DB.recibos
+        .filter(r => r.unidadeId) // nunca persiste recibo sem unidade
+        .map(r => ({ id: String(r.id), unidade_id: String(r.unidadeId), categoria: r.categoria||null, dados: r, criado_em: r.dataHora || r.assinaturaDataHora || new Date().toISOString() }))
+    ));
+  }
+
   try {
     await Promise.all(ops);
     // FIX BUG 1: atualiza cache local apos cada salvamento no Supabase
@@ -3902,7 +3916,7 @@ async function sDBSupabase() {
 // ── CARREGAR DO SUPABASE ──────────────────────────────────────
 async function lDBSupabase() {
   try {
-    const [cfgRows, unRows, saRows, coRows, cliRows, vRows, ocRows, cxRows] = await Promise.all([
+    const [cfgRows, unRows, saRows, coRows, cliRows, vRows, ocRows, cxRows, recRows] = await Promise.all([
       supaFetch('config?select=chave,valor'),
       supaFetch('unidades?select=dados&order=id.asc'),
       supaFetch('salas?select=dados,unidade_id&order=id.asc'), // [RLS-v59] inclui coluna unidade_id
@@ -3910,7 +3924,8 @@ async function lDBSupabase() {
       supaFetch('clientes?select=dados&order=criado_em.asc'),
       supaFetch('vendas?select=dados,unidade_id&order=criado_em.asc'),
       supaFetch('ocupacao?select=chave,status'),
-      supaFetch('caixa_unidades?select=unidade_id,dados')
+      supaFetch('caixa_unidades?select=unidade_id,dados'),
+      supaFetch('recibos?select=dados&order=criado_em.asc')
     ]);
 
     if (!unRows || unRows.length === 0) return null; // Banco vazio = primeira vez
@@ -3973,6 +3988,7 @@ async function lDBSupabase() {
       }),
       clientes: (cliRows||[]).map(r => r.dados),
       vendas: (vRows||[]).map(r => r.dados),
+      recibos: (recRows||[]).map(r => r.dados),
       ocupacao,
       caixaUnidades,
       caixa: { aberto:false, saldoAtual:0, entradas:0, saidas:0, historico:[] }
@@ -10409,7 +10425,38 @@ async function _confirmarPagColab(){
   if(err) err.style.display='none';
   el('pagColabPin').value='';
   toast(`✅ Pagamento de ${fM(ctx.valor)} a ${c.nome} confirmado e assinado!`,'success');
+  // [FEATURE-RECIBO-EMAIL] Envia o recibo assinado por e-mail (colaborador + unidade),
+  // sem bloquear a UI — se falhar, não desfaz o pagamento (já registrado/assinado acima).
+  _enviarReciboColabPorEmail(c, ctx, rec);
   setTimeout(()=>{ CM('mPagColab'); if(typeof renderPage==='function') renderPage(); }, 1500);
+}
+// [FEATURE-RECIBO-EMAIL] Chama a Edge Function que envia o recibo por e-mail.
+// Best-effort: nunca lança erro pro usuário (o pagamento já foi confirmado e assinado
+// antes desta chamada — falha de e-mail não deve parecer falha de pagamento).
+async function _enviarReciboColabPorEmail(c, ctx, rec){
+  try{
+    const uni=(DB.unidades||[]).find(u=>String(u.id)===String(ctx.unidadeId));
+    const destinos=[c.email, uni?.emailNotificacao].filter(Boolean);
+    if(!destinos.length) return; // ninguém configurado — nada a enviar
+    const r = await fetch(SUPA_URL + '/functions/v1/send-payment-receipt', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPA_KEY, 'apikey':SUPA_KEY },
+      body: JSON.stringify({
+        colaboradorNome: c.nome,
+        colaboradorEmail: c.email||'',
+        unidadeEmail: uni?.emailNotificacao||'',
+        unidadeNome: uni?.nome||'',
+        valor: ctx.valor,
+        mesReferencia: hoje().slice(0,7),
+        dataHoraFormatada: `${fD(hoje())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
+        textoJuridico: TEXTO_JURIDICO_RECIBO,
+        pagoPor: UA?.nome||''
+      })
+    });
+    if(!r.ok){ console.warn('[recibo-email] falha ao enviar:', await r.text()); return; }
+    const data = await r.json().catch(()=>null);
+    if(data && data.ok){ toast('📧 Recibo enviado por e-mail.','success'); }
+  }catch(e){ console.warn('[recibo-email] erro:', e); }
 }
 
 // [v74.49] ASSISTENTE FINANCEIRO VIRTUAL — análises, comparações e alertas
@@ -12254,6 +12301,7 @@ function abrirColab(id){
   el('mClN').value=c?.nome||'';
   el('mClPin').value='';
   el('mClHr').value=c?.valorHora||15;
+  el('mClEmail').value=c?.email||'';
   el('mClAt').checked=c?.ativo!==false;
   // Reset PIN fields
   const pinConf=el('mClPinConf');if(pinConf)pinConf.value='';
@@ -12289,6 +12337,7 @@ function rCfgU(){
     ${DB.unidades.length>1&&isAdm()?`<button class="btn bd bxs" onclick="excluirUnidade('${u.id}')" title="Excluir unidade">🗑 Excluir</button>`:''}
   </div>
   <div class="ir"><div class="fg"><label>Nome</label><input type="text" value="${san(u.nome)}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').nome=this.value;sDB();rSb()"></div><div class="fg"><label>Endereço / Shopping</label><input type="text" value="${san(u.endereco)}" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').endereco=this.value;sDB()"></div></div>
+  <div class="fg"><label>📧 E-mail de notificação da unidade <span style="color:var(--text3);font-weight:400">— recebe recibos de pagamento e relatórios semanais</span></label><input type="email" value="${san(u.emailNotificacao||'')}" placeholder="financeiro@exitgamesbrasil.com.br" onchange="DB.unidades.find(x=>String(x.id)==='${u.id}').emailNotificacao=this.value.trim();sDB()"></div>
   <!-- [Etapa2-Preço] Tabela de Preço por Unidade REMOVIDA. Preço agora é por SALA (Configurações → Salas). -->
   <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:var(--rsm);padding:14px;margin-bottom:12px">
     <div style="font-size:11px;font-weight:700;color:var(--info);margin-bottom:10px">🕐 Horários por Tipo de Dia <span style="font-weight:400;color:var(--text3)">(separe por vírgula: 14:00,15:30,17:00)</span></div>

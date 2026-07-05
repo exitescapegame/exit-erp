@@ -4431,6 +4431,17 @@ function hoje(){
   const dia = String(d.getDate()).padStart(2,'0');
   return `${ano}-${mes}-${dia}`;
 }
+// [FIX-DINHEIRO-SOME 2] Extrai a data LOCAL (não UTC) de um timestamp ISO (ex.: criadoEm).
+// Usa a mesma técnica do hoje() acima para não reintroduzir o bug de virada de dia por fuso.
+function _dataLocalDe(isoStr){
+  if(!isoStr) return null;
+  const d = new Date(isoStr);
+  if(isNaN(d.getTime())) return null;
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth()+1).padStart(2,'0');
+  const dia = String(d.getDate()).padStart(2,'0');
+  return `${ano}-${mes}-${dia}`;
+}
 // [v74.11] Verifica se data+hora já passou (horário ultrapassado)
 function _dataHoraPassou(data, hora){
   if(!data) return false;
@@ -4728,8 +4739,23 @@ function getCx(uId){
   // [v74.47] Caixa zera automaticamente a cada novo dia
   const cx0=DB.caixaUnidades[k];
   if(cx0.dataCaixa && cx0.dataCaixa!==hoje()){
-    // Novo dia: zera o caixa (saldo do dia anterior já foi fechado/contabilizado)
-    DB.caixaUnidades[k]={aberto:false,saldoAtual:0,entradas:0,saidas:0,historico:[],dataCaixa:hoje(),saldoInicial:0};
+    // [FIX-DINHEIRO-SOME] Só zera se o caixa já estava FECHADO no dia anterior.
+    // ANTES: zerava sempre que a data virava, mesmo com o caixa ainda ABERTO
+    // (operação que atravessa a meia-noite) — isso apagava silenciosamente
+    // saldoAtual/entradas/histórico do dia, sem log, enquanto as vendas
+    // continuavam gravadas em DB.vendas. Resultado: "venda existe, dinheiro não aparece".
+    if(!cx0.aberto){
+      // Novo dia e caixa já estava fechado: zera para começar o dia limpo
+      DB.caixaUnidades[k]={aberto:false,saldoAtual:0,entradas:0,saidas:0,historico:[],dataCaixa:hoje(),saldoInicial:0};
+    } else {
+      // Caixa ainda aberto na virada do dia: PRESERVA saldo/entradas/histórico.
+      // Só atualiza a referência de data para não repetir esta checagem à toa.
+      cx0.dataCaixa = hoje();
+      if(typeof registrarAuditoria==='function' && !cx0._avisoVirouDiaAberto){
+        cx0._avisoVirouDiaAberto = true;
+        registrarAuditoria('CAIXA_VIROU_DIA_ABERTO',`Caixa da unidade ${k} continuou ABERTO após virar o dia. Saldo preservado: ${cx0.saldoAtual}`,(typeof UA!=='undefined'&&UA)?UA.id:null);
+      }
+    }
   } else if(!cx0.dataCaixa){
     // Dados antigos sem dataCaixa: se há saldo/movimento herdado e o caixa está FECHADO,
     // zera para começar o dia limpo (usuária informa o fundo ao abrir). Se aberto, preserva.
@@ -8442,11 +8468,22 @@ function abrirFechamentoCaixa(){
   const cx=getCx(uId);
   const unidade=DB.unidades.find(u=>String(u.id)===uId);
   initSessoesCaixa();
-  garantirSessaoCaixa(uId);
+  const _sessAtual=garantirSessaoCaixa(uId);
 
-  const vendasSessao=DB.vendas.filter(v=>
-    v.status==='confirmado' && v.data===hoje() && String(v.unidadeId)===uId
-  );
+  const vendasSessao=DB.vendas.filter(v=>{
+    if(v.status!=='confirmado'||String(v.unidadeId)!==uId) return false;
+    // [FIX-DINHEIRO-SOME 2/3] Escopo pela SESSÃO DE CAIXA ATUAL (abertaEm), não pela
+    // data da venda nem por "hoje()". Isso corrige dois problemas:
+    //  a) vendas com data retroativa (Fluxo Intenso/avulsa) entram corretamente,
+    //     pois o pagamento foi recebido DENTRO da sessão aberta agora;
+    //  b) vendas de uma sessão ANTERIOR já fechada hoje (caixa fechado e reaberto
+    //     no mesmo dia) NÃO são recontadas na sessão nova — evita "dinheiro fantasma".
+    if(v.criadoEm && _sessAtual && _sessAtual.abertaEm) return v.criadoEm >= _sessAtual.abertaEm;
+    const _dataReal = _dataLocalDe(v.criadoEm);
+    if(_dataReal) return _dataReal===hoje();
+    // Fallback para vendas antigas sem criadoEm: mantém comportamento anterior
+    return v.data===hoje();
+  });
 
   const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0};
   vendasSessao.forEach(v=>{
@@ -8467,12 +8504,21 @@ function abrirFechamentoCaixa(){
 
   // [BUG-FIX] Inclui lançamentos avulsos do cx.historico (tabuleiro, melhor idade,
   // reservas diretas, etc.) que NÃO estão em DB.vendas
+  // [FIX-DINHEIRO-SOME 3] cx.historico é uma lista que cresce indefinidamente (nunca é
+  // limpa ao reabrir o caixa no mesmo dia) — antes, este loop somava TODAS as entradas
+  // já registradas alguma vez, inclusive de sessões JÁ FECHADAS anteriormente hoje,
+  // reaparecendo como "Outros" com valor alto mesmo com Total de Vendas = R$0,00.
+  // Agora, escopamos ao histórico A PARTIR da última marca "Caixa aberto" (início da
+  // sessão atual), assim como já fazemos com vendasSessao acima.
+  let _idxInicioSessao=-1;
+  for(let i=cx.historico.length-1;i>=0;i--){
+    if(cx.historico[i].tipo==='sistema' && /Caixa aberto/.test(cx.historico[i].desc||'')){ _idxInicioSessao=i; break; }
+  }
+  const _historicoSessaoAtual = _idxInicioSessao>=0 ? cx.historico.slice(_idxInicioSessao) : cx.historico;
   const idsVendasNoHistorico=new Set(vendasSessao.map(v=>v.id));
-  cx.historico.forEach(h=>{
+  _historicoSessaoAtual.forEach(h=>{
     if(h.tipo!=='entrada'||h._estornado)return;
     // Só adiciona se não for uma venda já contabilizada acima
-    // (entradas de venda de escape já passam por cx.historico mas estão em vendasSessao)
-    // Verificamos pela descrição de venda — entradas com _vendaId duplicariam
     if(h._vendaId&&idsVendasNoHistorico.has(h._vendaId))return;
     if(h._ehEstorno)return;
     const met=h.metodo||'outros';

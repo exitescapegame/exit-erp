@@ -8583,7 +8583,7 @@ function abrirFechamentoCaixa(){
   document.body.appendChild(m);
 
   const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito do cliente (vale)',outros:'🔄 Outros'};
-  const meioRows=Object.entries(totaisMeio).map(([k,v])=>v>0||k==='dinheiro'?`
+  const meioRows=Object.entries(totaisMeio).map(([k,v])=>v>0||k==='dinheiro'||k==='pix'?`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:13px">${meioLabels[k]||k}</span>
       <span style="font-weight:700;color:var(--success);font-size:13px;font-family:monospace">${fM(v)}</span>
@@ -8639,7 +8639,11 @@ function abrirFechamentoCaixa(){
           <label>Valor do Fundo (R$)</label>
           <input type="number" id="fcFundo" min="0" max="${saldoFisicoDisponivel.toFixed(2)}" step="0.01" value="${Math.min(200,saldoFisicoDisponivel).toFixed(2)}" style="font-size:16px;font-weight:700;text-align:center;font-family:monospace">
         </div>
-        <div style="font-size:11px;color:var(--text2)">💡 Dinheiro enviado ao financeiro (sangria): <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,saldoFisicoDisponivel-Math.min(200,saldoFisicoDisponivel)))}</strong></div>
+        <div style="font-size:11px;color:var(--text2)">📤 Sugestão de retirada (sangria) — <strong>ainda não confirmada</strong>: <strong id="fcFundoRest" style="color:var(--accent)">${fM(Math.max(0,saldoFisicoDisponivel-Math.min(200,saldoFisicoDisponivel)))}</strong></div>
+        <div id="fcSangriaResp" style="margin-top:8px;${Math.max(0,saldoFisicoDisponivel-Math.min(200,saldoFisicoDisponivel))>0?'':'display:none'}">
+          <label style="font-size:11px;color:var(--text2)">Quem retirou esse valor? <span style="color:var(--danger)">*obrigatório se houver retirada</span></label>
+          <input type="text" id="fcRespSangria" placeholder="Nome de quem retirou o dinheiro" style="font-size:13px">
+        </div>
       </div>
       <div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:12px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📧 Relatório</div>
@@ -8663,7 +8667,10 @@ function abrirFechamentoCaixa(){
   if(fcFundo&&fcRest){
     fcFundo.addEventListener('input',()=>{
       const f=parseFloat(fcFundo.value)||0;
-      fcRest.textContent=fM(Math.max(0,saldoFisicoDisponivel-f));
+      const _sangria=Math.max(0,saldoFisicoDisponivel-f);
+      fcRest.textContent=fM(_sangria);
+      const _divResp=el('fcSangriaResp');
+      if(_divResp) _divResp.style.display=_sangria>0?'block':'none';
     });
   }
 }
@@ -8792,6 +8799,17 @@ function _fcConfirmar(){
   const sessAtiva=getSessaoCaixaAtiva(uId);
   const dinheiroEnviadoFinanceiro=Math.max(0,saldoFisicoDisponivel-fundo);
 
+  // [FEATURE-SANGRIA-CONFIRMADA] Se há dinheiro saindo da gaveta (sangria), o
+  // OPERADOR precisa informar quem retirou — o sistema não assume mais isso
+  // sozinho, só calcula a sugestão de valor.
+  const _respSangriaEl=el('fcRespSangria');
+  const _respSangria=(_respSangriaEl?.value||'').trim();
+  if(dinheiroEnviadoFinanceiro>0 && !_respSangria){
+    if(fcErro){fcErro.textContent='⛔ Informe quem retirou os '+fM(dinheiroEnviadoFinanceiro)+' da gaveta antes de confirmar o fechamento.';fcErro.style.display='block';}
+    _respSangriaEl?.focus();
+    return;
+  }
+
   // 1. Fecha sessão atual
   if(sessAtiva){
     sessAtiva.status='FECHADO';sessAtiva.fechadaEm=agora();sessAtiva.fechadaPor=UA.id;
@@ -8810,9 +8828,13 @@ function _fcConfirmar(){
     meiosPagamento:totaisMeio,saldoFinalEsperado:saldoEsperado,
     saldoFisicoDisponivel,totalEletronico,
     fundoParaAmanha:fundo,saldoEnviadoFinanceiro:dinheiroEnviadoFinanceiro,
+    responsavelSangria:dinheiroEnviadoFinanceiro>0?_respSangria:null,
     criadoEm:agora()
   };
   DB.fechamentosCaixa.push(relatorio);
+  if(dinheiroEnviadoFinanceiro>0){
+    registrarAuditoria('SANGRIA_CONFIRMADA',`Retirada de ${fM(dinheiroEnviadoFinanceiro)} confirmada — retirado por: ${_respSangria}`,UA?.id,relatorio);
+  }
 
   // 3. Fecha caixa e zera contagens para o próximo dia
   cx.aberto=false;cx.fechadoEm=agora();cx.fechadoPor=UA.id;

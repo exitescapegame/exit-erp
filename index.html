@@ -11344,7 +11344,10 @@ function _imprimirRelShopping(){
   const area=el('printArea');
   const conteudo=el('shopPrintArea');
   if(!area||!conteudo){ toast('Área de impressão não encontrada.','error'); return; }
-  area.innerHTML=`<div style="padding:20px;font-family:sans-serif">${conteudo.innerHTML}</div>`;
+  // [FEATURE-SHOP-DIARIO] Na impressão, o detalhamento diário sempre aparece,
+  // independente de estar expandido ou recolhido na tela.
+  const _htmlComDetalhes = conteudo.innerHTML.replace(/display:\s*none/g,'display:table-row');
+  area.innerHTML=`<div style="padding:20px;font-family:sans-serif">${_htmlComDetalhes}</div>`;
   setTimeout(()=>{window.print();setTimeout(()=>{if(area)area.innerHTML='';},1800);},120);
 }
 function _enviarRelShoppingEmail(){
@@ -11352,20 +11355,36 @@ function _enviarRelShoppingEmail(){
   const {ini,fim}=_relShopPeriodo();
   const uId=isAdm()?(window._relShopUnidade?parseInt(window._relShopUnidade):null):UA.unidadeId;
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
+  const _dias=_diasEntre(ini,fim);
   let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
   let totJ=0, totV=0;
+  // [FEATURE-SHOP-DIARIO] Detalhamento dia a dia por unidade, incluído sempre no e-mail
+  const totalPorDia={};
   unidadesAlvo.forEach(u=>{
     const d=_dadosShopping(u.id,ini,fim);
     totJ+=d.jogadores; totV+=d.valor;
-    corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n\n`;
+    corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n`;
+    corpo+=`  Detalhamento diário:\n`;
+    _dias.forEach(dia=>{
+      const dd=_dadosShopping(u.id,dia,dia);
+      totalPorDia[dia]=(totalPorDia[dia]||0)+dd.valor;
+      corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${dd.jogadores} jogador(es) — ${fM(dd.valor)}\n`;
+    });
+    corpo+=`\n`;
   });
-  corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n\n`;
+  corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n`;
+  corpo+=`  Detalhamento diário (todas as unidades):\n`;
+  _dias.forEach(dia=>{
+    const jD=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,dia,dia).jogadores,0);
+    corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${jD} jogador(es) — ${fM(totalPorDia[dia]||0)}\n`;
+  });
+  corpo+=`\n`;
   corpo+=`Emitido em ${fD(hoje())} por ${UA.nome}\nEXIT GAMES — Inteligência e Diversão`;
   const assunto=`Relatório Semanal EXIT — ${cfg.nomeShopping} — ${fD(ini)} a ${fD(fim)}`;
   const mailto=`mailto:${encodeURIComponent(cfg.emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
   window.open(mailto,'_blank');
   registrarAuditoria('REL_SHOPPING_ENVIADO',`Relatório semanal do shopping (${fD(ini)} a ${fD(fim)}) enviado para ${cfg.emailDestino}`,UA?.id);
-  toast('📧 E-mail aberto com o relatório pronto. É só enviar!','success');
+  toast('📧 E-mail aberto com o relatório detalhado dia a dia. É só enviar!','success');
 }
 
 function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem seletor)

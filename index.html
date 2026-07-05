@@ -1382,6 +1382,9 @@ tbody tr:hover td { background: #f4f4ff !important; }
           <div class="fg"><label>Percentual (%)</label><input type="number" id="cpPc" min="0" max="100" step="0.1" placeholder="Ex: 15"></div>
           <div class="fg"><label>Dia do mês para vencer</label><input type="number" id="cpDia" min="1" max="31" value="10"></div>
         </div>
+        <div class="fg"><label>Mês de referência do faturamento <span style="color:var(--text3);font-weight:400">(ex: taxa de agosto referencia julho — 2026-07)</span></label>
+          <input type="month" id="cpMesRef">
+        </div>
       </div>
       <div class="fg"><label>Recorrência</label>
         <select id="cpRec">
@@ -4747,6 +4750,20 @@ function horariosU(uId,dataRef){
 // registrarPagamentoEvento são computados nativamente no balanço mensal/diário.
 function fatDia(uId){return DB.vendas.filter(v=>v.status==='confirmado'&&v.data===hoje()&&(!uId||String(v.unidadeId)===String(uId))).reduce((s,v)=>s+v.valorTotal,0);}
 function fatMes(uId){const m=hoje().slice(0,7);return DB.vendas.filter(v=>v.status==='confirmado'&&v.data&&v.data.startsWith(m)&&(!uId||String(v.unidadeId)===String(uId))).reduce((s,v)=>s+v.valorTotal,0);}
+// [FIX-TAXA-SHOPPING] Faturamento de um mês ESPECÍFICO (formato 'YYYY-MM'), não só o atual.
+// Necessário porque a taxa do shopping referencia o mês ANTERIOR ao do vencimento
+// (ex: taxa vencendo em 15/08 usa o faturamento de julho, não de agosto em andamento).
+function fatMesEspecifico(uId, mesStr){
+  if(!mesStr) return fatMes(uId);
+  return DB.vendas.filter(v=>v.status==='confirmado'&&v.data&&v.data.startsWith(mesStr)&&(!uId||String(v.unidadeId)===String(uId))).reduce((s,v)=>s+v.valorTotal,0);
+}
+// [FIX-TAXA-SHOPPING] Centraliza o cálculo de valor de uma conta percentual, usando o
+// mês de referência correto quando a conta tiver um (ex: taxa shopping usa o mês
+// anterior). Sem mesReferencia, mantém o comportamento de sempre (mês atual).
+function _calcValorConta(c){
+  if(c.tipo!=='percentual') return c.valor||0;
+  return fatMesEspecifico(c.unidadeId||null, c.mesReferencia)*(c.percentual/100);
+}
 // Caixa por unidade helpers
 // [v36-RBAC] getCx: não-ADM só acessa o caixa da própria unidade
 function getCx(uId){
@@ -10159,12 +10176,18 @@ function gerarProvisoesRecorrentes(){
     }
   });
   // Taxa shopping: gera provisão automática se não existir para o mês
+  // [FIX-TAXA-SHOPPING] ANTES: vencia dia 10 do MESMO mês e calculava sobre o
+  // faturamento desse mês (ainda em andamento, incompleto). Regra correta: a taxa
+  // referente às vendas de um mês é paga no mês SEGUINTE (ex: julho paga em 15/08).
   const jaTemTaxa=DB.contasPagar.some(c=>c._taxaShoppingAuto&&c.vencimento&&c.vencimento.startsWith(mes));
   if(!jaTemTaxa){
+    const [anoAtual,mesAtualNum]=mes.split('-').map(Number);
+    const dataMesAnterior=new Date(anoAtual,mesAtualNum-2,1); // mesAtualNum é 1-indexado; -2 = mês anterior
+    const mesReferencia=`${dataMesAnterior.getFullYear()}-${String(dataMesAnterior.getMonth()+1).padStart(2,'0')}`;
     DB.unidades.forEach(u=>{
-      const diaVenc=u.diaVencAluguel||10;
+      const diaVenc=u.diaVencAluguel||15;
       const venc=`${mes}-${String(diaVenc).padStart(2,'0')}`;
-      DB.contasPagar.push({id:uid(),desc:`Taxa Shopping/Aluguel — ${u.nome}`,categoria:'aluguel',unidadeId:u.id,tipo:'percentual',valor:0,percentual:DB.config.taxaShopping||15,diaVenc,vencimento:venc,recorrencia:'mensal',obs:'Gerado automaticamente',pago:false,criadoEm:agora(),_taxaShoppingAuto:true});
+      DB.contasPagar.push({id:uid(),desc:`Taxa Shopping/Aluguel — ${u.nome} (ref. ${mesReferencia})`,categoria:'aluguel',unidadeId:u.id,tipo:'percentual',valor:0,percentual:DB.config.taxaShopping||15,diaVenc,vencimento:venc,recorrencia:'mensal',obs:'Gerado automaticamente — referente ao faturamento de '+mesReferencia,pago:false,criadoEm:agora(),_taxaShoppingAuto:true,mesReferencia});
     });
   }
   DB._provisaoGeradaMes=mes;
@@ -10198,6 +10221,7 @@ function abrirConta(id){
   el('cpPc').value=c?.percentual||'';
   el('cpVc').value=c?.vencimento||hoje();
   el('cpDia').value=c?.diaVenc||10;
+  const _cpMesRefEl=el('cpMesRef'); if(_cpMesRefEl) _cpMesRefEl.value=c?.mesReferencia||'';
   // RLS: não-ADM só pode criar/editar contas da própria unidade
   if(isAdm()){
     el('cpUn').innerHTML='<option value="">Todas as unidades</option>'
@@ -10225,7 +10249,8 @@ function salvarConta(){
     tipo:t,valor:t==='percentual'?0:parseFloat(ev('cpV'))||0,
     percentual:t==='percentual'?parseFloat(ev('cpPc'))||0:0,
     diaVenc:parseInt(ev('cpDia'))||10,vencimento:ev('cpVc'),
-    recorrencia:rec,obs:ev('cpOb')
+    recorrencia:rec,obs:ev('cpOb'),
+    mesReferencia:ev('cpMesRef')||undefined
   };
   if(existeId){
     // Modo edição — atualiza conta existente
@@ -10302,7 +10327,7 @@ const catIc={aluguel:'🏢',folha:'👥',fornecedor:'📦',imposto:'🏛️',man
 function rContas(){
   // RLS: não-ADM só vê contas da sua unidade
   const cs=rlsContasPagar().slice().reverse();
-  const pend=cs.filter(c=>!c.pago).reduce((s,c)=>{return s+(c.tipo==='percentual'?fatMes(c.unidadeId||null)*(c.percentual/100):c.valor);},0);
+  const pend=cs.filter(c=>!c.pago).reduce((s,c)=>{return s+(_calcValorConta(c));},0);
   const pago=cs.filter(c=>c.pago).reduce((s,c)=>s+c.valor,0);
   return`<div class="g3" style="margin-bottom:14px">
     <div class="met rd"><div class="ml">Pendente</div><div class="mv">${fM(pend)}</div></div>
@@ -10310,7 +10335,7 @@ function rContas(){
     <div class="met bl"><div class="ml">Total Contas</div><div class="mv">${cs.length}</div></div>
   </div>
   ${cs.length?`<div class="tw"><table><thead><tr><th>Categoria</th><th>Descrição</th><th>Unidade</th><th>Valor/Critério</th><th>Vencimento</th><th>Recorrência</th><th>Status</th><th></th></tr></thead><tbody>
-    ${cs.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat. (≈${fM(fatMes(c.unidadeId||null)*(c.percentual/100))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''} ${c.pago&&(isAdm()||tP('ver_financeiro'))?`<button class="btn bg bxs" title="Estornar pagamento" onclick="estornarContaPagar('${c.id}')">↩</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
+    ${cs.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat.${c.mesReferencia?` de ${c.mesReferencia}`:''} (≈${fM(_calcValorConta(c))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''} ${c.pago&&(isAdm()||tP('ver_financeiro'))?`<button class="btn bg bxs" title="Estornar pagamento" onclick="estornarContaPagar('${c.id}')">↩</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
   </tbody></table></div>`:'<div class="empty"><div class="empty-ic">📋</div><div>Nenhuma conta cadastrada.</div></div>'}`;
 }
 function pagarConta(id){
@@ -10319,7 +10344,7 @@ function pagarConta(id){
   if(c.unidadeId&&!rlsCanAccess(c.unidadeId)){toast('Sem permissão para conta de outra unidade.','error');return;}
   if(c.pago){toast('Conta já marcada como paga.','warn');return;}
   c.pago=true;c.paidAt=agora();c.paidBy=UA.id;
-  const val=c.tipo==='percentual'?fatMes(c.unidadeId||null)*(c.percentual/100):c.valor;
+  const val=_calcValorConta(c);
   const uId=c.unidadeId||UA.unidadeId;
   const cx=getCx(uId);
   if(cx.aberto){cx.saidas+=val;cx.saldoAtual=Math.max(0,cx.saldoAtual-val);cx.historico.push({tipo:'saida',desc:c.desc,valor:val,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});}
@@ -10341,7 +10366,7 @@ function estornarContaPagar(id){
   const c=DB.contasPagar.find(x=>x.id===id);if(!c){toast('Conta não encontrada.','error');return;}
   if(c.unidadeId&&!rlsCanAccess(c.unidadeId)){toast('Sem permissão para conta de outra unidade.','error');return;}
   if(!c.pago){toast('Esta conta ainda não foi paga — nada a estornar.','warn');return;}
-  const val=c.tipo==='percentual'?fatMes(c.unidadeId||null)*(c.percentual/100):c.valor;
+  const val=_calcValorConta(c);
   if(!confirm(`Estornar pagamento de "${c.desc}" (${fM(val)})?\n\nO valor será devolvido ao caixa e a conta voltará para Pendente.`))return;
   // Reverte saída no caixa
   const uId=c.unidadeId||UA.unidadeId;
@@ -10364,8 +10389,7 @@ function rProvisoes(){
   const fm=isAdm()?fatMes(null):fatMes(UA.unidadeId);
   const cs=rlsContasPagar().filter(c=>!c.pago);
   const pp=cs.map(c=>{
-    const uFat=c.unidadeId?fatMes(String(c.unidadeId)):fm;
-    const val=c.tipo==='percentual'?uFat*(c.percentual/100):c.valor;
+    const val=_calcValorConta(c);
     const u=DB.unidades.find(x=>x.id==c.unidadeId);
     return{desc:c.desc,cat:c.categoria,val,tipo:c.tipo,percentual:c.percentual,uNome:u?.nome||'Geral'};
   });
@@ -10703,7 +10727,7 @@ function _custosFixosMes(uId){
     return (ehMensal||ehDoMes);
   }).reduce((s,c)=>{
     // percentual (ex: taxa shopping) calcula sobre faturamento; fixo usa valor
-    if(c.tipo==='percentual'){ return s + fatMes(uId)*((c.percentual||0)/100); }
+    if(c.tipo==='percentual'){ return s + fatMesEspecifico(uId,c.mesReferencia)*((c.percentual||0)/100); }
     return s + (c.valor||0);
   },0);
 }
@@ -12583,7 +12607,7 @@ function rCfgFin(){return`<div class="card"><div class="ct">💰 Parâmetros Fin
 </div>
 <div class="card"><div class="ct" style="justify-content:space-between">📋 Contas a Pagar <button class="btn bp bxs" onclick="abrirConta()">+ Nova Conta</button></div>
   ${(()=>{const cs=DB.contasPagar.slice().reverse();
-  const pend=cs.filter(c=>!c.pago).reduce((s,c)=>s+(c.tipo==='percentual'?fatMes(c.unidadeId||null)*(c.percentual/100):c.valor),0);
+  const pend=cs.filter(c=>!c.pago).reduce((s,c)=>s+(_calcValorConta(c)),0);
   return cs.length?`<div style="font-size:12px;color:#dc2626;font-weight:700;margin-bottom:10px">Pendente: ${fM(pend)}</div>
   <div class="tw"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Valor/Critério</th><th>Venc.</th><th>Status</th><th></th></tr></thead><tbody>
     ${cs.slice(0,10).map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}%`:fM(c.valor);const vencido=c.vencimento&&c.vencimento<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.desc)}</td><td style="font-size:10px">${san(c.categoria)}</td><td>${vEx}</td><td style="color:${vencido?'#dc2626':'inherit'};font-size:11px">${fD(c.vencimento)}${vencido?' ⚠️':''}</td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
@@ -12720,7 +12744,11 @@ function gmHorariosHoje(){
   const slots=[];
   salas.forEach(sala=>{
     horarios.forEach(h=>{
-      const ocKey=`${sala.id}_${h}`;
+      // [FIX-SLOT-FANTASMA] ANTES: ocKey='${sala.id}_${h}' (SEM a data) — não batia com a
+      // chave real gravada por setOc() ('${sId}_${data}_${h}'), então lia sempre um valor
+      // desatualizado/fantasma (de outro dia ou nunca correspondente a nada real), fazendo
+      // o Painel GM mostrar "EM JOGO"/"Reservado" sem nenhuma venda de verdade por trás.
+      const ocKey=`${sala.id}_${hoje_}_${h}`;
       const oc=DB.ocupacao[ocKey]||'vago';
       const venda=DB.vendas.find(v=>v.salaId==sala.id&&v.horario===h&&v.data===hoje_&&v.status==='confirmado')||null;
       slots.push({sala,horario:h,status:oc,venda});

@@ -12682,9 +12682,13 @@ function rGM(){
           const [hh,mm]=(s.horario||'00:00').split(':').map(Number);
           const slotDate=new Date(agora_.getFullYear(),agora_.getMonth(),agora_.getDate(),hh,mm);
           const diff=slotDate-agora_;
-          const emAndamento=diff<0&&diff>-60*60*1000;
-          const passado=diff<=-60*60*1000;
-          const minutosRestantes=emAndamento?Math.round((60*60*1000+diff)/60000):null;
+          // [FIX-TEMPO-JOGO] ANTES: janela fixa de 60min pra todas as salas, ignorando a
+          // duração real configurada (sala.tempo). Isso fazia o Game Master ficar "bloqueado"
+          // por 60min mesmo em salas de 25min (ex.: Salvador), mostrando contagem errada.
+          const duracaoMs=(sala.tempo||60)*60*1000;
+          const emAndamento=diff<0&&diff>-duracaoMs;
+          const passado=diff<=-duracaoMs;
+          const minutosRestantes=emAndamento?Math.round((duracaoMs+diff)/60000):null;
           const cli=s.venda?.clienteId?DB.clientes.find(c=>c.id==s.venda.clienteId):null;
 
           let statusIcon='⬜';let statusCor='var(--text3)';let statusLabel='Vago';let rowBg='';

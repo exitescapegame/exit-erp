@@ -8283,6 +8283,9 @@ function confirmarPonto(){
       sDB();el('ptPin').value='';updPontoSt();CM('mPonto');rSb();
       toast(`⏰ Entrada registrada às ${hora}`,'success');
     }
+    // [FEATURE-PAGAMENTO-REMOTO] Garante que o colaborador veja pagamentos pendentes
+    // ao bater ponto, mesmo se o aparelho/sessão for compartilhado com outros colegas.
+    if(typeof _verificarPagamentosPendentes==='function') _verificarPagamentosPendentes(uId);
   }
   if(c.pinHashSec && c.pinSalt){
     // [B2-FIX] PBKDF2
@@ -10417,7 +10420,7 @@ function rFolha(){
   const totFolha=ls.reduce((s,l)=>s+l.prev,0);
   return`<div class="met yw" style="margin-bottom:14px"><div class="ml">Previsão Folha — ${mes}</div><div class="mv">${fM(totFolha)}</div></div>
   <div class="tw"><table><thead><tr><th>Colaborador</th><th>Cargo</th><th>Unidade</th><th>Dias</th><th>Horas</th><th>R$/hora</th><th>Previsão</th><th>Ação</th></tr></thead><tbody>
-    ${ls.map(l=>`<tr><td>${san(l.c.nome)}</td><td>${san(l.cg?.nome||'')}</td><td>${san(l.u?.nome||'')}</td><td>${l.dias}</td><td style="color:var(--accent)">${l.hrs.toFixed(1)}h</td><td>${fM(l.c.valorHora||0)}</td><td style="font-weight:700;color:${l.prev>0?'var(--success)':'var(--text2)'}">${fM(l.prev)}</td><td>${(isAdm()||tP('pagar_folha'))?`<button class="btn bs bxs" onclick="_pagarColaborador('${l.c.id}',${l.prev})">💵 Pagar</button>`:'—'}</td></tr>`).join('')}
+    ${ls.map(l=>`<tr><td>${san(l.c.nome)}</td><td>${san(l.cg?.nome||'')}</td><td>${san(l.u?.nome||'')}</td><td>${l.dias}</td><td style="color:var(--accent)">${l.hrs.toFixed(1)}h</td><td>${fM(l.c.valorHora||0)}</td><td style="font-weight:700;color:${l.prev>0?'var(--success)':'var(--text2)'}">${fM(l.prev)}</td><td>${l.prev>0&&(isAdm()||tP('pagar_folha'))?`<button class="btn bs bxs" onclick="_pagarColaborador('${l.c.id}',${l.prev})">💵 Pagar</button>`:'—'}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
 
@@ -10435,6 +10438,11 @@ async function _pagarColaborador(colabId, valor){
   if(valorDigitado===null) return; // cancelou
   const valorFinal=parseFloat(valorDigitado.replace(',','.'));
   if(isNaN(valorFinal)||valorFinal<=0){ toast('Valor inválido.','error'); return; }
+  // [FIX-VALOR-ALTO] Trava de segurança contra erro de digitação: valores muito acima do
+  // normal para uma folha individual pedem confirmação extra antes de prosseguir.
+  if(valorFinal>3000){
+    if(!confirm(`⚠️ ATENÇÃO: valor de ${fM(valorFinal)} é bem acima do comum para um pagamento individual.\n\nTem certeza que não foi erro de digitação? Confirme só se o valor estiver correto mesmo.`)) return;
+  }
 
   if(!confirm(`Enviar solicitação de pagamento de ${fM(valorFinal)} para ${c.nome}?\n\nO valor só sai do caixa depois que ${c.nome} aprovar com o PIN pessoal dele (no próximo login).`)) return;
 
@@ -10476,15 +10484,16 @@ function _imprimirPagColab(){
   area.innerHTML=`<div style="padding:20px;font-family:monospace;max-width:320px">${conteudo.innerHTML}</div>`;
   setTimeout(()=>{window.print();setTimeout(()=>{if(area)area.innerHTML='';},1800);},120);
 }
-// [FEATURE-PAGAMENTO-REMOTO] Verifica, logo após o login, se este colaborador tem
-// algum pagamento AGUARDANDO A APROVAÇÃO DELE. Se tiver, mostra o modal de aprovação.
-function _verificarPagamentosPendentes(){
-  if(!UA) return;
-  const pendentes=(DB.recibos||[]).filter(r=>r.categoria==='colaborador' && r.statusAprovacao==='aguardando_aprovacao' && String(r.refId)===String(UA.id));
+// [FEATURE-PAGAMENTO-REMOTO] Verifica se um colaborador (por padrão, o UA logado) tem
+// pagamento aguardando aprovação. Também é chamada ao bater ponto — útil quando vários
+// colaboradores usam o mesmo aparelho/sessão, e nem sempre fazem login completo cada um.
+function _verificarPagamentosPendentes(colaboradorId){
+  const alvoId = colaboradorId || UA?.id;
+  if(!alvoId) return;
+  const pendentes=(DB.recibos||[]).filter(r=>r.categoria==='colaborador' && r.statusAprovacao==='aguardando_aprovacao' && String(r.refId)===String(alvoId));
   if(!pendentes.length) return;
-  // Mostra o mais antigo primeiro
   const rec=pendentes.sort((a,b)=>(a.solicitadoEm||'').localeCompare(b.solicitadoEm||''))[0];
-  setTimeout(()=>_abrirAprovacaoPagamento(rec),600); // pequeno delay para não brigar com outros alertas de login
+  setTimeout(()=>_abrirAprovacaoPagamento(rec),600);
 }
 // [FEATURE-PAGAMENTO-REMOTO] Modal onde o PRÓPRIO colaborador revisa e aprova
 // (ou recusa) o pagamento, com o PIN pessoal dele.
@@ -10545,17 +10554,21 @@ async function _aprovarPagamento(){
   const err=el('aprovPagErr');
   const showErr=(t)=>{ if(err){err.textContent=t;err.style.display='block';} };
   if(pin.length<4){ showErr('⛔ Digite seu PIN (mínimo 4 dígitos).'); return; }
-  if(!UA){ showErr('⛔ Sessão expirada. Faça login novamente.'); return; }
-  const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(UA.id));
-  let pinOk=false;
-  if(c && c.pinHashSec && c.pinSalt){
-    try{ pinOk=await verificarPin(pin, c.pinHashSec, c.pinSalt); }catch(e){}
-  }
-  if(!pinOk){ showErr('⛔ PIN incorreto.'); return; }
 
   const rec=(DB.recibos||[]).find(r=>r.id===ctx.recId);
   if(!rec){ showErr('⛔ Solicitação não encontrada (pode já ter sido processada).'); return; }
   if(rec.statusAprovacao!=='aguardando_aprovacao'){ showErr('⛔ Esta solicitação já foi processada.'); return; }
+
+  // [FIX-PONTO-COMPARTILHADO] O PIN deve ser do colaborador DONO da solicitação
+  // (rec.refId), não do usuário atualmente logado no aparelho (UA) — importante
+  // quando vários colaboradores usam o mesmo aparelho/sessão (ex: bater ponto).
+  const c=(DB.colaboradores||[]).find(x=>String(x.id)===String(rec.refId));
+  if(!c){ showErr('⛔ Colaborador não encontrado.'); return; }
+  let pinOk=false;
+  if(c.pinHashSec && c.pinSalt){
+    try{ pinOk=await verificarPin(pin, c.pinHashSec, c.pinSalt); }catch(e){}
+  }
+  if(!pinOk){ showErr(`⛔ PIN incorreto. Deve ser o PIN pessoal de ${san(c.nome)}.`); return; }
 
   // Finaliza: assina, marca aprovado, e SÓ AGORA deduz o caixa
   rec.assinado=true; rec.textoJuridico=TEXTO_JURIDICO_RECIBO; rec.versao='REC-2026.1';
@@ -10568,7 +10581,7 @@ async function _aprovarPagamento(){
     cx.saidas+=rec.valor; cx.saldoAtual=Math.max(0,cx.saldoAtual-rec.valor);
     cx.historico.push({tipo:'saida',desc:`Pagamento colaborador: ${c.nome}`,valor:rec.valor,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   }
-  registrarAuditoria('PAGAMENTO_COLABORADOR_APROVADO',`${c.nome} aprovou e assinou o pagamento de ${fM(rec.valor)}`,UA?.id,rec);
+  registrarAuditoria('PAGAMENTO_COLABORADOR_APROVADO',`${c.nome} aprovou e assinou o pagamento de ${fM(rec.valor)}`,c.id,rec);
   sDB();
   toast(`✅ Pagamento de ${fM(rec.valor)} aprovado e assinado!`,'success');
   _enviarReciboColabPorEmail(c, {valor:rec.valor, unidadeId:rec.unidadeId}, rec);

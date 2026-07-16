@@ -5987,7 +5987,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v91] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão)');
+  console.log('🔒 [INTEGRIDADE v92] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -8524,18 +8524,22 @@ function abrirFechamentoCaixa(){
 
   const vendasSessao=DB.vendas.filter(v=>{
     if(v.status!=='confirmado'||String(v.unidadeId)!==uId) return false;
-    // [FIX-DINHEIRO-SOME 5] REGRA DE NEGÓCIO CONFIRMADA: o CAIXA é diário — mostra
-    // só o que pertence ao dia de HOJE (campo v.data, a data da reserva/sessão).
-    // Vendas com data retroativa (ex.: Fluxo Intenso lançado com data de dias
-    // anteriores) NÃO entram no caixa físico de hoje, mesmo que o registro tenha
-    // sido processado agora — esses valores aparecem nos RELATÓRIOS (shopping,
-    // financeiro), que já filtram corretamente por v.data.
-    if(v.data!==hoje()) return false;
-    // Dentro do dia de hoje, ainda escopamos pela SESSÃO DE CAIXA atual (abertaEm),
-    // para não recontar dinheiro de uma sessão já fechada e reaberta hoje mesmo
-    // ("dinheiro fantasma" — ver fix anterior).
+    // [FIX-DINHEIRO-SOME 7] RESTAURAÇÃO: uma sessão anterior (rotulada erroneamente
+    // "FIX-DINHEIRO-SOME 5") tinha revertido esta lógica para filtrar por v.data
+    // (data da RESERVA/sessão, que pode ser retroativa — ex.: Venda Avulsa lançada
+    // com data de dias anteriores). Isso reintroduziu o bug original: o dinheiro de
+    // uma venda retroativa recebido HOJE deixava de aparecer no Fechamento de Caixa
+    // (nem na linha "Dinheiro" nem no "Disponível em dinheiro/gaveta"), mesmo o valor
+    // já tendo entrado em cx.entradas/saldoAtual no momento da venda.
+    // Regra correta (já validada e usada antes — ver _dataLocalDe): o caixa físico do
+    // dia conta pelo MOMENTO REAL do pagamento (criadoEm), não pela data da reserva.
+    // Dentro da sessão de caixa atual (abertaEm), para não recontar dinheiro de uma
+    // sessão já fechada e reaberta hoje mesmo ("dinheiro fantasma"):
     if(v.criadoEm && _sessAtual && _sessAtual.abertaEm) return v.criadoEm >= _sessAtual.abertaEm;
-    return true;
+    const _dataReal = _dataLocalDe(v.criadoEm);
+    if(_dataReal) return _dataReal===hoje();
+    // Fallback para vendas antigas sem criadoEm: mantém comportamento anterior
+    return v.data===hoje();
   });
 
   const totaisMeio={dinheiro:0,pix:0,cartao_debito:0,cartao_credito:0,credito_cliente:0,outros:0};

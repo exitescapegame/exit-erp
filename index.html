@@ -5987,7 +5987,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v92] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa)');
+  console.log('🔒 [INTEGRIDADE v94] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -6555,6 +6555,7 @@ function slotClick(sId,h,st){
       ${(tP('liberar_salas')||isAdm())&&!isTotem?`<button class="btn bs bsm" onclick="setOcUI('${sId}','${h}','vago')">🔓 Liberar</button>`:''}
       ${totemLibBtn}
       ${tP('liberar_salas')||isAdm()?`<button class="btn bw bsm" onclick="setOcUI('${sId}','${h}','analise')">⚠️ Análise</button>`:''}
+      ${vExist&&(tP('liberar_salas')||isAdm())?`<button class="btn bw bsm" onclick="CM('mSlot');_abrirGestaoAtraso('${sId}','${h}')">🕐 Chegada / Atraso</button>`:''}
       ${editJogBtn}
       ${waBtn}
       ${tP('cancelar_vendas')||isAdm()?`<button class="btn bd bsm" onclick="cancelSlot('${sId}','${h}')">❌ Cancelar</button>`:''}
@@ -11595,35 +11596,58 @@ function _enviarRelShoppingEmail(){
   const uId=isAdm()?(window._relShopUnidade?parseInt(window._relShopUnidade):null):UA.unidadeId;
   const unidadesAlvo = uId ? DB.unidades.filter(u=>String(u.id)===String(uId)) : DB.unidades;
   const _dias=_diasEntre(ini,fim);
-  let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
-  let totJ=0, totV=0;
-  // [FEATURE-SHOP-DIARIO] Detalhamento dia a dia por unidade, incluído sempre no e-mail
-  const totalPorDia={};
-  unidadesAlvo.forEach(u=>{
-    const d=_dadosShopping(u.id,ini,fim);
-    totJ+=d.jogadores; totV+=d.valor;
-    corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n`;
-    corpo+=`  Detalhamento diário:\n`;
-    _dias.forEach(dia=>{
-      const dd=_dadosShopping(u.id,dia,dia);
-      totalPorDia[dia]=(totalPorDia[dia]||0)+dd.valor;
-      corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${dd.jogadores} jogador(es) — ${fM(dd.valor)}\n`;
+
+  // [FIX-EMAIL-TRUNCADO] Monta o detalhamento diário completo primeiro, depois decide
+  // se cabe inteiro no e-mail. Links mailto: têm limite prático de ~2000 caracteres em
+  // clientes como Outlook — acima disso, o final da mensagem é cortado SEM AVISO. Como
+  // o detalhamento fica no final do texto, sábado/domingo eram sempre os primeiros a sumir.
+  function _montarCorpo(comDetalheDiario){
+    let corpo=`RELATÓRIO SEMANAL — ${cfg.nomeShopping}\nPeríodo: ${fD(ini)} a ${fD(fim)}\n${'='.repeat(40)}\n\n`;
+    let totJ=0, totV=0;
+    const totalPorDia={};
+    unidadesAlvo.forEach(u=>{
+      const d=_dadosShopping(u.id,ini,fim);
+      totJ+=d.jogadores; totV+=d.valor;
+      corpo+=`${u.nome}\n  Jogadores: ${d.jogadores}\n  Valor vendido: ${fM(d.valor)}\n`;
+      if(comDetalheDiario){
+        corpo+=`  Detalhamento diário:\n`;
+        _dias.forEach(dia=>{
+          const dd=_dadosShopping(u.id,dia,dia);
+          totalPorDia[dia]=(totalPorDia[dia]||0)+dd.valor;
+          corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${dd.jogadores} jogador(es) — ${fM(dd.valor)}\n`;
+        });
+      }
+      corpo+=`\n`;
     });
+    corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n`;
+    // A quebra diária do TOTAL só faz sentido (não é redundante) quando há mais de 1
+    // unidade somada. Com 1 unidade só, é idêntica à quebra diária já mostrada acima.
+    if(comDetalheDiario && unidadesAlvo.length>1){
+      corpo+=`  Detalhamento diário (todas as unidades):\n`;
+      _dias.forEach(dia=>{
+        const jD=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,dia,dia).jogadores,0);
+        corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${jD} jogador(es) — ${fM(totalPorDia[dia]||0)}\n`;
+      });
+    }
     corpo+=`\n`;
-  });
-  corpo+=`${'='.repeat(40)}\nTOTAL\n  Jogadores: ${totJ}\n  Valor vendido: ${fM(totV)}\n`;
-  corpo+=`  Detalhamento diário (todas as unidades):\n`;
-  _dias.forEach(dia=>{
-    const jD=unidadesAlvo.reduce((s,u)=>s+_dadosShopping(u.id,dia,dia).jogadores,0);
-    corpo+=`    ${fD(dia)} (${_diaSemanaLabel(dia)}) — ${jD} jogador(es) — ${fM(totalPorDia[dia]||0)}\n`;
-  });
-  corpo+=`\n`;
-  corpo+=`Emitido em ${fD(hoje())} por ${UA.nome}\nEXIT GAMES — Inteligência e Diversão`;
+    if(!comDetalheDiario){
+      corpo+=`⚠️ Detalhamento dia a dia omitido aqui só por causa do limite de tamanho do link de e-mail — os números diários completos (incluindo fim de semana) estão no relatório na tela e no botão "Copiar texto".\n\n`;
+    }
+    corpo+=`Emitido em ${fD(hoje())} por ${UA.nome}\nEXIT GAMES — Inteligência e Diversão`;
+    return corpo;
+  }
+
+  // Limite conservador: caracteres acentuados/símbolos (á, —, R$) inflam bastante ao
+  // serem url-encoded, então usamos uma margem de segurança bem abaixo do limite real.
+  const LIMITE_SEGURO_CORPO = 1400;
+  let corpo=_montarCorpo(true);
+  if(corpo.length>LIMITE_SEGURO_CORPO) corpo=_montarCorpo(false);
+
   const assunto=`Relatório Semanal EXIT — ${cfg.nomeShopping} — ${fD(ini)} a ${fD(fim)}`;
   const mailto=`mailto:${encodeURIComponent(cfg.emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
   window.open(mailto,'_blank');
   registrarAuditoria('REL_SHOPPING_ENVIADO',`Relatório semanal do shopping (${fD(ini)} a ${fD(fim)}) enviado para ${cfg.emailDestino}`,UA?.id);
-  toast('📧 E-mail aberto com o relatório detalhado dia a dia. É só enviar!','success');
+  toast('📧 E-mail aberto com o relatório. É só enviar!','success');
 }
 
 function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem seletor)

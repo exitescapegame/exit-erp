@@ -1,8 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v2.5
+// EXIT GAMES — KEYO UI v2.6
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
 // Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
+// v2.6: FIX-ADM-TODAS — _montarContextoAgente() agora trata login ADM
+//        (unidade_id="todas", sem seletor de unidade no painel): monta
+//        contexto das DUAS unidades (Aracaju + Salvador) separadamente,
+//        em vez de zerar tudo e rotular sempre como Aracaju.
 // v2.0: FIX — keyo-mpros-inline adicionado na lista de limpeza de _trocarAgente() e _abrirModulo(); remove módulos inline SEMPRE (não só
 //        quando _kAba !== 'chat'). Remove m12 a m16 e chama _k15Stop().
 // NUNCA modificar funções do ERP base.
@@ -41,28 +45,21 @@ window.KEYO_AGENTS.forEach(a => { _kHistory[a.id] = []; });
 // ════════════════════════════════════════════════════════════════
 // ETAPA 1.3 — INJETAR NO MENU VIA MENUS[] + rSb()
 // ════════════════════════════════════════════════════════════════
-// ── PATCH SEGURO DO rSb() ────────────────────────────────────────
-// MENUS é const local no ERP — não acessível via window.MENUS.
-// Solução: interceptar rSb() e injetar o item KEYO após cada redesenho,
-// sem MutationObserver e sem tocar no array MENUS original.
 function _injetarMenu() {
   if (!window.rSb) {
     console.warn('[KEYO-01] rSb() não encontrado — tentando novamente em 500ms.');
     setTimeout(_injetarMenu, 500);
     return;
   }
-
-  // Já foi patchado?
   if (window.__KEYO_RSB_PATCHED__) return;
   window.__KEYO_RSB_PATCHED__ = true;
 
   const _rSbOrig = window.rSb;
   window.rSb = function() {
-    _rSbOrig.apply(this, arguments);   // executa o rSb original primeiro
-    _injetarItemDOM();                  // depois injeta o item KEYO
+    _rSbOrig.apply(this, arguments);
+    _injetarItemDOM();
   };
 
-  // Executa uma vez já para aparecer imediatamente
   _injetarItemDOM();
   console.info('[KEYO-01] ✅ rSb() interceptado — item KEYO será injetado após cada redesenho.');
 }
@@ -71,19 +68,16 @@ function _injetarItemDOM() {
   const nav = document.getElementById('sbNav');
   if (!nav) return;
 
-  // Atualiza active se já existe
   const existing = document.getElementById('keyo-sb-item');
   if (existing) {
     existing.className = 'sb-item' + (window.PA === 'keyo' ? ' active' : '');
     return;
   }
 
-  // Seção
   const secao = document.createElement('div');
   secao.className = 'sb-section';
   secao.textContent = 'Inteligência';
 
-  // Item
   const item = document.createElement('div');
   item.id = 'keyo-sb-item';
   item.className = 'sb-item' + (window.PA === 'keyo' ? ' active' : '');
@@ -98,20 +92,12 @@ function _injetarItemDOM() {
 
 // ════════════════════════════════════════════════════════════════
 // ETAPA 1.2 — PATCH SEGURO DO goTo()
-// PA é let local do ERP — não acessível via window.PA.
-// Solução: interceptar goTo('keyo') antes do ERP processar.
 // ════════════════════════════════════════════════════════════════
 (function _patchGoTo() {
   if (!window.goTo) return;
   const _orig     = window.goTo;
   const _rpOrig   = window.renderPage;
 
-  // ── Patch de renderPage ──────────────────────────────────────
-  // O goTo('keyo') não seta PA='keyo' (PA é local do ERP).
-  // Qualquer chamada a renderPage() — opFinalizar, sDB callbacks,
-  // timers, botões do ERP — substituía o #pc derrubando a tela KEYO.
-  // Solução: interceptar renderPage() e bloquear enquanto #keyo-wrap
-  // estiver visível. Ao navegar para fora do KEYO, restaura o original.
   function _patchRenderPage() {
     if (window.__KEYO_RP_PATCHED__) return;
     if (typeof _rpOrig !== 'function') return;
@@ -121,7 +107,6 @@ function _injetarItemDOM() {
         console.info('[KEYO-01] renderPage() bloqueado — tela KEYO ativa.');
         return;
       }
-      // Saiu do KEYO — remove o patch e executa normalmente
       window.__KEYO_RP_PATCHED__ = false;
       window.renderPage = _rpOrig;
       return _rpOrig.apply(this, arguments);
@@ -131,21 +116,17 @@ function _injetarItemDOM() {
 
   window.goTo = function(pg) {
     if (pg === 'keyo') {
-      // Atualiza estado visual do sidebar
       document.querySelectorAll('#sbNav .sb-item').forEach(el => el.classList.remove('active'));
       const keyoItem = document.getElementById('keyo-sb-item');
       if (keyoItem) keyoItem.classList.add('active');
-      // Renderiza tela do KEYO
       const e = document.getElementById('pc');
       if (e) {
         e.innerHTML = _keyoHTML();
         _keyoInit();
       }
-      // Protege renderPage IMEDIATAMENTE após renderizar o KEYO
       _patchRenderPage();
       return;
     }
-    // Saindo do KEYO: remove patch do renderPage
     window.__KEYO_RP_PATCHED__ = false;
     window.renderPage = _rpOrig;
     return _orig.apply(this, arguments);
@@ -154,21 +135,19 @@ function _injetarItemDOM() {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// CSS EXTRA — aba Campanhas no painel lateral
+// CSS EXTRA
 // ════════════════════════════════════════════════════════════════
 (function _injetarCSSAbas() {
   if (document.getElementById('keyo-ui-abas-css')) return;
   const s = document.createElement('style');
   s.id = 'keyo-ui-abas-css';
   s.textContent = `
-/* ── Agentes recolhível ── */
 #keyo-agents-title{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
 #keyo-agents-title:hover{color:rgba(255,255,255,0.7)}
 #keyo-agents-chevron{font-size:11px;transition:transform .2s;opacity:.6}
 #keyo-agents.recolhido #keyo-agents-chevron{transform:rotate(-90deg)}
 #keyo-agents-list{overflow:hidden;transition:max-height .25s ease;max-height:1000px}
 #keyo-agents.recolhido #keyo-agents-list{max-height:0}
-/* ── Separador e aba Campanhas ── */
 #keyo-agents-sep{height:1px;background:rgba(255,255,255,0.08);margin:8px 12px}
 #keyo-agents-modulos{padding:0 0 8px}
 #keyo-agents-modulos-title{padding:8px 16px 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px}
@@ -176,12 +155,10 @@ function _injetarItemDOM() {
 .keyo-mod-btn:hover{background:rgba(255,255,255,0.07);color:#f0f0f8}
 .keyo-mod-btn.active{background:rgba(201,168,76,.12);color:#C9A84C;font-weight:700;border-left-color:#C9A84C}
 .keyo-mod-emoji{font-size:16px;width:20px;text-align:center;flex-shrink:0}
-/* ── Setas fixas de rolagem (painel de agentes/módulos cortado em telas menores) ── */
 .keyo-scroll-btn{position:sticky;left:0;width:100%;height:24px;border:none;background:#13131f;color:#C9A84C;font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5;flex-shrink:0}
 .keyo-scroll-btn:hover{background:#1c1c2c;color:#fff}
 .keyo-scroll-up{top:0;box-shadow:0 4px 6px -4px rgba(0,0,0,.5)}
 .keyo-scroll-down{bottom:0;box-shadow:0 -4px 6px -4px rgba(0,0,0,.5)}
-/* Scrollbar fina e visível (antes era invisível em vários dispositivos) */
 #keyo-agents{scrollbar-width:thin;scrollbar-color:rgba(201,168,76,.5) transparent}
 #keyo-agents::-webkit-scrollbar{width:10px}
 #keyo-agents::-webkit-scrollbar-track{background:rgba(255,255,255,0.04)}
@@ -190,22 +167,10 @@ function _injetarItemDOM() {
 #keyo-agents::-webkit-scrollbar{width:6px}
 #keyo-agents::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:3px}
 #keyo-agents::-webkit-scrollbar-track{background:transparent}
-/* ── [FIX v2.7] ROLAGEM REAL DO PAINEL DE AGENTES ──────────────────────────
-   Sintoma: só ~4,5 agentes aparecem (KEYO..Financeiro), Jurídico/RH somem e
-   MÓDULOS aparece logo abaixo, sem barra de rolagem.
-   Causa-raiz: dentro de #keyo-agents (flex column de altura fixa), os filhos
-   #keyo-agents-list e #keyo-agents-modulos têm flex-shrink:1 (padrão). Quando
-   falta altura, o flexbox os ENCOLHE; como #keyo-agents-list tem overflow:hidden,
-   ele CORTA os agentes em vez de o painel rolar.
-   Correção: min-height:0 no painel (permite rolar) + flex-shrink:0 nos filhos
-   (eles mantêm a altura natural e forçam o painel #keyo-agents a rolar via
-   overflow-y:auto, que já existe).
-   100% ADITIVO e REVERSÍVEL: apague este bloco para voltar ao estado anterior. */
 #keyo-wrap{min-height:0}
 #keyo-agents{min-height:0}
 #keyo-agents-list{flex-shrink:0}
 #keyo-agents-modulos{flex-shrink:0}
-/* barra de rolagem BEM visível (dourada), pra deixar claro que o painel rola */
 #keyo-agents{scrollbar-width:auto;scrollbar-color:#C9A84C rgba(255,255,255,0.10)}
 #keyo-agents::-webkit-scrollbar{width:10px}
 #keyo-agents::-webkit-scrollbar-thumb{background:#C9A84C;border-radius:5px;border:2px solid #0f0f1a}
@@ -215,7 +180,7 @@ function _injetarItemDOM() {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// HTML DA TELA KEYO — com aba Campanhas abaixo dos agentes
+// HTML DA TELA KEYO
 // ════════════════════════════════════════════════════════════════
 function _keyoHTML() {
   const ag = window.KEYO_AGENTS[0];
@@ -298,26 +263,22 @@ function _keyoHTML() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ABRIR MÓDULO (Campanhas ou voltar ao chat)
+// ABRIR MÓDULO
 // ════════════════════════════════════════════════════════════════
 function _abrirModulo(modulo) {
   _kAba = modulo;
 
-  // Desmarca agentes, marca módulo
   document.querySelectorAll('.keyo-agent-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.keyo-mod-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('keyo-mod-' + modulo);
   if (btn) btn.classList.add('active');
 
-  // Remove TODOS os painéis inline antes de abrir o novo
-  // Fecha Cientista via flag explícita (evita sobreposição pelo MutationObserver)
   if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   ['keyo-m12-inline','keyo-m13-inline','keyo-m14-inline',
    'keyo-m15-inline','keyo-m16-inline','keyo-mpros-inline'].forEach(function(mid) {
     const el = document.getElementById(mid);
     if (el) el.remove();
   });
-  // Restaura msgs/inputArea caso o Cientista os tenha escondido
   const _msgs = document.getElementById('keyo-msgs');
   const _ia   = document.getElementById('keyo-input-area');
   if (_msgs) _msgs.style.cssText = '';
@@ -325,7 +286,6 @@ function _abrirModulo(modulo) {
   if (typeof window._k15Stop === 'function') window._k15Stop();
 
   if (modulo === 'campanhas') {
-    // Atualiza header
     const emoji = document.getElementById('keyo-header-emoji');
     const nome  = document.getElementById('keyo-header-nome');
     const desc  = document.getElementById('keyo-header-desc');
@@ -333,16 +293,14 @@ function _abrirModulo(modulo) {
     if (nome)  nome.textContent  = 'Campanhas';
     if (desc)  desc.textContent  = 'Agendador de campanhas de marketing';
 
-    // Esconde input do chat, mostra área do M12
     const inputArea = document.getElementById('keyo-input-area');
     const msgs      = document.getElementById('keyo-msgs');
     if (inputArea) inputArea.style.display = 'none';
     if (msgs)      msgs.style.display      = 'none';
 
-    // Renderiza M12 se disponível
     if (typeof window._k12RenderAgendadorInline === 'function') {
       window._k12RenderAgendadorInline();
-    } else if (typeof window.__KEYO_M12_LOADED__ !== 'undefined') {      // M12 carregado mas sem função inline — fallback
+    } else if (typeof window.__KEYO_M12_LOADED__ !== 'undefined') {
       const main = document.getElementById('keyo-msgs');
       if (main) {
         main.style.display = 'block';
@@ -515,13 +473,12 @@ function _abrirModulo(modulo) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// INIT — chamado após renderizar a tela
+// INIT
 // ════════════════════════════════════════════════════════════════
 function _keyoInit() {
   _kAgente  = 'keyo';
   _kAba     = 'chat';
   _kLoading = false;
-  // Reseta flag do Cientista (KEYO foi reaberto do zero)
   if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   window.KEYO_AGENTS.forEach(a => { if (!_kHistory[a.id]) _kHistory[a.id] = []; });
   _renderHistory();
@@ -535,15 +492,13 @@ function _keyoInit() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// TROCAR AGENTE — volta ao chat se estava em módulo
+// TROCAR AGENTE
 // ════════════════════════════════════════════════════════════════
 function _trocarAgente(id) {
   const ag = window.KEYO_AGENTS.find(a => a.id === id);
   if (!ag) return;
 
-  // Sempre limpa módulos inline ao trocar de agente
   _kAba = 'chat';
-  // Fecha Cientista via flag explícita (evita sobreposição pelo MutationObserver)
   if (typeof window.mpros_fechar === 'function') window.mpros_fechar();
   const inputArea = document.getElementById('keyo-input-area');
   const msgs      = document.getElementById('keyo-msgs');
@@ -593,7 +548,7 @@ function _renderHistory() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ADICIONAR MENSAGEM NA UI + HISTÓRICO
+// ADICIONAR MENSAGEM
 // ════════════════════════════════════════════════════════════════
 function _appendMsg(role, texto) {
   const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -652,8 +607,7 @@ function _hideLoading() {
 
 // ════════════════════════════════════════════════════════════════
 // CONTEXTO REAL DO DB — injetado no prompt de cada agente
-// Resolve o problema de a IA inventar dados e usar datas antigas.
-// O M15 (KPIs) já faz isso correto — replicamos o padrão aqui.
+// [FIX-ADM-TODAS aplicado aqui]
 // ════════════════════════════════════════════════════════════════
 function _montarContextoAgente(agente) {
   try {
@@ -661,57 +615,113 @@ function _montarContextoAgente(agente) {
     const anoAtual = new Date().getFullYear();
     const mesAtual = hoje.slice(0, 7);
 
-    const vendas   = Array.isArray(window.DB?.vendas)   ? window.DB.vendas   : [];
-    const clientes = Array.isArray(window.DB?.clientes) ? window.DB.clientes : [];
-    const unidades = Array.isArray(window.DB?.unidades) ? window.DB.unidades : [];
+    const uniIdRaw = String(
+      (typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+      ?? window.UA?.unidadeId
+      ?? 1
+    );
 
-    const vendasConf = vendas.filter(v => v.status === 'confirmado');
-    const vendasMes  = vendasConf.filter(v => v.data?.startsWith(mesAtual));
-    const fat        = vendasMes.reduce((s, v)  => s + (Number(v.valorTotal) || 0), 0);
-    const fatTotal   = vendasConf.reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
-    const ticket     = vendasMes.length ? (fat / vendasMes.length) : 0;
-    const canceladas = vendas.filter(v => v.status === 'cancelado').length;
+    // [FIX-ADM-TODAS] Login ADM tem unidade_id = "todas" em app_metadata, sem
+    // seletor de unidade no painel. Antes, "todas" não batia com "1"/"2" em
+    // nenhum filtro e o contexto saía zerado, rotulado sempre como Aracaju.
+    // Agora: monta as DUAS unidades separadamente quando for "todas".
+    const unidadesParaMontar = uniIdRaw === 'todas' ? ['1', '2'] : [uniIdRaw];
 
-    const nomeUnidade = (window.UA?.unidade === 2 || window.UA?.unidadeId === 2)
-      ? 'EXIT SALVADOR — Shopping Barra'
-      : 'EXIT ARACAJU — Shopping Jardins';
-
-    const campanhasAtivas = Array.isArray(window.DB?.keyoCampanhas)
-      ? window.DB.keyoCampanhas.filter(c => c.status === 'agendada').length
-      : 0;
-
-    const salas = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
-    const staff = Array.isArray(window.DB?.staff) ? window.DB.staff : [];
-
-    // [v2.3] Dados financeiros reais + unidade ativa (para o agente pensar estratégico)
-    const contasPagar   = Array.isArray(window.DB?.contasPagar)   ? window.DB.contasPagar   : [];
-    const contasReceber = Array.isArray(window.DB?.contasReceber) ? window.DB.contasReceber : [];
-    const uniId  = String(window.UA?.unidadeId ?? window.UA?.unidade ?? 1);
+    const vendasTodas        = Array.isArray(window.DB?.vendas)        ? window.DB.vendas        : [];
+    const clientesTodos      = Array.isArray(window.DB?.clientes)      ? window.DB.clientes      : [];
+    const contasPagarTodas   = Array.isArray(window.DB?.contasPagar)   ? window.DB.contasPagar   : [];
+    const contasReceberTodas = Array.isArray(window.DB?.contasReceber) ? window.DB.contasReceber : [];
+    const staff              = Array.isArray(window.DB?.staff)         ? window.DB.staff         : [];
     const fmtBRL = n => 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-    // [v2.3] Tendência de faturamento — últimos 4 meses (dá noção de evolução, não só foto)
-    const tendencia = [];
-    for (let i = 3; i >= 0; i--) {
-      const dt = new Date();
-      dt.setDate(1);
-      dt.setMonth(dt.getMonth() - i);
-      const ym  = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
-      const tot = vendasConf.filter(v => v.data?.startsWith(ym)).reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
-      tendencia.push(ym + ' = ' + fmtBRL(tot));
+    function _montarBlocoUnidade(uniId) {
+      const vendas     = vendasTodas.filter(v => String(v.unidadeId) === uniId);
+      const vendasConf = vendas.filter(v => v.status === 'confirmado');
+      const vendasMes  = vendasConf.filter(v => v.data?.startsWith(mesAtual));
+      const fat        = vendasMes.reduce((s, v)  => s + (Number(v.valorTotal) || 0), 0);
+      const fatTotal   = vendasConf.reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
+      const ticket     = vendasMes.length ? (fat / vendasMes.length) : 0;
+      const canceladas = vendas.filter(v => v.status === 'cancelado').length;
+
+      const nomeUnidade = uniId === '2'
+        ? 'EXIT SALVADOR — Shopping Barra'
+        : 'EXIT ARACAJU — Shopping Jardins';
+
+      const campanhasAtivas = Array.isArray(window.DB?.keyoCampanhas)
+        ? window.DB.keyoCampanhas.filter(c => c.status === 'agendada' && (c.unidadeId == null || String(c.unidadeId) === uniId)).length
+        : 0;
+
+      const salasTodas = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
+      const _precoUni  = (typeof window.precoAtual === 'function') ? window.precoAtual(uniId) : null;
+      const salasLive  = salasTodas
+        .filter(s => s && !s.manutencao && (String(s.unidadeId) === uniId || s.unidadeId == null))
+        .map(s => {
+          const dur = s.tempo ? (s.tempo + ' min') : '';
+          const cap = (s.minJog && s.maxJog) ? (s.minJog + '–' + s.maxJog + ' jogadores') : '';
+          const dif = s.dificuldade || '';
+          return '• ' + (s.nome || 'Sala') +
+            [dur, cap, dif].filter(Boolean).map(x => ' — ' + x).join('');
+        })
+        .join('\n');
+
+      const tendencia = [];
+      for (let i = 3; i >= 0; i--) {
+        const dt = new Date();
+        dt.setDate(1);
+        dt.setMonth(dt.getMonth() - i);
+        const ym  = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+        const tot = vendasConf.filter(v => v.data?.startsWith(ym)).reduce((s, v) => s + (Number(v.valorTotal) || 0), 0);
+        tendencia.push(ym + ' = ' + fmtBRL(tot));
+      }
+
+      const linhas = [
+        '── ' + nomeUnidade + ' ──',
+        'Vendas confirmadas este mês (' + mesAtual + '): ' + vendasMes.length,
+        'Faturamento do mês: ' + fmtBRL(fat),
+        'Ticket médio do mês: ' + fmtBRL(ticket),
+        'Faturamento acumulado total: ' + fmtBRL(fatTotal),
+        'Evolução do faturamento (4 meses): ' + tendencia.join(' · '),
+        'Cancelamentos (histórico): ' + canceladas,
+        'SALAS EM OPERAÇÃO (lidas AO VIVO do app — use SEMPRE estes dados, nunca suponha duração, capacidade ou preço):',
+        (salasLive || '(nenhuma sala ativa cadastrada nesta unidade)'),
+        'Preço da sessão hoje, pela regra da unidade (semana/fim de semana/feriado): ' + (_precoUni != null ? fmtBRL(_precoUni) : '—') + '. Observação: o sistema cobra por sessão/unidade, não por sala.',
+      ];
+
+      if (agente === 'mkt') {
+        linhas.push('Campanhas agendadas: ' + campanhasAtivas);
+        linhas.push('Instagram desta unidade: ' + (uniId === '2' ? '@exitgames.ssa (Salvador)' : '@exit.games (Aracaju)'));
+      }
+      if (agente === 'ops') {
+        linhas.push('Salas cadastradas: ' + salasTodas.filter(s => String(s.unidadeId) === uniId).length);
+      }
+      if (agente === 'fin' || agente === 'keyo') {
+        const cpAberto = contasPagarTodas.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
+        const crAberto = contasReceberTodas.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
+        const cpSoma = cpAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+        const crSoma = crAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+        linhas.push('Contas a pagar em aberto: ' + cpAberto.length + ' lançamento(s) · ' + fmtBRL(cpSoma));
+        linhas.push('Contas a receber em aberto: ' + crAberto.length + ' lançamento(s) · ' + fmtBRL(crSoma));
+        linhas.push('Saldo projetado (a receber − a pagar): ' + fmtBRL(crSoma - cpSoma));
+      }
+      if (agente === 'vendas') {
+        const top = vendas
+          .filter(v => v.status === 'confirmado' && v.data?.startsWith(mesAtual))
+          .reduce((acc, v) => {
+            const salas2 = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
+            const sala = salas2.find(s => String(s.id) === String(v.salaId));
+            const nome = sala ? sala.nome : ('Sala ' + v.salaId);
+            acc[nome] = (acc[nome] || 0) + 1;
+            return acc;
+          }, {});
+        const topStr = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3)
+          .map(([n, q]) => n + ' (' + q + 'x)').join(', ');
+        if (topStr) linhas.push('Salas mais reservadas este mês: ' + topStr);
+      }
+
+      return linhas.join('\n');
     }
 
-    // [v2.5] Salas reais lidas AO VIVO do app — nunca gravadas, sempre do cadastro atual.
-    const _precoUni = (typeof window.precoAtual === 'function') ? window.precoAtual(uniId) : null;
-    const salasLive = salas
-      .filter(s => s && !s.manutencao && (String(s.unidadeId) === uniId || s.unidadeId == null))
-      .map(s => {
-        const dur = s.tempo ? (s.tempo + ' min') : '';
-        const cap = (s.minJog && s.maxJog) ? (s.minJog + '–' + s.maxJog + ' jogadores') : '';
-        const dif = s.dificuldade || '';
-        return '• ' + (s.nome || 'Sala') +
-          [dur, cap, dif].filter(Boolean).map(x => ' — ' + x).join('');
-      })
-      .join('\n');
+    const blocosUnidades = unidadesParaMontar.map(_montarBlocoUnidade).join('\n\n');
 
     const base = [
       '╔══ CONTEXTO REAL DA EXIT GAMES (use estes dados — não invente) ══╗',
@@ -720,53 +730,15 @@ function _montarContextoAgente(agente) {
       'Instagram — a marca tem 2 contas: Aracaju = @exit.games · Salvador = @exitgames.ssa.',
       '─────────────────────────────────────────────',
       'Data de hoje: ' + new Date(hoje).toLocaleDateString('pt-BR') + ' (' + anoAtual + ')',
-      'Unidade ativa: ' + nomeUnidade,
-      'Clientes cadastrados: ' + clientes.length,
-      'Vendas confirmadas este mês (' + mesAtual + '): ' + vendasMes.length,
-      'Faturamento do mês: ' + fmtBRL(fat),
-      'Ticket médio do mês: ' + fmtBRL(ticket),
-      'Faturamento acumulado total: ' + fmtBRL(fatTotal),
-      'Evolução do faturamento (4 meses): ' + tendencia.join(' · '),
-      'Cancelamentos (histórico): ' + canceladas,
+      uniIdRaw === 'todas'
+        ? 'Visão ativa: ADM — acesso às DUAS unidades (dados de cada uma logo abaixo, não confunda uma com a outra)'
+        : 'Unidade ativa: ' + (uniIdRaw === '2' ? 'EXIT SALVADOR — Shopping Barra' : 'EXIT ARACAJU — Shopping Jardins'),
+      'Clientes cadastrados (geral, não segmentado por unidade): ' + clientesTodos.length,
       '─────────────────────────────────────────────',
-      'SALAS EM OPERAÇÃO (unidade ativa, lidas AO VIVO do app — use SEMPRE estes dados, nunca suponha duração, capacidade ou preço):',
-      (salasLive || '(nenhuma sala ativa cadastrada nesta unidade)'),
-      'Preço da sessão hoje, pela regra da unidade (semana/fim de semana/feriado): ' + (_precoUni != null ? fmtBRL(_precoUni) : '—') + '. Observação: o sistema cobra por sessão/unidade, não por sala.',
+      blocosUnidades,
     ];
 
-    // Contexto adicional por agente
-    if (agente === 'mkt') {
-      base.push('Campanhas agendadas: ' + campanhasAtivas);
-      base.push('Instagram desta unidade: ' + (uniId === '2' ? '@exitgames.ssa (Salvador)' : '@exit.games (Aracaju)'));
-    }
-    if (agente === 'ops')  base.push('Salas cadastradas: ' + salas.length);
-    if (agente === 'rh')   base.push('Equipe cadastrada: ' + staff.length + ' pessoas');
-
-    // [v2.3] Bloco financeiro real — agente Financeiro e KEYO geral
-    if (agente === 'fin' || agente === 'keyo') {
-      const cpAberto = contasPagar.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
-      const crAberto = contasReceber.filter(c => c.pago !== true && String(c.unidadeId) === uniId);
-      const cpSoma = cpAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
-      const crSoma = crAberto.reduce((s, c) => s + (Number(c.valor) || 0), 0);
-      base.push('Contas a pagar em aberto (unidade ativa): ' + cpAberto.length + ' lançamento(s) · ' + fmtBRL(cpSoma));
-      base.push('Contas a receber em aberto (unidade ativa): ' + crAberto.length + ' lançamento(s) · ' + fmtBRL(crSoma));
-      base.push('Saldo projetado (a receber − a pagar): ' + fmtBRL(crSoma - cpSoma));
-    }
-
-    if (agente === 'vendas') {
-      const top = vendas
-        .filter(v => v.status === 'confirmado' && v.data?.startsWith(mesAtual))
-        .reduce((acc, v) => {
-          const salas2 = typeof window.rlsSalas === 'function' ? window.rlsSalas() : [];
-          const sala = salas2.find(s => String(s.id) === String(v.salaId));
-          const nome = sala ? sala.nome : ('Sala ' + v.salaId);
-          acc[nome] = (acc[nome] || 0) + 1;
-          return acc;
-        }, {});
-      const topStr = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 3)
-        .map(([n, q]) => n + ' (' + q + 'x)').join(', ');
-      if (topStr) base.push('Salas mais reservadas este mês: ' + topStr);
-    }
+    if (agente === 'rh') base.push('Equipe cadastrada (geral, não segmentada por unidade): ' + staff.length + ' pessoas');
 
     base.push('╚════════════════════════════════════════════════════════════╝');
     return base.join('\n');
@@ -802,39 +774,48 @@ async function _enviar() {
     .slice(-20)
     .map(function(m) { return { role: m.role === 'user' ? 'user' : 'assistant', content: m.texto }; });
 
-  const unidadeId = (window.UA && window.UA.unidade) ? window.UA.unidade : 1;
+  const unidadeId = (typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+    || (window.UA && window.UA.unidadeId)
+    || 1;
 
-  // Injeta contexto real do DB no payload — evita que a IA invente dados ou use anos antigos
   const _ctx = _montarContextoAgente(_kAgente);
   const _msgFinal = _ctx ? (_ctx + '\n\n' + texto) : texto;
 
   try {
+    if (typeof window.unidadeRenovarToken === 'function') {
+      try { await window.unidadeRenovarToken(); } catch (_e) { /* segue com o token que tiver */ }
+    }
+
+    let jwt = '';
+    try {
+      const erpSession = (window._unidadeSession && window._unidadeSession.access_token)
+        ? window._unidadeSession
+        : JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
+      jwt = erpSession?.access_token || '';
+      if (!jwt && window._keyoToken) jwt = window._keyoToken;
+      if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+    } catch (e) {
+      jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
+    }
+
     const resp = await fetch(window.KEYO_EDGE_URL, {
       method:  'POST',
-      headers: (function() {
-        let jwt = '';
-        try {
-          const erpSession = JSON.parse(localStorage.getItem('exit_unidade_session') || '{}');
-          jwt = erpSession?.access_token || '';
-          if (!jwt && window._keyoToken) jwt = window._keyoToken;
-          if (!jwt) jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
-        } catch(e) {
-          jwt = window.SUPA_KEY || window.KEYO_ANON_KEY || '';
-        }
-        return {
-          'Content-Type':  'application/json',
-          'Authorization': 'Bearer ' + jwt,
-          'apikey':         window.KEYO_ANON_KEY || '',
-        };
-      })(),
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + jwt,
+        'apikey':         window.KEYO_ANON_KEY || '',
+      },
       body: JSON.stringify({
         agente:      _kAgente,
-        mensagem:    _msgFinal,  // contexto real + pergunta do usuário
+        mensagem:    _msgFinal,
         historico:   hist,
         unidade_id:  unidadeId,
       })
     });
 
+    if (resp.status === 401) {
+      throw new Error('SESSAO_EXPIRADA');
+    }
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
     const data = await resp.json();
@@ -850,7 +831,15 @@ async function _enviar() {
 
   } catch (err) {
     _hideLoading();
-    _appendMsg('bot', '⚠️ Erro ao conectar com o servidor. Verifique sua conexão e tente novamente.');
+    let msg;
+    if (err && err.message === 'SESSAO_EXPIRADA') {
+      msg = '🔒 Sua sessão expirou. Saia e entre de novo (ou recarregue a página) e tente novamente.';
+    } else if (err && /^HTTP \d+/.test(err.message || '')) {
+      msg = '⚠️ O servidor respondeu com erro (' + err.message + '). Tente de novo em instantes; se persistir, avise o suporte.';
+    } else {
+      msg = '⚠️ Não consegui conectar com o servidor. Verifique sua internet e tente novamente.';
+    }
+    _appendMsg('bot', msg);
     console.error('[KEYO-01] Erro na chamada à Edge Function:', err);
   }
 
@@ -892,7 +881,7 @@ function _scrollBottom() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// RENDERIZAR TELA (chamado pelo item do menu DOM fallback)
+// RENDERIZAR TELA
 // ════════════════════════════════════════════════════════════════
 function _renderTela() {
   document.querySelectorAll('#sbNav .sb-item').forEach(el => el.classList.remove('active'));
@@ -913,11 +902,6 @@ function _renderTela() {
   main.innerHTML = _keyoHTML();
   _keyoInit();
 }
-
-// ════════════════════════════════════════════════════════════════
-// VERIFICAÇÃO DE INTEGRIDADE
-// rSb e goTo são patchados intencionalmente pelo KEYO — não alertar.
-// ════════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════════
 // EXPÕE GLOBALMENTE
@@ -944,6 +928,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.5 — Salas lidas ao vivo do app (nome, tempo, capacidade, dificuldade) + preço atual da unidade no contexto. KEYO para de chutar. Menu e Fase 3 preservados.');
+console.info('[KEYO-01] ✅ UI v2.6 — FIX-ADM-TODAS: contexto do ADM mostra as duas unidades separadamente em vez de zerar tudo. Salas lidas ao vivo do app + preço atual da unidade no contexto.');
 
 })();

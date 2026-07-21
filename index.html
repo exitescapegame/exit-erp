@@ -3400,40 +3400,87 @@ const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0aXZhY3pmdXVhenNweWNoZHh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjI2OTMsImV4cCI6MjA5NTMzODY5M30.fKq1xIBNtxgv8bhynC4CzxI4LOPdN_mSHIR_t1pEohs';
 
 // Helper base para chamadas REST
+// ═══════════════════════════════════════════════════════════════════
+// [FIX-SYNC v92] CONTABILIDADE REAL DE FALHAS DE NUVEM
+// Motivo: supaFetch sempre devolveu null em erro (sem lançar exceção), então
+// sDBSupabase() "terminava com sucesso" mesmo com 100% das gravações rejeitadas
+// e o indicador exibia "✅ Salvo às HH:MM". Foi isso que escondeu 4 dias sem
+// sincronizar. Agora cada falha é contada e o indicador reflete a verdade.
+// 100% aditivo: supaFetch continua devolvendo null (nenhum chamador quebra).
+// ═══════════════════════════════════════════════════════════════════
+window._SUPA_FALHAS_ESCRITA = 0;   // zerado no início de cada sDBSupabase()
+window._SUPA_FALHAS_LEITURA = 0;   // zerado no início de cada resync
+window._SUPA_ULTIMO_ERRO    = null;
+window._SUPA_ULTIMO_OK      = null; // timestamp da última ESCRITA aceita pela nuvem
+function _supaFalhaCiclo(tipo, path, motivo){
+  try{
+    if (tipo === 'escrita') window._SUPA_FALHAS_ESCRITA++;
+    else window._SUPA_FALHAS_LEITURA++;
+    window._SUPA_ULTIMO_ERRO = { tipo, path: String(path).split('?')[0], motivo, quando: Date.now() };
+  }catch(e){}
+}
+
 async function supaFetch(path, method='GET', body=null) {
+  const _ehEscrita = (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE');
   // [v74.82] MODO LOCAL: se o Supabase não está configurado, não tenta a rede (evita erros no Console)
-  if (window._SUPA_DESLIGADO) { return null; }
+  if (window._SUPA_DESLIGADO) { if (_ehEscrita) _supaFalhaCiclo('escrita', path, 'modo-local'); return null; }
   // [v74.85] AUTH POR UNIDADE: usa o token da sessão de unidade quando existe (isolamento via RLS).
-  // [FIX-JWT] Renova token expirado antes de usar; se falhar, usa SUPA_KEY diretamente
-  if (window._unidadeSession && window._unidadeSession.expires_at && Date.now() >= window._unidadeSession.expires_at) {
+  // [FIX-SYNC v92] Renova ANTES de vencer (margem de 5 min já tratada dentro de
+  // unidadeRenovarToken). Antes só renovava DEPOIS de vencido — e se o servidor
+  // rejeitasse o token por outro motivo, nunca se recuperava.
+  if (window._unidadeSession && window._unidadeSession.refresh_token) {
     const _renovado = await unidadeRenovarToken().catch(()=>false);
-    if (!_renovado) { window._unidadeSession = null; try { localStorage.removeItem('exit_unidade_session'); } catch(e){} }
-  }
-  const _authToken = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
-  const opts = {
-    method,
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + _authToken,
-      'Content-Type': 'application/json',
-      'Prefer': method==='POST' ? 'resolution=merge-duplicates,return=minimal' : 'return=minimal'
+    if (!_renovado && window._unidadeSession && window._unidadeSession.expires_at && Date.now() >= window._unidadeSession.expires_at) {
+      window._unidadeSession = null; try { localStorage.removeItem('exit_unidade_session'); } catch(e){}
     }
-  };
-  if (body) opts.body = JSON.stringify(body);
+  }
+  function _montarOpts(){
+    const _authToken = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
+    const o = {
+      method,
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + _authToken,
+        'Content-Type': 'application/json',
+        'Prefer': method==='POST' ? 'resolution=merge-duplicates,return=minimal' : 'return=minimal'
+      }
+    };
+    if (body) o.body = JSON.stringify(body);
+    return o;
+  }
   let r;
   try {
-    r = await fetch(SUPA_URL + '/rest/v1/' + path, opts);
+    r = await fetch(SUPA_URL + '/rest/v1/' + path, _montarOpts());
   } catch(e) {
     _supaRegistrarFalha();
+    _supaFalhaCiclo(_ehEscrita ? 'escrita' : 'leitura', path, 'rede');
     return null;
+  }
+  // [FIX-SYNC v92] 401/403 = token REJEITADO pelo servidor (vencido, chave rotacionada,
+  // relógio fora de hora). Força a renovação e repete a requisição UMA vez. Sem isto,
+  // a rotina de 3 min repetia o mesmo token inválido indefinidamente — a origem da
+  // parada de 4 dias.
+  if ((r.status === 401 || r.status === 403) && window._unidadeSession && window._unidadeSession.refresh_token) {
+    const _ren = await unidadeRenovarToken(true).catch(()=>false);
+    if (_ren) {
+      try {
+        r = await fetch(SUPA_URL + '/rest/v1/' + path, _montarOpts());
+      } catch(e) {
+        _supaRegistrarFalha();
+        _supaFalhaCiclo(_ehEscrita ? 'escrita' : 'leitura', path, 'rede');
+        return null;
+      }
+    }
   }
   if (!r.ok) {
     // [v74.82] Conta falhas de tabela/coluna ausente — se muitas, liga o modo local automaticamente
     if (r.status===404 || r.status===400) _supaRegistrarFalha();
+    _supaFalhaCiclo(_ehEscrita ? 'escrita' : 'leitura', path, 'HTTP ' + r.status);
     if (!window._SUPA_DESLIGADO) { const err = await r.text(); console.warn('Supabase error:', err); }
     return null;
   }
   _supaFalhas = 0; // sucesso: zera o contador
+  if (_ehEscrita) window._SUPA_ULTIMO_OK = Date.now();
   const txt = await r.text();
   return txt ? JSON.parse(txt) : null;
 }
@@ -3443,13 +3490,21 @@ function _supaRegistrarFalha(){
   _supaFalhas++;
   if (_supaFalhas >= 5 && !window._SUPA_DESLIGADO) {
     window._SUPA_DESLIGADO = true;
-    try{ localStorage.setItem('exit_supa_off','1'); }catch(e){}
-    console.log('%c💾 [EXIT ERP] Modo LOCAL ativado — o banco na nuvem (Supabase) não está configurado. Os dados são salvos neste navegador. Para usar a nuvem, configure as tabelas (veja o SQL fornecido).','color:#0ea5e9;font-weight:bold');
+    // [FIX-SYNC v92] NÃO grava mais 'exit_supa_off' no localStorage. Antes, 5 falhas
+    // (uma queda de internet bastava) desligavam a nuvem PARA SEMPRE naquele
+    // computador — a flag era restaurada a cada recarga e o supaFetch passava a
+    // devolver null na primeira linha, sem nem tentar a rede, enquanto a tela
+    // seguia mostrando "Salvo". Agora o modo local vale só para esta sessão: ao
+    // recarregar a página o sistema volta a tentar a nuvem normalmente.
+    console.error('%c🔴 [EXIT ERP] MODO LOCAL ativado nesta sessão — a nuvem não respondeu 5 vezes. Os dados estão sendo salvos SÓ neste navegador. Recarregue a página (F5) para voltar a sincronizar.','color:#dc2626;font-weight:bold');
+    if(typeof toast==='function') toast('🔴 SEM NUVEM: salvando só neste computador. Recarregue a página (F5).','error');
     if(typeof setConexaoStatus==='function') setConexaoStatus(false);
+    if(typeof _atualizarIndicadorAutoSave==='function') _atualizarIndicadorAutoSave('erro-nuvem');
   }
 }
-// Restaura preferência de modo local entre sessões
-try{ if(localStorage.getItem('exit_supa_off')==='1') window._SUPA_DESLIGADO=true; }catch(e){}
+// [FIX-SYNC v92] Limpa a flag antiga persistida por versões anteriores — máquinas que
+// ficaram travadas em modo local voltam a sincronizar sozinhas ao abrir esta versão.
+try{ localStorage.removeItem('exit_supa_off'); }catch(e){}
 
 // ═══════════════════════════════════════════════════════════════════
 // [v74.85] AUTH POR UNIDADE — isolamento multi-tenant via Supabase Auth
@@ -3491,10 +3546,14 @@ function unidadeRestaurarSessao(){
   return false;
 }
 
-async function unidadeRenovarToken(){
+// [FIX-SYNC v92] Parâmetro "forcar": ignora a validade local do token e pede um novo
+// ao servidor. Necessário no retry de 401/403 — o token pode estar dentro da validade
+// gravada aqui e mesmo assim ser recusado pelo servidor (chave rotacionada, relógio
+// do computador errado). Sem forcar, a função retornava true sem renovar nada.
+async function unidadeRenovarToken(forcar){
   const s = window._unidadeSession;
   if(!s || !s.refresh_token || window._SUPA_DESLIGADO) return false;
-  if(s.expires_at && (s.expires_at - Date.now() > 300000)) return true;
+  if(!forcar && s.expires_at && (s.expires_at - Date.now() > 300000)) return true;
   try{
     const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
       method:'POST', headers:{ 'apikey': SUPA_KEY, 'Content-Type':'application/json' },
@@ -17540,7 +17599,10 @@ function _atualizarIndicadorAutoSave(estado) {
     inativo:  { cor: '#555',    label: 'Auto-save inativo' },
     pendente: { cor: '#d97706', label: '⚠ Alterações não salvas' },
     salvando: { cor: '#2563eb', label: '💾 Salvando...' },
-    salvo:    { cor: '#16a34a', label: '✅ Salvo automaticamente' }
+    salvo:    { cor: '#16a34a', label: '✅ Salvo automaticamente' },
+    // [FIX-SYNC v92] Estado novo: gravou no computador mas a NUVEM recusou.
+    // Antes isso era invisível — caía em 'salvo' e ninguém percebia.
+    'erro-nuvem': { cor: '#dc2626', label: '🔴 NÃO SALVO NA NUVEM' }
   };
   const cfg = mapa[estado] || mapa.inativo;
   dot.style.background = cfg.cor;
@@ -17548,6 +17610,23 @@ function _atualizarIndicadorAutoSave(estado) {
   if (estado === 'salvo') {
     const agora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
     txt.textContent = '✅ Salvo às ' + agora;
+  }
+  // [FIX-SYNC v92] No erro de nuvem, informa há quanto tempo nada sobe — é o dado que
+  // faltava para alguém perceber que o sistema parou de sincronizar.
+  if (estado === 'erro-nuvem') {
+    let _detalhe = '';
+    try {
+      if (window._SUPA_ULTIMO_OK) {
+        const _min = Math.round((Date.now() - window._SUPA_ULTIMO_OK) / 60000);
+        _detalhe = _min >= 1 ? (' (há ' + _min + ' min)') : '';
+      } else {
+        _detalhe = ' (nada subiu ainda)';
+      }
+    } catch(e){}
+    txt.textContent = cfg.label + _detalhe;
+    dot.style.animation = 'pulse 1.2s infinite';
+  } else if (dot.style.animation) {
+    dot.style.animation = '';
   }
 }
 
@@ -17559,9 +17638,25 @@ async function autoSaveExec(forcarSync) {
     // 1. Sempre persiste no cache local (síncrono e garantido)
     salvarCacheLocal();
     // 2. Tenta sincronizar com Supabase
+    // [FIX-SYNC v92] Zera o contador do ciclo ANTES de gravar: supaFetch nunca lança
+    // exceção (devolve null), então este contador é a única forma de saber se a nuvem
+    // realmente aceitou. Sem ele, o catch abaixo nunca era alcançado e o indicador
+    // mentia "Salvo" com 100% das gravações recusadas.
+    window._SUPA_FALHAS_ESCRITA = 0;
     await sDBSupabase();
+    if (window._SUPA_FALHAS_ESCRITA > 0) {
+      // Cache local está salvo (passo 1), mas a nuvem recusou: alarme visível.
+      _unsavedChanges = true;
+      _atualizarIndicadorAutoSave('erro-nuvem');
+      if (typeof setConexaoStatus === 'function') setConexaoStatus(false);
+      const _e = window._SUPA_ULTIMO_ERRO || {};
+      console.error('[EXIT ERP] 🔴 NUVEM RECUSOU ' + window._SUPA_FALHAS_ESCRITA + ' gravação(ões). Último erro:', _e.motivo || '?', 'em', _e.path || '?');
+      if (forcarSync) toast('🔴 NÃO subiu para a nuvem (' + (_e.motivo || 'erro') + '). Salvo só neste computador.', 'error');
+      return;
+    }
     _unsavedChanges = false;
     _atualizarIndicadorAutoSave('salvo');
+    if (typeof setConexaoStatus === 'function') setConexaoStatus(true);
     if (forcarSync) toast('💾 Dados salvos com sucesso!', 'success');
   } catch(e) {
     // Falha na nuvem — cache local já foi salvo, não é catastrófico
@@ -26402,6 +26497,10 @@ function runFinancialTests() {
     if (navigator.onLine === false) return;              // sem rede: não adianta
     _emResync = true;
     try {
+      // [FIX-SYNC v92] Zera o contador de falhas de leitura do ciclo. Antes, este laço
+      // engolia todos os erros e logo abaixo pintava "🟢 Online" incondicionalmente —
+      // o console dizia "Re-sincronizado" com 100% das leituras recusadas.
+      window._SUPA_FALHAS_LEITURA = 0;
       for (var i=0;i<TABELAS.length;i++){
         try { await sincTabela(TABELAS[i]); } catch(_e){}
       }
@@ -26410,8 +26509,15 @@ function runFinancialTests() {
       if (typeof renderPage === 'function' && typeof UA !== 'undefined' && UA && !_digitando()) {
         try { renderPage(); } catch(_e){}
       }
-      if (typeof setConexaoStatus === 'function') setConexaoStatus(true);
-      console.info('[CONEXAO] 🔄 Re-sincronizado ('+motivo+').');
+      var _falhas = window._SUPA_FALHAS_LEITURA || 0;
+      if (typeof setConexaoStatus === 'function') setConexaoStatus(_falhas === 0);
+      if (_falhas === 0) {
+        console.info('[CONEXAO] 🔄 Re-sincronizado ('+motivo+').');
+      } else {
+        var _e = window._SUPA_ULTIMO_ERRO || {};
+        console.error('[CONEXAO] 🔴 Sincronização FALHOU ('+motivo+') — ' + _falhas + ' leitura(s) recusada(s). Último erro: ' + (_e.motivo||'?') + ' em ' + (_e.path||'?'));
+        if (typeof _atualizarIndicadorAutoSave === 'function') _atualizarIndicadorAutoSave('erro-nuvem');
+      }
     } finally { _emResync = false; }
   }
   window._forcarResync = function(){ return _resync('manual'); }; // disponível no console
@@ -26448,6 +26554,86 @@ function runFinancialTests() {
   setInterval(function(){ _resync('rotina 3min'); }, 3*60*1000);
 
   console.info('[CONEXAO] 🛡️ Watchdog de reconexão v91 ativo — resync em reconexão, rede restaurada, aba reativada e a cada 3 min.');
+})();
+
+/* ═══ [FIX-SYNC v92] VIGIA DE SINCRONIZAÇÃO — SALVAMENTO CONSTANTE ═══
+   Necessário porque a rede opera com mais de uma unidade ao mesmo tempo: se um
+   balcão para de subir dados, ninguém percebe olhando a tela dele.
+   Faz três coisas, todas isoladas neste bloco (remover o <script> volta ao estado
+   anterior, sem efeito colateral em nenhuma função do ERP):
+   1) Renova a sessão a cada 15 min, ANTES de vencer (o token dura 1 h).
+   2) A cada 2 min, se houver alteração pendente, força o envio para a nuvem.
+   3) Se a nuvem não aceitar nada por mais de 10 min, dispara alarme na tela
+      repetidamente — ninguém mais opera 4 dias achando que está salvo.        */
+(function _vigiaSincronizacao(){
+  'use strict';
+  if (window.__VIGIA_SYNC_V92__) return;
+  window.__VIGIA_SYNC_V92__ = true;
+
+  var LIMITE_ALARME_MS = 10 * 60 * 1000;
+  var _ultimoAviso = 0;
+
+  // (1) Renovação preventiva da sessão — o token vence em 1 h; renovar a cada 15 min
+  // garante que ele nunca chegue vencido numa gravação.
+  setInterval(function(){
+    try {
+      if (typeof unidadeRenovarToken !== 'function') return;
+      if (!window._unidadeSession || !window._unidadeSession.refresh_token) return;
+      unidadeRenovarToken().then(function(ok){
+        if (!ok) console.warn('[VIGIA] Renovação preventiva da sessão falhou — próxima gravação tentará forçar.');
+      }).catch(function(){});
+    } catch(_e){}
+  }, 15 * 60 * 1000);
+
+  // (2) Envio constante: a cada 2 min, se há alteração pendente, empurra para a nuvem.
+  // (O auto-save do ERP continua funcionando normalmente — isto é uma rede extra.)
+  setInterval(function(){
+    try {
+      if (typeof UA === 'undefined' || !UA) return;
+      if (typeof autoSaveExec !== 'function') return;
+      if (navigator.onLine === false) return;
+      var _pend = (typeof _unsavedChanges !== 'undefined') && _unsavedChanges;
+      var _travado = window._SUPA_ULTIMO_OK && (Date.now() - window._SUPA_ULTIMO_OK > LIMITE_ALARME_MS);
+      if (_pend || _travado) autoSaveExec(false);
+    } catch(_e){}
+  }, 2 * 60 * 1000);
+
+  // (3) Alarme persistente enquanto a nuvem estiver recusando.
+  setInterval(function(){
+    try {
+      if (typeof UA === 'undefined' || !UA) return;
+      var ok = window._SUPA_ULTIMO_OK;
+      var parado = ok ? (Date.now() - ok > LIMITE_ALARME_MS) : false;
+      if (!parado && !window._SUPA_DESLIGADO) return;
+      if (Date.now() - _ultimoAviso < 5 * 60 * 1000) return; // no máximo 1 aviso a cada 5 min
+      _ultimoAviso = Date.now();
+      var _min = ok ? Math.round((Date.now() - ok) / 60000) : null;
+      var _msg = _min
+        ? ('🔴 ATENÇÃO: nada é salvo na nuvem há ' + _min + ' min. Os dados estão só neste computador.')
+        : '🔴 ATENÇÃO: o sistema não está salvando na nuvem. Os dados estão só neste computador.';
+      if (typeof _atualizarIndicadorAutoSave === 'function') _atualizarIndicadorAutoSave('erro-nuvem');
+      if (typeof setConexaoStatus === 'function') setConexaoStatus(false);
+      if (typeof toast === 'function') toast(_msg, 'error');
+      console.error('[VIGIA] ' + _msg);
+    } catch(_e){}
+  }, 60 * 1000);
+
+  // Diagnóstico sob demanda no console: _statusNuvem()
+  window._statusNuvem = function(){
+    var s = window._unidadeSession || {};
+    return {
+      modoLocal: !!window._SUPA_DESLIGADO,
+      sessao: !!s.access_token,
+      unidade: s.unidade_id || null,
+      expiraEm: s.expires_at ? new Date(s.expires_at).toLocaleString('pt-BR') : null,
+      ultimaGravacaoAceita: window._SUPA_ULTIMO_OK ? new Date(window._SUPA_ULTIMO_OK).toLocaleString('pt-BR') : 'nenhuma nesta sessão',
+      falhasEscritaUltimoCiclo: window._SUPA_FALHAS_ESCRITA || 0,
+      falhasLeituraUltimoCiclo: window._SUPA_FALHAS_LEITURA || 0,
+      ultimoErro: window._SUPA_ULTIMO_ERRO || null
+    };
+  };
+
+  console.info('[VIGIA] 🛡️ Vigia de sincronização v92 ativo — renovação de sessão a cada 15 min, envio a cada 2 min e alarme se a nuvem parar de aceitar. Diagnóstico: _statusNuvem()');
 })();
   </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->

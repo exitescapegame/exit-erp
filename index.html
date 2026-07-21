@@ -245,6 +245,7 @@ tr:last-child td{border-bottom:none}
 .hsl.ocupado .hl{color:var(--danger)}.hsl.analise .hl{color:var(--warn)}.hsl.manutencao .hl{color:var(--purple)}
 /* [v74.43] Status de jogo: concluído / chegando / atrasado */
 .hsl.concluido{background:rgba(22,163,74,.15);border-color:#16a34a}.hsl.concluido .hl{color:#16a34a}
+.hsl.encerrado{background:#ececf2;border-color:#d5d5e0;opacity:.55}.hsl.encerrado .hl{color:#8b8b9a}.hsl.encerrado .ht{color:#a0a0ae}
 .hsl.chegando{background:rgba(245,158,11,.18);border-color:var(--amber);animation:piscaAmarelo 1s infinite}.hsl.chegando .hl{color:#b45309;font-weight:800}
 .hsl.atrasado{background:rgba(220,38,38,.2);border-color:#dc2626;animation:piscaVermelho .8s infinite}.hsl.atrasado .hl{color:#dc2626;font-weight:800}
 .hsl.atraso-afetado{background:rgba(245,158,11,.1);border-color:var(--amber);border-style:dashed}
@@ -5991,6 +5992,20 @@ function _liberarSlotNoShow(sId,h,ocupante){
 function _statusVisualSlot(sId, h, stBase){
   try{
     const hj = hoje();
+    // [FIX-SLOT-ENCERRADO] Slot LIVRE cujo horário já passou (30min de margem,
+    // cobrindo o jogo de 25min e vendas de última hora do slot corrente) aparece
+    // como "Encerrado" (apagado) em vez de "LIVRE". SOMENTE visual: o clique
+    // continua abrindo a venda normal — registrar uma venda retroativa do dia
+    // continua possível. À meia-noite, hoje() vira e o grid volta limpo sozinho.
+    if(stBase==='vago'){
+      const _agoraMin = new Date().getHours()*60 + new Date().getMinutes();
+      const _p = String(h||'').split(':');
+      const _slotMin = (parseInt(_p[0],10)||0)*60 + (parseInt(_p[1],10)||0);
+      if(_agoraMin - _slotMin > 30){
+        return {cls:'encerrado', lbl:'Encerrado'};
+      }
+      return null;
+    }
     // Acha a venda/reserva ocupando este slot hoje
     const venda = (DB.vendas||[]).find(v=>String(v.salaId)===String(sId) && v.horario===h && v.data===hj && v.status==='confirmado');
     const reserva = (DB.eventos||[]).find(e=>e.tipo==='reserva' && e.status!=='cancelado' && e.data===hj && e.hora===h &&
@@ -6059,7 +6074,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v96] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho)');
+  console.log('🔒 [INTEGRIDADE v97] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}

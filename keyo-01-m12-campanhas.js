@@ -466,7 +466,13 @@ async function _k12GerarIA() {
         agente:     'mkt',
         mensagem:   msgCompleta,
         historico:  [],
-        unidade_id: Number(unidadeId) || Number(window.UA?.unidade) || 1,
+        // [FIX-UNIDADE-ID] window.UA?.unidade nunca existiu (campo real: unidadeId);
+        // o fallback sempre caía em "1" (Aracaju). pdvUID() é a mesma função que o
+        // resto do ERP usa (respeita a unidade selecionada pelo ADM no PDV).
+        unidade_id: Number(unidadeId)
+          || Number(typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+          || Number(window.UA?.unidadeId)
+          || 1,
       })
     });
 

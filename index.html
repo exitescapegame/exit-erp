@@ -3757,6 +3757,68 @@ function _cfgGuard(chave, arr) {
   return arr;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// [FIX-CAIXA-MERGE] Proteção contra perda de lançamentos do caixa em
+// uso multi-aparelho. O caixa é gravado como um blob único por unidade;
+// sem isto, dois aparelhos da MESMA unidade abertos ao mesmo tempo se
+// sobrescrevem ("último a salvar vence") e o lançamento feito num deles
+// some silenciosamente quando o outro salva — com a venda continuando
+// registrada em DB.vendas ("venda existe, dinheiro não aparece").
+// Antes de gravar, lemos a linha atual do banco e MESCLAMOS: lançamentos
+// que existem lá e faltam aqui são incorporados (com ajuste de
+// entradas/saídas/saldo igual ao dos lançamentos originais), desde que
+// seja a MESMA sessão de caixa. Append-only: nunca reordena o histórico,
+// porque o estorno endereça lançamentos pelo índice do array.
+// ═══════════════════════════════════════════════════════════════════
+function _hidDeItemCx(h){
+  // Identidade de um lançamento: hid explícito quando existe; senão uma
+  // assinatura do conteúdo (para lançamentos gravados antes deste fix).
+  if (h && h.hid) return 'hid|' + h.hid;
+  return 'leg|' + [h?.tipo||'', h?.desc||'', h?.valor||0, h?.hora||'', h?.data||''].join('|');
+}
+function _garantirHidsCaixa(cx){
+  (cx?.historico||[]).forEach(h => {
+    if (h && !h.hid) h.hid = 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  });
+}
+function _mesclarCaixaRemoto(k, remoto){
+  const local = DB.caixaUnidades ? DB.caixaUnidades[k] : null;
+  if (!local || !remoto) return 0;
+  // Só mescla dentro da MESMA sessão de caixa — nunca ressuscita histórico
+  // de dia anterior nem de uma reabertura com fundo diferente. Se qualquer
+  // condição falhar, não mexe em nada (grava-se como sempre se gravou).
+  if (local.aberto !== true || remoto.aberto !== true) return 0;
+  if (String(remoto.dataCaixa||'') !== String(local.dataCaixa||'')) return 0;
+  if ((parseFloat(remoto.saldoInicial)||0) !== (parseFloat(local.saldoInicial)||0)) return 0;
+
+  // Contagem multiset: dois lançamentos legítimos idênticos (mesmo minuto,
+  // mesmo valor) não são confundidos — só se incorpora o que realmente falta.
+  const contagemLocal = {};
+  (local.historico||[]).forEach(h => { const id=_hidDeItemCx(h); contagemLocal[id]=(contagemLocal[id]||0)+1; });
+  const faltantes = [];
+  (remoto.historico||[]).forEach(h => {
+    const id = _hidDeItemCx(h);
+    if (contagemLocal[id] > 0) { contagemLocal[id]--; return; }
+    faltantes.push(h);
+  });
+  if (!faltantes.length) return 0;
+
+  if (!Array.isArray(local.historico)) local.historico = [];
+  faltantes.forEach(h => {
+    local.historico.push(h); // append-only: preserva índices usados pelo estorno
+    const v = parseFloat(h?.valor)||0;
+    if (h?.tipo === 'entrada' && v > 0){ local.entradas=(local.entradas||0)+v; local.saldoAtual=(local.saldoAtual||0)+v; }
+    else if (h?.tipo === 'saida' && v > 0){ local.saidas=(local.saidas||0)+v; local.saldoAtual=Math.max(0,(local.saldoAtual||0)-v); }
+    // tipo 'sistema' (abertura/fechamento/avisos): só registro, não altera somas
+  });
+  try{
+    if(typeof registrarAuditoria==='function') registrarAuditoria('CAIXA_MERGE_MULTIDEVICE',
+      `Recuperados ${faltantes.length} lançamento(s) do caixa feitos em outro aparelho (unidade ${k})`,
+      (typeof UA!=='undefined'&&UA)?UA.id:null);
+  }catch(_){ }
+  return faltantes.length;
+}
+
 async function sDBSupabase() {
   // [BUG4-FIX] Guard: nunca salva se o banco ainda não foi carregado (evita sobrescrever dados reais com DBD defaults)
   if (!_DB_CARREGADO) {
@@ -3890,12 +3952,22 @@ async function sDBSupabase() {
   }
 
   // Caixa por unidade
+  // [FIX-CAIXA-MERGE] Lê a linha atual e mescla lançamentos feitos em outro
+  // aparelho ANTES de gravar (ver _mesclarCaixaRemoto acima). Se a leitura
+  // falhar, grava exatamente como sempre gravou — o fix nunca bloqueia o save.
   const cxKeys = Object.keys(DB.caixaUnidades||{});
   if (cxKeys.length) {
-    ops.push(supaFetch('caixa_unidades', 'POST',
-      // FIX: chave já é string de String(uId), passar diretamente
-      cxKeys.map(k => ({ unidade_id: k, dados: DB.caixaUnidades[k], atualizado_em: new Date().toISOString() }))
-    ));
+    ops.push((async () => {
+      try {
+        _garantirHidsCaixa && cxKeys.forEach(k => _garantirHidsCaixa(DB.caixaUnidades[k]));
+        const atuais = await supaFetch('caixa_unidades?select=unidade_id,dados&unidade_id=in.(' + cxKeys.map(encodeURIComponent).join(',') + ')');
+        (atuais||[]).forEach(r => { try { _mesclarCaixaRemoto(String(r.unidade_id), r.dados); } catch(_){ } });
+      } catch(_){ /* leitura indisponível: segue com a gravação normal */ }
+      return supaFetch('caixa_unidades', 'POST',
+        // FIX: chave já é string de String(uId), passar diretamente
+        cxKeys.map(k => ({ unidade_id: k, dados: DB.caixaUnidades[k], atualizado_em: new Date().toISOString() }))
+      );
+    })());
   }
 
   // [FEATURE-RECIBOS-CLOUD] Recibos (pagamentos de colaborador, vendas, etc.) — ANTES
@@ -5987,7 +6059,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v94] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado)');
+  console.log('🔒 [INTEGRIDADE v96] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -10462,23 +10534,20 @@ async function _pagarColaborador(colabId, valor){
   registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO',`Solicitação de pagamento de ${fM(valorFinal)} para ${c.nome}, aguardando aprovação dele`,UA?.id,solicitacao);
   toast(`📤 Solicitação enviada! ${c.nome} vai aprovar com o PIN dele no próximo login.`,'success');
 
-  _notificarColabPagamentoPendente(c, valorFinal);
+  _notificarColabPagamentoPendente(c, valorFinal, solicitacao.id);
 }
 // [FEATURE-PAGAMENTO-REMOTO] Envia um e-mail avisando o colaborador que há um
 // pagamento aguardando a aprovação dele (não é o recibo final — é só o aviso).
-async function _notificarColabPagamentoPendente(c, valor){
+async function _notificarColabPagamentoPendente(c, valor, solicitacaoId){
   try{
     if(!c.email) return; // sem e-mail cadastrado, não há como avisar remotamente
+    // [FIX-VALIDACAO-RECIBO] Manda só o ID do recibo — a Edge Function busca
+    // nome, valor e e-mails reais no banco, em vez de confiar no que o
+    // navegador informa (evita recibo/aviso falso enviado por terceiros).
     const r = await fetch(SUPA_URL + '/functions/v1/send-payment-receipt', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPA_KEY, 'apikey':SUPA_KEY },
-      body: JSON.stringify({
-        colaboradorNome: c.nome, colaboradorEmail: c.email, unidadeEmail:'', unidadeNome:'',
-        valor, mesReferencia: hoje().slice(0,7),
-        dataHoraFormatada: `${fD(hoje())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
-        textoJuridico: `Este é um AVISO de pagamento pendente — ainda não é o recibo final. Acesse o sistema EXIT e faça login com seu PIN pessoal para revisar e aprovar este pagamento de ${fM(valor)}.`,
-        pagoPor: UA?.nome||'', assunto_customizado:'aviso_pendente'
-      })
+      body: JSON.stringify({ recId: solicitacaoId, pagoPor: UA?.nome||'' })
     });
     if(!r.ok) console.warn('[aviso-pendente] falha ao enviar:', await r.text());
   }catch(e){ console.warn('[aviso-pendente] erro:', e); }
@@ -10600,20 +10669,14 @@ async function _enviarReciboColabPorEmail(c, ctx, rec){
     const uni=(DB.unidades||[]).find(u=>String(u.id)===String(ctx.unidadeId));
     const destinos=[c.email, uni?.emailNotificacao].filter(Boolean);
     if(!destinos.length) return; // ninguém configurado — nada a enviar
+    // [FIX-VALIDACAO-RECIBO] Manda só o ID do recibo já assinado — a Edge
+    // Function busca valor/nome/e-mails reais no banco (o recibo já foi
+    // gravado com sDB() antes desta chamada), em vez de confiar no corpo
+    // da requisição.
     const r = await fetch(SUPA_URL + '/functions/v1/send-payment-receipt', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPA_KEY, 'apikey':SUPA_KEY },
-      body: JSON.stringify({
-        colaboradorNome: c.nome,
-        colaboradorEmail: c.email||'',
-        unidadeEmail: uni?.emailNotificacao||'',
-        unidadeNome: uni?.nome||'',
-        valor: ctx.valor,
-        mesReferencia: hoje().slice(0,7),
-        dataHoraFormatada: `${fD(hoje())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
-        textoJuridico: TEXTO_JURIDICO_RECIBO,
-        pagoPor: UA?.nome||''
-      })
+      body: JSON.stringify({ recId: rec.id, pagoPor: UA?.nome||'' })
     });
     if(!r.ok){ console.warn('[recibo-email] falha ao enviar:', await r.text()); return; }
     const data = await r.json().catch(()=>null);

@@ -1858,7 +1858,11 @@ Entregue o projeto completo com todas as 14 seções. Seja o Cientista: rigoroso
 // ── Chamada simples à IA ─────────────────────────────────────────
 async function _chamarCientista(sistema, usuario) {
   const SUPA_URL = 'https://utivaczfuuazspychdxt.supabase.co/functions/v1/super-action';
-  const unidade  = (window.UA && (window.UA.unidade || window.UA.unidadeId)) || 1;
+  // [FIX-UNIDADE-ID] window.UA.unidade nunca existiu (campo real: unidadeId).
+  // pdvUID() é a função oficial do ERP para a unidade ativa (respeita o seletor do ADM).
+  const unidade  = Number(typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+    || Number(window.UA?.unidadeId)
+    || 1;
 
   const resp = await fetch(SUPA_URL, {
     method: 'POST',

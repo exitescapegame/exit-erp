@@ -1,14 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// EXIT GAMES — KEYO UI v2.6
+// EXIT GAMES — KEYO UI v2.7
 // Arquivo: keyo-01-ui.js
 // Depende de: keyo-00-core.js (deve ser carregado antes)
-// Cobre: Etapas 1.2 + 1.3 + 1.4 do Plano Mestre v2.0
-// v2.6: FIX-ADM-TODAS — _montarContextoAgente() agora trata login ADM
-//        (unidade_id="todas", sem seletor de unidade no painel): monta
-//        contexto das DUAS unidades (Aracaju + Salvador) separadamente,
-//        em vez de zerar tudo e rotular sempre como Aracaju.
-// v2.0: FIX — keyo-mpros-inline adicionado na lista de limpeza de _trocarAgente() e _abrirModulo(); remove módulos inline SEMPRE (não só
-//        quando _kAba !== 'chat'). Remove m12 a m16 e chama _k15Stop().
+// v2.7: FIX-ADM-EXPLICITO — para operador ADM (isAdm()), o chat envia
+//        unidade_id='todas' SEMPRE, ignorando window._pdvUnidade (estado
+//        interno do PDV que mandava "1" sem o usuário saber). O servidor
+//        (super-action v37) converte 'todas' em contexto das DUAS unidades.
+//        Mesmo critério aplicado ao contexto local (_montarContextoAgente).
+// v2.6: FIX-ADM-TODAS — contexto das duas unidades quando uniId='todas'.
 // NUNCA modificar funções do ERP base.
 // ═══════════════════════════════════════════════════════════════
 (function _KEYO_UI() {
@@ -30,6 +29,14 @@ window.__KEYO_UI_LOADED__ = true; // alias para diagnóstico
 const _ERP_ORIG_RENDER = window.renderPage;
 const _ERP_ORIG_RSB    = window.rSb;
 const _ERP_ORIG_GOTO   = window.goTo;
+
+// ── [v2.7] Detecção de ADM — mesma régua de permissão do ERP ────
+function _keyoEhAdm() {
+  try {
+    if (typeof window.isAdm === 'function' && window.isAdm()) return true;
+  } catch (_) { /* segue no fallback */ }
+  return String((window.UA && window.UA.unidadeId) || '') === 'todas';
+}
 
 // ════════════════════════════════════════════════════════════════
 // ESTADO INTERNO
@@ -607,7 +614,7 @@ function _hideLoading() {
 
 // ════════════════════════════════════════════════════════════════
 // CONTEXTO REAL DO DB — injetado no prompt de cada agente
-// [FIX-ADM-TODAS aplicado aqui]
+// [v2.6 FIX-ADM-TODAS + v2.7 FIX-ADM-EXPLICITO]
 // ════════════════════════════════════════════════════════════════
 function _montarContextoAgente(agente) {
   try {
@@ -615,16 +622,17 @@ function _montarContextoAgente(agente) {
     const anoAtual = new Date().getFullYear();
     const mesAtual = hoje.slice(0, 7);
 
-    const uniIdRaw = String(
-      (typeof window.pdvUID === 'function' ? window.pdvUID() : null)
-      ?? window.UA?.unidadeId
-      ?? 1
-    );
+    // [v2.7] ADM → SEMPRE 'todas' (duas unidades), ignorando window._pdvUnidade:
+    // evidência dos keyo_logs mostrou que o PDV deixava "1" nesse estado interno
+    // e o KEYO herdava sem o usuário saber. Não-ADM → mesma lógica de antes.
+    const uniIdRaw = _keyoEhAdm()
+      ? 'todas'
+      : String(
+          (typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+          ?? window.UA?.unidadeId
+          ?? 1
+        );
 
-    // [FIX-ADM-TODAS] Login ADM tem unidade_id = "todas" em app_metadata, sem
-    // seletor de unidade no painel. Antes, "todas" não batia com "1"/"2" em
-    // nenhum filtro e o contexto saía zerado, rotulado sempre como Aracaju.
-    // Agora: monta as DUAS unidades separadamente quando for "todas".
     const unidadesParaMontar = uniIdRaw === 'todas' ? ['1', '2'] : [uniIdRaw];
 
     const vendasTodas        = Array.isArray(window.DB?.vendas)        ? window.DB.vendas        : [];
@@ -774,9 +782,16 @@ async function _enviar() {
     .slice(-20)
     .map(function(m) { return { role: m.role === 'user' ? 'user' : 'assistant', content: m.texto }; });
 
-  const unidadeId = (typeof window.pdvUID === 'function' ? window.pdvUID() : null)
-    || (window.UA && window.UA.unidadeId)
-    || 1;
+  // [v2.7 FIX-ADM-EXPLICITO] ADM → 'todas' SEMPRE (servidor v37 converte em
+  // contexto das duas unidades). Evidência dos keyo_logs: pdvUID() herdava
+  // window._pdvUnidade="1" do PDV e o chat mandava Aracaju sem o usuário saber.
+  // Não-ADM → mesma lógica de antes (unidade do operador).
+  const unidadeId = _keyoEhAdm()
+    ? 'todas'
+    : ((typeof window.pdvUID === 'function' ? window.pdvUID() : null)
+        || (window.UA && window.UA.unidadeId)
+        || 1);
+  console.info('[KEYO-01] enviando unidade_id =', unidadeId);
 
   const _ctx = _montarContextoAgente(_kAgente);
   const _msgFinal = _ctx ? (_ctx + '\n\n' + texto) : texto;
@@ -928,6 +943,6 @@ if (document.readyState === 'loading') {
   _injetarMenu();
 }
 
-console.info('[KEYO-01] ✅ UI v2.6 — FIX-ADM-TODAS: contexto do ADM mostra as duas unidades separadamente em vez de zerar tudo. Salas lidas ao vivo do app + preço atual da unidade no contexto.');
+console.info('[KEYO-01] ✅ UI v2.7 — FIX-ADM-EXPLICITO: ADM envia unidade_id=todas sempre (duas unidades no contexto), ignorando estado interno do PDV.');
 
 })();

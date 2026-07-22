@@ -3769,19 +3769,34 @@ function iniciarRealtime() {
 // 1000 linhas por padrão, silenciosamente — sem erro, só corta o resto. Tabelas
 // que passam de 1000 registros (ex.: vendas, com meses de histórico) tinham o
 // final cortado. Esta função busca em páginas de 1000 até não sobrar mais nada.
+// [FIX-CONCORRENCIA v2] O travamento de 1000 linhas exigiu 2 chamadas (2 páginas)
+// em vez de 1. Como várias rotinas (reconexão, aba reativada, rotina de 3 min)
+// podiam chamar sincTabela('vendas') ao mesmo tempo, e nenhuma esperava a
+// anterior terminar, com a rede instável essas buscas se empilharam — dezenas
+// de conexões abertas ao mesmo tempo, travando o navegador (ERR_INSUFFICIENT_
+// RESOURCES). Esta trava garante que só uma busca de vendas roda por vez;
+// uma nova chamada enquanto a anterior ainda está em andamento é ignorada
+// (a que já está rodando termina e atualiza os dados normalmente).
+window._paginandoVendas = false;
 async function _supaFetchTodasPaginas(pathBase){
-  let todas = [];
-  let offset = 0;
-  const TAM_PAGINA = 1000;
-  while (true) {
-    const sep = pathBase.includes('?') ? '&' : '?';
-    const pagina = await supaFetch(`${pathBase}${sep}limit=${TAM_PAGINA}&offset=${offset}`);
-    if (!pagina || !pagina.length) break;
-    todas = todas.concat(pagina);
-    if (pagina.length < TAM_PAGINA) break; // última página (veio incompleta = acabou)
-    offset += TAM_PAGINA;
+  if (pathBase.startsWith('vendas') && window._paginandoVendas) return null;
+  if (pathBase.startsWith('vendas')) window._paginandoVendas = true;
+  try {
+    let todas = [];
+    let offset = 0;
+    const TAM_PAGINA = 1000;
+    while (true) {
+      const sep = pathBase.includes('?') ? '&' : '?';
+      const pagina = await supaFetch(`${pathBase}${sep}limit=${TAM_PAGINA}&offset=${offset}`);
+      if (!pagina || !pagina.length) break;
+      todas = todas.concat(pagina);
+      if (pagina.length < TAM_PAGINA) break; // última página (veio incompleta = acabou)
+      offset += TAM_PAGINA;
+    }
+    return todas;
+  } finally {
+    if (pathBase.startsWith('vendas')) window._paginandoVendas = false;
   }
-  return todas;
 }
 async function sincTabela(tbl) {
   try {

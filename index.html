@@ -3422,6 +3422,20 @@ function _supaFalhaCiclo(tipo, path, motivo){
 
 async function supaFetch(path, method='GET', body=null) {
   const _ehEscrita = (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE');
+  // [FIX-RETRY-MODO-LOCAL v1] Antes, uma vez em modo local (5 falhas seguidas), só saía
+  // com F5 — podia ficar travado indefinidamente mesmo depois do Supabase voltar a
+  // responder (ex.: durante uma importação em lote que já passou). Agora, depois de
+  // alguns minutos, tenta a nuvem de novo sozinho. Se voltar a falhar, reentra no modo
+  // local pela mesma contagem de 5 falhas de sempre — não desliga a proteção, só dá
+  // uma chance automática de voltar sem precisar recarregar a página.
+  const _RETRY_MODO_LOCAL_MS = 5 * 60 * 1000; // 5 minutos
+  if (window._SUPA_DESLIGADO && window._SUPA_DESLIGADO_QUANDO &&
+      (Date.now() - window._SUPA_DESLIGADO_QUANDO > _RETRY_MODO_LOCAL_MS)) {
+    console.info('[EXIT ERP] Modo local: tentando reconectar à nuvem automaticamente após ' + Math.round(_RETRY_MODO_LOCAL_MS/60000) + ' min.');
+    window._SUPA_DESLIGADO = false;
+    window._SUPA_DESLIGADO_QUANDO = null;
+    _supaFalhas = 0;
+  }
   // [v74.82] MODO LOCAL: se o Supabase não está configurado, não tenta a rede (evita erros no Console)
   if (window._SUPA_DESLIGADO) { if (_ehEscrita) _supaFalhaCiclo('escrita', path, 'modo-local'); return null; }
   // [v74.85] AUTH POR UNIDADE: usa o token da sessão de unidade quando existe (isolamento via RLS).
@@ -3490,6 +3504,7 @@ function _supaRegistrarFalha(){
   _supaFalhas++;
   if (_supaFalhas >= 5 && !window._SUPA_DESLIGADO) {
     window._SUPA_DESLIGADO = true;
+    window._SUPA_DESLIGADO_QUANDO = Date.now(); // [FIX-RETRY-MODO-LOCAL v1] usado pelo retry automático em supaFetch()
     // [FIX-SYNC v92] NÃO grava mais 'exit_supa_off' no localStorage. Antes, 5 falhas
     // (uma queda de internet bastava) desligavam a nuvem PARA SEMPRE naquele
     // computador — a flag era restaurada a cada recarga e o supaFetch passava a
@@ -3665,6 +3680,14 @@ try{ unidadeRestaurarSessao(); }catch(e){}
 
 // ── SINCRONIZAÇÃO EM TEMPO REAL (WebSocket) ──────────────────
 let _realtimeWS = null;
+// [FIX-WS v1] Timer de reconexão pendente + backoff progressivo. Objetivo: (a) nunca
+// deixar dois sockets abertos ao mesmo tempo (antes, iniciarRealtime() nunca fechava
+// o anterior); (b) não martelar o servidor a cada 5s fixo se a queda for do lado do
+// Supabase, não da rede local. 100% aditivo — se algo der errado, reverte-se restaurando
+// só este bloco e a função iniciarRealtime() para a versão anterior.
+let _realtimeReconectTimer = null;
+let _realtimeBackoffMs = 5000;
+const _REALTIME_BACKOFF_MAX_MS = 30000; // teto de 30s
 function setConexaoStatus(ok) {
   const dot = document.getElementById('sbConexaoDot');
   const txt = document.getElementById('sbConexaoTxt');
@@ -3673,6 +3696,20 @@ function setConexaoStatus(ok) {
 }
 function iniciarRealtime() {
   try {
+    // [FIX-WS v1] Cancela qualquer reconexão pendente antes de abrir uma nova — impede
+    // que o timer do onclose e o gatilho do evento 'online' disparem sockets duplicados.
+    if (_realtimeReconectTimer) { clearTimeout(_realtimeReconectTimer); _realtimeReconectTimer = null; }
+    // [FIX-WS v1] Fecha explicitamente a conexão anterior antes de abrir outra. Zera os
+    // handlers primeiro para o close do socket antigo não disparar mais uma reconexão.
+    if (_realtimeWS) {
+      try {
+        _realtimeWS.onclose = null;
+        _realtimeWS.onerror = null;
+        if (_realtimeWS.readyState === WebSocket.OPEN || _realtimeWS.readyState === WebSocket.CONNECTING) {
+          _realtimeWS.close();
+        }
+      } catch(_e){}
+    }
     // [v83 fix] Token enviado na URL (apikey) E no payload do phx_join.
     // O Supabase Realtime rejeita a conexao WS se nao houver apikey na URL,
     // independentemente do token enviado no phx_join.
@@ -3680,6 +3717,7 @@ function iniciarRealtime() {
     const wsUrl = SUPA_URL.replace('https','wss') + '/realtime/v1/websocket?vsn=1.0.0&apikey=' + SUPA_KEY;
     _realtimeWS = new WebSocket(wsUrl);
     _realtimeWS.onopen = () => {
+      _realtimeBackoffMs = 5000; // [FIX-WS v1] conectou com sucesso: reseta o backoff
       setConexaoStatus(true);
       // [v83 sync] Assina todas as tabelas que podem mudar entre usuários
       ['vendas','ocupacao','caixa_unidades','config','salas','colaboradores','clientes','unidades'].forEach(tbl => {
@@ -3714,8 +3752,13 @@ function iniciarRealtime() {
     };
     _realtimeWS.onclose = () => {
       setConexaoStatus(false);
-      // Reconecta após 5s
-      setTimeout(iniciarRealtime, 5000);
+      // [FIX-WS v1] Backoff progressivo (5s → 10s → 20s → 30s teto) em vez de 5s fixo.
+      if (_realtimeReconectTimer) clearTimeout(_realtimeReconectTimer);
+      _realtimeReconectTimer = setTimeout(() => {
+        _realtimeReconectTimer = null;
+        iniciarRealtime();
+      }, _realtimeBackoffMs);
+      _realtimeBackoffMs = Math.min(_realtimeBackoffMs * 2, _REALTIME_BACKOFF_MAX_MS);
     };
     _realtimeWS.onerror = () => setConexaoStatus(false);
   } catch(e) { console.warn('Realtime WS error:', e); setConexaoStatus(false); }
@@ -3790,6 +3833,11 @@ function _sDBCore() {
 }
 
 let _sDBSupabaseRunning = false; // guard contra chamadas concorrentes
+// [FIX-FILA v1] Antes, uma chamada que chegava enquanto outra rodava esperava 300ms e,
+// se ainda estivesse ocupado, era descartada (podia perder gravações — ex.: várias
+// chamadas em sequência rápida numa importação em lote). Agora ela marca esta flag e
+// o save em andamento, ao terminar, dispara uma nova rodada sozinho.
+let _sDBSupabasePendente = false;
 let _DB_CARREGADO = false; // [BUG4-FIX] flag: só permite sDB() após carga confirmada do Supabase
 
 // [BLINDAGEM ANTI-WIPE v87] Memória do estado REAL no momento da carga.
@@ -3905,13 +3953,13 @@ async function sDBSupabase() {
     if (typeof toast === 'function') toast('⚠️ Salvamento bloqueado: estado de dados inconsistente. Recarregue a página para proteger seus dados.', 'error');
     return;
   }
-  // Guard: se ja ha um save em progresso, aguarda ate 3s antes de desistir
+  // [FIX-FILA v1] Guard: se já há um save em progresso, enfileira e sai. Quando o save
+  // atual terminar (bloco finally lá embaixo), ele mesmo dispara uma nova rodada, que vai
+  // pegar o DB.vendas/DB.* já atualizado no momento em que rodar — não perde a chamada.
   if (_sDBSupabaseRunning) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    if (_sDBSupabaseRunning) {
-      console.warn('[EXIT ERP] sDBSupabase: chamada concorrente ignorada — save ja em andamento');
-      return;
-    }
+    _sDBSupabasePendente = true;
+    console.warn('[EXIT ERP] sDBSupabase: chamada concorrente — enfileirada, roda assim que o save atual terminar.');
+    return;
   }
   _sDBSupabaseRunning = true;
 
@@ -3972,19 +4020,25 @@ async function sDBSupabase() {
     ));
   }
 
-  // Vendas (upsert por id)
+  // Vendas (upsert por id) — [FIX-SYNC-LOTE v1] antes ia tudo num único POST; um DB.vendas
+  // grande (ex.: importação histórica) aumentava o risco de HTTP 400/413 nesse POST, o que,
+  // via o disjuntor de 5 falhas (_supaRegistrarFalha), podia desligar a nuvem pra sessão
+  // inteira. Agora divide em lotes de 200 vendas por requisição — mesmo conteúdo, mesmo
+  // upsert (merge-duplicates), só menor por chamada.
   if (DB.vendas?.length) {
-    ops.push(supaFetch('vendas', 'POST',
-      DB.vendas
-        .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
-        .map(v => ({
-          id: String(v.id),
-          unidade_id: String(v.unidadeId),
-          data: v.data,
-          dados: { ...v, unidadeId: String(v.unidadeId) }, // sincroniza blob com coluna
-          criado_em: v.criadoEm || new Date().toISOString()
-        }))
-    ));
+    const _vendasRows = DB.vendas
+      .filter(v => v.unidadeId) // [RLS-v59] Nunca persiste venda sem unidade_id
+      .map(v => ({
+        id: String(v.id),
+        unidade_id: String(v.unidadeId),
+        data: v.data,
+        dados: { ...v, unidadeId: String(v.unidadeId) }, // sincroniza blob com coluna
+        criado_em: v.criadoEm || new Date().toISOString()
+      }));
+    const _LOTE_VENDAS = 200;
+    for (let _iLote = 0; _iLote < _vendasRows.length; _iLote += _LOTE_VENDAS) {
+      ops.push(supaFetch('vendas', 'POST', _vendasRows.slice(_iLote, _iLote + _LOTE_VENDAS)));
+    }
   }
 
   // Ocupação
@@ -4047,6 +4101,12 @@ async function sDBSupabase() {
     salvarCacheLocal();
   } finally {
     _sDBSupabaseRunning = false; // libera guard independente de sucesso/falha
+    // [FIX-FILA v1] Havia uma chamada enfileirada enquanto este save rodava — dispara
+    // agora, pegando o estado mais atual do DB (não perde o que mudou nesse meio-tempo).
+    if (_sDBSupabasePendente) {
+      _sDBSupabasePendente = false;
+      setTimeout(() => { sDBSupabase(); }, 0);
+    }
   }
 }
 

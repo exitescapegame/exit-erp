@@ -3765,6 +3765,24 @@ function iniciarRealtime() {
 }
 
 // Recarrega uma tabela específica do Supabase para o DB em memória
+// [FIX-PAGINACAO-1000] O Supabase (PostgREST) limita cada resposta a no máx.
+// 1000 linhas por padrão, silenciosamente — sem erro, só corta o resto. Tabelas
+// que passam de 1000 registros (ex.: vendas, com meses de histórico) tinham o
+// final cortado. Esta função busca em páginas de 1000 até não sobrar mais nada.
+async function _supaFetchTodasPaginas(pathBase){
+  let todas = [];
+  let offset = 0;
+  const TAM_PAGINA = 1000;
+  while (true) {
+    const sep = pathBase.includes('?') ? '&' : '?';
+    const pagina = await supaFetch(`${pathBase}${sep}limit=${TAM_PAGINA}&offset=${offset}`);
+    if (!pagina || !pagina.length) break;
+    todas = todas.concat(pagina);
+    if (pagina.length < TAM_PAGINA) break; // última página (veio incompleta = acabou)
+    offset += TAM_PAGINA;
+  }
+  return todas;
+}
 async function sincTabela(tbl) {
   try {
     if (tbl === 'vendas') {
@@ -3773,7 +3791,7 @@ async function sincTabela(tbl) {
       const filtroUnidade = (typeof isAdm === 'function' && isAdm()) || !UA?.unidadeId
         ? ''
         : `&unidade_id=eq.${UA.unidadeId}`;
-      const rows = await supaFetch(`vendas?select=dados,unidade_id&order=criado_em.asc${filtroUnidade}`);
+      const rows = await _supaFetchTodasPaginas(`vendas?select=dados,unidade_id&order=criado_em.asc${filtroUnidade}`);
       if (rows) DB.vendas = rows.map(r => { const v=r.dados; if(v&&r.unidade_id)v.unidadeId=String(r.unidade_id); return v; });
     } else if (tbl === 'ocupacao') {
       // [RLS-v59] Filtra slots por unidade no realtime — nao-ADM nao recebe ocupacao de outras unidades

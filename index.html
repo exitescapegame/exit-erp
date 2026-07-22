@@ -10223,9 +10223,23 @@ function rVendas(){
   }
   // RLS: não-ADM forçado à sua unidade (sem opção de trocar)
   const _fu = isAdm() ? (window._vendasFiltroUnidade||'') : String(UA.unidadeId);
-  const vs=rlsVendas().filter(v=>!_fu||String(v.unidadeId)===_fu).slice().reverse();
+  // [FIX-BUSCA-VENDAS] Filtro por período e por valor — antes não existia
+  // nenhum campo de busca em Vendas, só o seletor de unidade (ADM).
+  const _fDe=window._vendasFiltroDe||'', _fAte=window._vendasFiltroAte||'';
+  const _fMin=window._vendasFiltroMin||'', _fMax=window._vendasFiltroMax||'';
+  const vs=rlsVendas().filter(v=>!_fu||String(v.unidadeId)===_fu)
+    .filter(v=>!_fDe||v.data>=_fDe)
+    .filter(v=>!_fAte||v.data<=_fAte)
+    .filter(v=>!_fMin||v.valorTotal>=parseFloat(_fMin))
+    .filter(v=>!_fMax||v.valorTotal<=parseFloat(_fMax))
+    .slice().reverse();
   const tot=vs.filter(v=>v.status!=='cancelado').reduce((s,v)=>s+v.valorTotal,0);
   const filtroHtml=isAdm()&&DB.unidades.length>1?`<select style="width:160px" onchange="window._vendasFiltroUnidade=this.value;renderPage()"><option value="">Todas as unidades</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select>`:'';
+  const filtroBusca=`<input type="date" title="De" style="width:130px" value="${_fDe}" onchange="window._vendasFiltroDe=this.value;renderPage()">
+    <input type="date" title="Até" style="width:130px" value="${_fAte}" onchange="window._vendasFiltroAte=this.value;renderPage()">
+    <input type="number" placeholder="Valor mín" title="Valor mínimo" style="width:90px" value="${_fMin}" onchange="window._vendasFiltroMin=this.value;renderPage()">
+    <input type="number" placeholder="Valor máx" title="Valor máximo" style="width:90px" value="${_fMax}" onchange="window._vendasFiltroMax=this.value;renderPage()">
+    ${(_fDe||_fAte||_fMin||_fMax)?`<button class="btn bg bxs" onclick="window._vendasFiltroDe='';window._vendasFiltroAte='';window._vendasFiltroMin='';window._vendasFiltroMax='';renderPage()">✕ Limpar</button>`:''}`;
   const badgeContexto=podeVerRH&&podeVerMetas
     ?'<span class="bdg b-ok" style="font-size:10px">Visão Completa</span>'
     :podeVerRH
@@ -10233,7 +10247,7 @@ function rVendas(){
       :'<span class="bdg b-if" style="font-size:10px">Visão Metas</span>';
   const thMetas=podeVerMetas?'<th>Sala/Desc</th><th>Horário</th><th>Jog.</th>':'';
   const thRH=podeVerRH?'<th>Vendedor</th>':'';
-  return`<div class="ph"><div><div class="pt">🧾 Vendas</div></div><div class="br">${filtroHtml}${badgeContexto}<span style="font-size:14px;color:var(--accent);font-weight:700">Total: ${fM(tot)}</span></div></div>
+  return`<div class="ph"><div><div class="pt">🧾 Vendas</div></div><div class="br">${filtroHtml}${filtroBusca}${badgeContexto}<span style="font-size:14px;color:var(--accent);font-weight:700">Total: ${fM(tot)}</span></div></div>
   <div class="pb">
   ${DB.unidades.length>1&&!_fu&&isAdm()?`<div class="g${Math.min(DB.unidades.length,4)}" style="margin-bottom:14px">${DB.unidades.map(u=>{const uv=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id));const ut=uv.reduce((s,v)=>s+v.valorTotal,0);const uhj=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id)&&v.data===hoje()).reduce((s,v)=>s+v.valorTotal,0);return`<div class="met yw"><div class="ml">${san(u.nome)}</div><div class="mv">${fM(ut)}</div><div class="ms">Hoje: ${fM(uhj)} • ${uv.length} vendas</div></div>`;}).join('')}</div>`:''}
   <div class="tw"><table><thead><tr><th>Data</th><th>Unidade</th><th>Tipo</th>${thMetas}<th>Valor</th>${thRH}<th>Cupom</th><th>Canal</th><th>Status</th><th></th></tr></thead><tbody>
@@ -10543,14 +10557,27 @@ function rContas(){
   const cs=rlsContasPagar().slice().reverse();
   const pend=cs.filter(c=>!c.pago).reduce((s,c)=>{return s+(_calcValorConta(c));},0);
   const pago=cs.filter(c=>c.pago).reduce((s,c)=>s+c.valor,0);
+  // [FIX-CONTAS-MISTURADAS] Antes a tabela mostrava pendentes e já pagas juntas,
+  // sem separação — difícil de ler. Agora um toggle separa as duas visões,
+  // "Pendentes" como padrão (o que precisa de ação). Não muda nenhum dado,
+  // só o que é exibido.
+  const _view=window._contasPagarView||'pendente';
+  const cPend=cs.filter(c=>!c.pago), cPago=cs.filter(c=>c.pago);
+  const csView=_view==='pago'?cPago:_view==='todas'?cs:cPend;
+  const toggleHtml=`<div style="display:flex;gap:6px;margin-bottom:12px">
+    <button class="btn ${_view==='pendente'?'bp':'bg'} bxs" onclick="window._contasPagarView='pendente';renderPage()">📋 Pendentes (${cPend.length})</button>
+    <button class="btn ${_view==='pago'?'bp':'bg'} bxs" onclick="window._contasPagarView='pago';renderPage()">✅ Já Pagas (${cPago.length})</button>
+    <button class="btn ${_view==='todas'?'bp':'bg'} bxs" onclick="window._contasPagarView='todas';renderPage()">Todas (${cs.length})</button>
+  </div>`;
   return`<div class="g3" style="margin-bottom:14px">
     <div class="met rd"><div class="ml">Pendente</div><div class="mv">${fM(pend)}</div></div>
     <div class="met gr"><div class="ml">Pago no Mês</div><div class="mv">${fM(pago)}</div></div>
     <div class="met bl"><div class="ml">Total Contas</div><div class="mv">${cs.length}</div></div>
   </div>
-  ${cs.length?`<div class="tw"><table><thead><tr><th>Categoria</th><th>Descrição</th><th>Unidade</th><th>Valor/Critério</th><th>Vencimento</th><th>Recorrência</th><th>Status</th><th></th></tr></thead><tbody>
-    ${cs.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat.${c.mesReferencia?` de ${c.mesReferencia}`:''} (≈${fM(_calcValorConta(c))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''} ${c.pago&&(isAdm()||tP('ver_financeiro'))?`<button class="btn bg bxs" title="Estornar pagamento" onclick="estornarContaPagar('${c.id}')">↩</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
-  </tbody></table></div>`:'<div class="empty"><div class="empty-ic">📋</div><div>Nenhuma conta cadastrada.</div></div>'}`;
+  ${toggleHtml}
+  ${csView.length?`<div class="tw"><table><thead><tr><th>Categoria</th><th>Descrição</th><th>Unidade</th><th>Valor/Critério</th><th>Vencimento</th><th>Recorrência</th><th>Status</th><th></th></tr></thead><tbody>
+    ${csView.map(c=>{const u=DB.unidades.find(x=>x.id==c.unidadeId);let vEx=c.tipo==='percentual'?`${c.percentual}% do fat.${c.mesReferencia?` de ${c.mesReferencia}`:''} (≈${fM(_calcValorConta(c))})`:fM(c.valor);const venc=c.vencimento,vencido=venc&&venc<hoje()&&!c.pago;return`<tr><td>${catIc[c.categoria]||'📝'} ${san(c.categoria)}</td><td>${san(c.desc)}</td><td>${san(u?.nome||'Geral')}</td><td>${vEx}</td><td style="color:${vencido?'var(--danger)':'inherit'}">${fD(venc)}${vencido?' ⚠️':''}</td><td><span class="bdg b-gh">${san(c.recorrencia||'único')}</span></td><td><span class="bdg ${c.pago?'b-ok':'b-no'}">${c.pago?'Pago':'Pendente'}</span></td><td style="display:flex;gap:4px">${!c.pago?`<button class="btn bs bxs" onclick="pagarConta('${c.id}')">✅</button><button class="btn bg bxs" title="Editar" onclick="abrirConta('${c.id}')">✏️</button>`:''} ${c.pago&&(isAdm()||tP('ver_financeiro'))?`<button class="btn bg bxs" title="Estornar pagamento" onclick="estornarContaPagar('${c.id}')">↩</button>`:''}<button class="btn bg bxs" onclick="excConta('${c.id}')">🗑</button></td></tr>`;}).join('')}
+  </tbody></table></div>`:`<div class="empty"><div class="empty-ic">📋</div><div>${_view==='pago'?'Nenhuma conta paga ainda.':_view==='pendente'?'Nenhuma conta pendente.':'Nenhuma conta cadastrada.'}</div></div>`}`;
 }
 function pagarConta(id){
   if(!tP('ver_financeiro')&&!isAdm()){toast('Sem permissão para registrar pagamentos.','error');return;}
@@ -11849,10 +11876,15 @@ function _enviarRelShoppingEmail(){
 
 function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem seletor)
   const _fu = isAdm() ? (window._relFinUnidade||'') : String(UA.unidadeId);
-  const mes=hoje().slice(0,7);
-  const fm=fatMes(_fu||null);
+  // [FIX-DRE-SEM-MES] Antes o DRE (Faturamento/Taxa/Folha/Despesas/Resultado)
+  // era travado no mês atual (hoje().slice(0,7)), sem nenhum seletor — por isso
+  // meses passados (maio, junho...) nunca apareciam. fatMesEspecifico(uId,mes)
+  // já existia no sistema (usada só pela taxa de shopping) — agora reaproveitada
+  // aqui para o mês escolhido, com o mês atual como padrão.
+  const mes=window._relFinMes||hoje().slice(0,7);
+  const fm=fatMesEspecifico(_fu||null, mes);
   const desp=DB.contasPagar.filter(c=>c.pago&&c.paidAt&&c.paidAt.startsWith(mes)&&(!_fu||String(c.unidadeId)===_fu)).reduce((s,c)=>s+c.valor,0);
-  const taxaS=_fu?fatMes(parseInt(_fu))*((DB.config.taxaShopping||15)/100):DB.unidades.reduce((s,u)=>s+fatMes(u.id)*((DB.config.taxaShopping||15)/100),0);
+  const taxaS=_fu?fatMesEspecifico(parseInt(_fu),mes)*((DB.config.taxaShopping||15)/100):DB.unidades.reduce((s,u)=>s+fatMesEspecifico(u.id,mes)*((DB.config.taxaShopping||15)/100),0);
   const folha=DB.colaboradores.filter(c=>c.ativo&&(!_fu||String(c.unidadeId)===_fu)).reduce((s,c)=>{return s+DB.pontos.filter(p=>p.data&&p.data.startsWith(mes)&&p.colaboradorId===c.id&&p.saida).reduce((a,p)=>a+(p.valorDevido||0),0);},0);
   const res=fm-taxaS-folha-desp;
 
@@ -11869,7 +11901,7 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
   },0);
   const cortesiaVendas=vendasMes.filter(v=>v.cortesia===true||v.canal==='cortesia'||v.valorTotal===0);
   const totalCortesias=cortesiaVendas.reduce((s,v)=>s+(v._valorOriginal||v.valorOriginal||0),0);
-  const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px"><span style="font-size:12px;font-weight:600;color:var(--text2)">Filtrar:</span><select onchange="window._relFinUnidade=this.value;renderPage()"><option value="">Consolidado (todas)</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select></div>`:'';
+  const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--text2)">Filtrar:</span><select onchange="window._relFinUnidade=this.value;renderPage()"><option value="">Consolidado (todas)</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select><input type="month" title="Mês do DRE" value="${mes}" onchange="window._relFinMes=this.value;renderPage()">${mes!==hoje().slice(0,7)?`<button class="btn bg bxs" onclick="window._relFinMes='';renderPage()">↺ Mês atual</button>`:''}</div>`:`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px"><input type="month" title="Mês do DRE" value="${mes}" onchange="window._relFinMes=this.value;renderPage()">${mes!==hoje().slice(0,7)?`<button class="btn bg bxs" onclick="window._relFinMes='';renderPage()">↺ Mês atual</button>`:''}</div>`;
 
   // ── Caixa por unidade (ADM) ──
   const caixaHtml=isAdm()?`<div class="card" style="margin-top:14px"><div class="ct">💰 Resumo de Caixas por Unidade</div>
@@ -11922,7 +11954,7 @@ function rRelFin(){  // RLS: não-ADM só vê relatório da sua unidade (sem sel
       </div>
     </div>
     <div class="card"><div class="ct">🏢 Por Unidade</div>
-      ${DB.unidades.map(u=>{const uf=fatMes(u.id);const ut=uf*((DB.config.taxaShopping||15)/100);return`<div class="fi"><div style="flex:1"><div style="font-size:12px;font-weight:600">${san(u.nome)}</div><div style="font-size:10px;color:#888">Taxa: ${fM(ut)}</div></div><div class="fv pos">${fM(uf)}</div></div>`;}).join('')}
+      ${DB.unidades.map(u=>{const uf=fatMesEspecifico(u.id,mes);const ut=uf*((DB.config.taxaShopping||15)/100);return`<div class="fi"><div style="flex:1"><div style="font-size:12px;font-weight:600">${san(u.nome)}</div><div style="font-size:10px;color:#888">Taxa: ${fM(ut)}</div></div><div class="fv pos">${fM(uf)}</div></div>`;}).join('')}
     </div>
   </div>
 
@@ -12224,9 +12256,17 @@ async function _avalCarregar() {
 function rFechamentosCaixa(){
   if(!isAdm()&&!tP('ver_financeiro')){return'<div class="card"><div class="empty">⛔ Acesso restrito.</div></div>';}
   if(!DB.fechamentosCaixa)DB.fechamentosCaixa=[];
-  const lista=DB.fechamentosCaixa.slice().reverse().slice(0,60);
+  // [FIX-FECHAMENTOS-CONFUSO] Antes sempre mostrava os últimos 60 juntos, sem
+  // filtro de período — virava uma parede de números. Agora tem filtro de
+  // data (De/Até); sem filtro, mantém o comportamento de antes (últimos 60).
   const _fu=isAdm()?(window._relFinUnidade||''):String(UA.unidadeId);
-  const filtrados=_fu?lista.filter(f=>f.unidadeId===_fu):lista;
+  const _fDe=window._fechFiltroDe||'', _fAte=window._fechFiltroAte||'';
+  const todosOrdenados=DB.fechamentosCaixa.slice().reverse();
+  const filtrados=todosOrdenados
+    .filter(f=>!_fu||f.unidadeId===_fu)
+    .filter(f=>!_fDe||f.data>=_fDe)
+    .filter(f=>!_fAte||f.data<=_fAte)
+    .slice(0,(_fDe||_fAte)?500:60);
 
   // Métricas rápidas
   const totalFechamentos=filtrados.length;
@@ -12235,13 +12275,17 @@ function rFechamentosCaixa(){
 
   const meioLabels={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',outros:'🔄 Outros'};
 
-  const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px"><span style="font-size:12px;font-weight:600;color:var(--text2)">Unidade:</span>
+  const filtroPeriodoHtml=`<input type="date" title="De" style="width:130px" value="${_fDe}" onchange="window._fechFiltroDe=this.value;renderPage()">
+    <input type="date" title="Até" style="width:130px" value="${_fAte}" onchange="window._fechFiltroAte=this.value;renderPage()">
+    ${(_fDe||_fAte)?`<button class="btn bg bxs" onclick="window._fechFiltroDe='';window._fechFiltroAte='';renderPage()">✕ Limpar</button>`:''}`;
+  const filtroHtml=isAdm()&&DB.unidades.length>1?`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--text2)">Unidade:</span>
     <select onchange="window._relFinUnidade=this.value;renderPage()">
       <option value="">Todas</option>
       ${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}
     </select>
+    ${filtroPeriodoHtml}
     <button class="btn bg bxs" onclick="exportarFechamentosCSV()">📊 Exportar</button>
-  </div>`:`<div style="margin-bottom:14px"><button class="btn bg bxs" onclick="exportarFechamentosCSV()">📊 Exportar</button></div>`;
+  </div>`:`<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${filtroPeriodoHtml}<button class="btn bg bxs" onclick="exportarFechamentosCSV()">📊 Exportar</button></div>`;
 
   if(!filtrados.length)return`${filtroHtml}<div class="card"><div class="empty"><div class="empty-ic">🔒</div><div>Nenhum fechamento registrado ainda.</div><div style="font-size:12px;color:var(--text3);margin-top:6px">Os fechamentos de caixa aparecem aqui após o operador fechar o caixa no PDV.</div></div></div>`;
 

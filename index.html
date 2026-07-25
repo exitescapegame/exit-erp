@@ -4011,10 +4011,15 @@ async function sDBSupabase() {
     { chave: 'cargos', valor: DB.cargos }
   ];
   const _cfgArrays = {
+    // [FIX-FECHAMENTO-SUMINDO] fechamentosCaixa estava de fora dessa lista —
+    // todo fechamento de caixa feito existia só na memória do navegador e
+    // sumia pra sempre ao recarregar a página, sem deixar nenhum rastro no
+    // banco. Isso é um buraco grave de auditoria: ninguém tinha como provar
+    // quanto tinha no caixa antes de fechar. Agora persiste igual tudo mais.
     jogosTabuleiro: DB.jogosTabuleiro, contasPagar: DB.contasPagar, contasReceber: DB.contasReceber,
     eventos: DB.eventos, sessoesTabuleiro: DB.sessoesTabuleiro, termosTabuleiro: DB.termosTabuleiro,
     alertsGM: DB.alertsGM, chatGM: DB.chatGM, sessoesSenior: DB.sessoesSenior, pontos: DB.pontos,
-    manutencoes: DB.manutencoes, mensagens: DB.mensagens
+    manutencoes: DB.manutencoes, mensagens: DB.mensagens, fechamentosCaixa: DB.fechamentosCaixa
   };
   for (const _k in _cfgArrays) {
     const _v = _cfgGuard(_k, _cfgArrays[_k]);
@@ -4280,7 +4285,7 @@ const DBD={
   caixa:{aberto:false,saldoAtual:0,entradas:0,saidas:0,historico:[]},
   caixaUnidades:{},
   metas:{geral:50000,unidades:{1:30000,2:20000}},
-  manutencoes:[],contasPagar:[],tokenTotem:'',tokenExpiracao:0
+  manutencoes:[],contasPagar:[],tokenTotem:'',tokenExpiracao:0,resumoDiarioAtual:null,fechamentosCaixa:[]
 };
 
 let DB=dc(DBD); // será preenchido pelo Supabase em carregarDBSeguro()

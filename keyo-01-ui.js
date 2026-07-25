@@ -607,9 +607,44 @@ function _appendMsg(role, texto) {
 function _appendMsgDOM(container, role, texto, ts) {
   const div = document.createElement('div');
   div.className = 'keyo-msg ' + role;
+  // [FEATURE-COPIAR-TEXTO] Antes não dava pra copiar a resposta do KEYO —
+  // toda campanha/texto gerado ficava "preso" na tela, precisando ser
+  // retranscrito na mão. Botão de copiar só nas respostas do bot (não faz
+  // sentido copiar a própria mensagem que o usuário digitou).
+  const btnCopiar = role !== 'user'
+    ? '<button type="button" class="keyo-btn-copiar" title="Copiar texto" style="margin-top:6px;padding:3px 8px;font-size:11px;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:rgba(0,0,0,.03);cursor:pointer;display:inline-flex;align-items:center;gap:4px;color:inherit">📋 Copiar</button>'
+    : '';
   div.innerHTML =
-    '<div class="keyo-bubble">' + _formato(texto) + '</div>' +
+    '<div class="keyo-bubble">' + _formato(texto) + btnCopiar + '</div>' +
     '<div class="keyo-ts">' + ts + '</div>';
+  if (role !== 'user') {
+    const btn = div.querySelector('.keyo-btn-copiar');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        const _feedback = (ok) => {
+          const original = btn.textContent;
+          btn.textContent = ok ? '✅' : '⚠️';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(texto).then(() => _feedback(true)).catch(() => _feedback(false));
+        } else {
+          // Fallback pra navegadores/contextos sem Clipboard API
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = texto;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            _feedback(ok);
+          } catch (_e) { _feedback(false); }
+        }
+      });
+    }
+  }
   container.appendChild(div);
 }
 

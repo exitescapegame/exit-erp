@@ -9280,7 +9280,41 @@ async function confirmarRetirada(){
 // ── CALCULADORA ───────────────────────
 let _cExpr='';
 function toggleCalc(){const p=el('calcPanel');if(p)p.style.display=p.style.display==='none'?'block':'none';}
-function cp(b){const d=el('calcD');if(!d)return;if(b==='C'){_cExpr='';d.textContent='0';return;}if(b==='←'){_cExpr=_cExpr.slice(0,-1)||'';d.textContent=_cExpr||'0';return;}if(b==='='){try{const r=Function('"use strict";return('+_cExpr.replace(/÷/g,'/').replace(/×/g,'*').replace(/%/g,'/100')+')')();d.textContent=+r.toFixed(2);_cExpr=String(+r.toFixed(2));}catch{d.textContent='Erro';_cExpr='';}return;}_cExpr+=b;d.textContent=_cExpr;}
+// [FIX-CALCULADORA] Duas correções: (1) o botão "=" ou dois operadores seguidos
+// sempre caíam no "Erro" — em vez de deixar quebrar, agora ignora operador
+// repetido (troca pelo novo) e ignora "=" com expressão vazia; (2) não existia
+// NENHUM jeito de digitar pelo teclado, só clicando nos botões com o mouse —
+// agora um dígito/operador/Enter/Backspace no teclado funciona igual ao clique,
+// mas só quando a calculadora está aberta e o foco não está num campo de texto
+// (pra não atrapalhar quem está digitando em outro lugar da tela).
+function cp(b){
+  const d=el('calcD');if(!d)return;
+  const OPS=['+','-','×','÷'];
+  if(b==='C'){_cExpr='';d.textContent='0';return;}
+  if(b==='←'){_cExpr=_cExpr.slice(0,-1)||'';d.textContent=_cExpr||'0';return;}
+  if(b==='='){
+    if(!_cExpr){return;}
+    try{const r=Function('"use strict";return('+_cExpr.replace(/÷/g,'/').replace(/×/g,'*').replace(/%/g,'/100')+')')();if(!isFinite(r))throw 0;d.textContent=+r.toFixed(2);_cExpr=String(+r.toFixed(2));}
+    catch{d.textContent='Erro';_cExpr='';}
+    return;
+  }
+  if(OPS.includes(b)){
+    if(!_cExpr && b!=='-')return;
+    if(OPS.includes(_cExpr.slice(-1))){_cExpr=_cExpr.slice(0,-1)+b;d.textContent=_cExpr;return;}
+  }
+  if(b==='.'&&/(\.\d*)$/.test(_cExpr))return;
+  _cExpr+=b;d.textContent=_cExpr;
+}
+document.addEventListener('keydown', function(ev){
+  const p=el('calcPanel'); if(!p||p.style.display==='none')return;
+  const foco=document.activeElement;
+  if(foco&&(foco.tagName==='INPUT'||foco.tagName==='TEXTAREA'||foco.isContentEditable))return;
+  const MAPA={'*':'×','/':'÷','Enter':'=','Backspace':'←','Escape':'C','Delete':'C'};
+  let b = MAPA[ev.key] || ev.key;
+  if(!/^[0-9.+\-×÷=%]$/.test(b) && !['←','C'].includes(b))return;
+  ev.preventDefault();
+  cp(b);
+});
 
 // ── IMPRESSÃO TÉRMICA 80mm ────────────
 function imprimirRecibo(venda) {
@@ -12327,6 +12361,10 @@ function rFechamentosCaixa(){
 
   if(!filtrados.length)return`${filtroHtml}<div class="card"><div class="empty"><div class="empty-ic">🔒</div><div>Nenhum fechamento registrado ainda.</div><div style="font-size:12px;color:var(--text3);margin-top:6px">Os fechamentos de caixa aparecem aqui após o operador fechar o caixa no PDV.</div></div></div>`;
 
+  // [FEATURE-FECHAMENTO-DETALHES] Tabela principal simplificada (não cabia mais
+  // tudo sem ficar poluído) — meios de pagamento, sangria/enviado ao financeiro,
+  // saldo de abertura etc. agora ficam numa linha de detalhe que abre/fecha ao
+  // clicar em "Detalhes", em vez de aparecer sempre cravado na tela.
   return`${filtroHtml}
   <div class="g3" style="margin-bottom:14px">
     <div class="met bl"><div class="ml">Fechamentos</div><div class="mv">${totalFechamentos}</div></div>
@@ -12338,27 +12376,46 @@ function rFechamentosCaixa(){
       <span>🔒 Histórico de Fechamentos (últimos ${filtrados.length})</span>
     </div>
     <div class="tw"><table>
-      <thead><tr><th>Data</th><th>Hora</th><th>Unidade</th><th>Operador</th><th>Total Vendas</th><th>Saídas</th><th>Saldo Final</th><th>Fundo Amanhã</th><th>Meios</th></tr></thead>
+      <thead><tr><th>Data</th><th>Hora</th><th>Unidade</th><th>Operador</th><th>Total Vendas</th><th>Saldo Final</th><th></th></tr></thead>
       <tbody>
         ${filtrados.map(f=>{
           const u=DB.unidades.find(x=>x.id===f.unidadeId||String(x.id)===f.unidadeId);
           const meiosHtml=Object.entries(f.meiosPagamento||{}).filter(([,v])=>v>0)
-            .map(([k,v])=>`<span class="bdg b-gh" style="font-size:9px">${meioLabels[k]||k}: ${fM(v)}</span>`).join(' ');
+            .map(([k,v])=>`<span class="bdg b-gh" style="font-size:10px">${meioLabels[k]||k}: ${fM(v)}</span>`).join(' ');
+          const temSangria=(f.saldoEnviadoFinanceiro||0)>0;
           return`<tr>
             <td style="font-weight:600">${fD(f.data)}</td>
             <td style="font-family:monospace">${f.hora||'—'}</td>
             <td>${san(u?.nome||f.unidadeId)}</td>
             <td>${san(f.operadorNome||'—')}</td>
             <td style="color:var(--success);font-weight:700;font-family:monospace">${fM(f.totalVendas||0)}</td>
-            <td style="color:var(--danger);font-family:monospace">${fM(f.totalSaidas||0)}</td>
             <td style="color:var(--accent);font-weight:800;font-family:monospace">${fM(f.saldoFinalEsperado||0)}</td>
-            <td style="font-family:monospace">${fM(f.fundoParaAmanha||0)}</td>
-            <td style="max-width:160px">${meiosHtml||'—'}</td>
+            <td><button class="btn bg bxs" onclick="_toggleFechDetalhe('${f.id}')">🔎 Detalhes</button></td>
+          </tr>
+          <tr id="fechDet-${f.id}" style="display:none">
+            <td colspan="7" style="background:rgba(0,0,0,.02);padding:14px">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 20px;font-size:12px">
+                <div><div style="color:var(--text3)">Saldo de abertura</div><div style="font-weight:700;font-family:monospace">${fM(f.saldoAbertura||0)}</div></div>
+                <div><div style="color:var(--text3)">Saídas avulsas (durante o dia)</div><div style="font-weight:700;font-family:monospace;color:${(f.totalSaidas||0)>0?'var(--danger)':'inherit'}">${fM(f.totalSaidas||0)}</div></div>
+                <div><div style="color:var(--text3)">Dinheiro físico disponível</div><div style="font-weight:700;font-family:monospace">${fM(f.saldoFisicoDisponivel||0)}</div></div>
+                <div><div style="color:var(--text3)">Total eletrônico (PIX/cartão)</div><div style="font-weight:700;font-family:monospace">${fM(f.totalEletronico||0)}</div></div>
+                <div><div style="color:var(--text3)">Fundo deixado pra amanhã</div><div style="font-weight:700;font-family:monospace">${fM(f.fundoParaAmanha||0)}</div></div>
+                <div><div style="color:var(--text3)">Enviado ao financeiro (sangria)</div><div style="font-weight:700;font-family:monospace;color:${temSangria?'var(--warn,#c9a84c)':'inherit'}">${fM(f.saldoEnviadoFinanceiro||0)}${temSangria&&f.responsavelSangria?` — retirado por ${san(f.responsavelSangria)}`:''}</div></div>
+              </div>
+              <div style="margin-top:10px">
+                <div style="color:var(--text3);font-size:12px;margin-bottom:4px">Meios de pagamento</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">${meiosHtml||'—'}</div>
+              </div>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
     </table></div>
   </div>`;
+}
+function _toggleFechDetalhe(id){
+  const el=document.getElementById('fechDet-'+id);
+  if(el)el.style.display=el.style.display==='none'?'table-row':'none';
 }
 
 function exportarFechamentosCSV(){

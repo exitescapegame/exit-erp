@@ -8846,8 +8846,18 @@ function abrirFechamentoCaixa(){
   const totalEletronico=+((totaisMeio.pix||0)+(totaisMeio.cartao_debito||0)+(totaisMeio.cartao_credito||0)+(totaisMeio.outros||0)).toFixed(2);
   const saldoFisicoDisponivel=+(Math.max(0,(cx.saldoInicial||0)+(totaisMeio.dinheiro||0)-totalSaidas)).toFixed(2);
 
+  // [FEATURE-AVISO-RETROATIVA] Não muda NENHUM cálculo existente (cx.entradas,
+  // totaisMeio, saldoEsperado, saldoFisicoDisponivel continuam exatamente como
+  // antes — isso já foi corrigido de propósito pro dinheiro físico não sumir).
+  // Só torna VISÍVEL quando o fechamento de hoje inclui venda(s) com a "data"
+  // de um dia diferente (lançamento tardio/retroativo) — pra ninguém mais
+  // precisar descobrir isso na unha comparando com o caderno, como aconteceu.
+  const vendasRetroativas=vendasSessao.filter(v=>v.data!==hoje());
+  const valorRetroativo=+vendasRetroativas.reduce((s,v)=>s+(v.valorTotal||0),0).toFixed(2);
+  const qtdRetroativas=vendasRetroativas.length;
+
   // Salva no contexto global — sem passar pelo onclick
-  _fcCtx={uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel};
+  _fcCtx={uId,totalVendas,totalSaidas,saldoEsperado,totaisMeio,totalEletronico,saldoFisicoDisponivel,valorRetroativo,qtdRetroativas};
 
   let mOld=el('mFechamentoCaixa');if(mOld)mOld.remove();
   const m=document.createElement('div');m.className='mo';m.id='mFechamentoCaixa';
@@ -8901,6 +8911,9 @@ function abrirFechamentoCaixa(){
           <span style="font-weight:900;color:var(--success);font-size:16px;font-family:monospace">${fM(saldoFisicoDisponivel)}</span>
         </div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px">📲💳 Eletrônico (PIX/débito/crédito): ${fM(totalEletronico)} — já está na conta, não passa pela gaveta.</div>
+        ${qtdRetroativas>0?`<div style="margin-top:10px;padding:10px 12px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:8px;font-size:12px;color:var(--text2)">
+          ⚠️ <strong style="color:var(--danger)">Inclui ${qtdRetroativas} venda(s) de dia(s) anterior(es)</strong>, lançada(s) só hoje, somando ${fM(valorRetroativo)}. Se estiver conferindo com caderno físico do dia de HOJE, esse valor pode não bater — ele pertence à conferência do dia original da venda.
+        </div>`:''}
         ${_legendaMeios}
       </div>
       <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;padding:14px;margin-bottom:16px">
@@ -9100,6 +9113,7 @@ function _fcConfirmar(){
     saldoFisicoDisponivel,totalEletronico,
     fundoParaAmanha:fundo,saldoEnviadoFinanceiro:dinheiroEnviadoFinanceiro,
     responsavelSangria:dinheiroEnviadoFinanceiro>0?_respSangria:null,
+    valorRetroativo:_fcCtx.valorRetroativo||0,qtdRetroativas:_fcCtx.qtdRetroativas||0,
     criadoEm:agora()
   };
   DB.fechamentosCaixa.push(relatorio);
@@ -12402,6 +12416,7 @@ function rFechamentosCaixa(){
                 <div><div style="color:var(--text3)">Fundo deixado pra amanhã</div><div style="font-weight:700;font-family:monospace">${fM(f.fundoParaAmanha||0)}</div></div>
                 <div><div style="color:var(--text3)">Enviado ao financeiro (sangria)</div><div style="font-weight:700;font-family:monospace;color:${temSangria?'var(--warn,#c9a84c)':'inherit'}">${fM(f.saldoEnviadoFinanceiro||0)}${temSangria&&f.responsavelSangria?` — retirado por ${san(f.responsavelSangria)}`:''}</div></div>
               </div>
+              ${(f.qtdRetroativas||0)>0?`<div style="margin-top:10px;padding:8px 10px;background:rgba(220,38,38,.06);border-radius:6px;font-size:11px;color:var(--text2)">⚠️ Inclui ${f.qtdRetroativas} venda(s) de dia(s) anterior(es), lançada(s) nesta sessão, somando ${fM(f.valorRetroativo||0)}.</div>`:''}
               <div style="margin-top:10px">
                 <div style="color:var(--text3);font-size:12px;margin-bottom:4px">Meios de pagamento</div>
                 <div style="display:flex;flex-wrap:wrap;gap:6px">${meiosHtml||'—'}</div>

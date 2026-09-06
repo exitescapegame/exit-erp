@@ -10319,7 +10319,7 @@ function rVendas(){
     .filter(v=>!_fMin||v.valorTotal>=parseFloat(_fMin))
     .filter(v=>!_fMax||v.valorTotal<=parseFloat(_fMax))
     .slice().reverse();
-  const tot=vs.filter(v=>v.status!=='cancelado').reduce((s,v)=>s+v.valorTotal,0);
+  const tot=vs.filter(v=>v.status!=='cancelado'&&v.status!=='cancelada').reduce((s,v)=>s+(parseFloat(v.valorTotal)||parseFloat(v.valor)||0),0);
   const filtroHtml=isAdm()&&DB.unidades.length>1?`<select style="width:160px" onchange="window._vendasFiltroUnidade=this.value;renderPage()"><option value="">Todas as unidades</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select>`:'';
   const filtroBusca=`<input type="date" title="De" style="width:130px" value="${_fDe}" onchange="window._vendasFiltroDe=this.value;renderPage()">
     <input type="date" title="Até" style="width:130px" value="${_fAte}" onchange="window._vendasFiltroAte=this.value;renderPage()">
@@ -10335,7 +10335,7 @@ function rVendas(){
   const thRH=podeVerRH?'<th>Vendedor</th>':'';
   return`<div class="ph"><div><div class="pt">🧾 Vendas</div></div><div class="br">${filtroHtml}${filtroBusca}${badgeContexto}<span style="font-size:14px;color:var(--accent);font-weight:700">Total: ${fM(tot)}</span></div></div>
   <div class="pb">
-  ${DB.unidades.length>1&&!_fu&&isAdm()?`<div class="g${Math.min(DB.unidades.length,4)}" style="margin-bottom:14px">${DB.unidades.map(u=>{const uv=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id));const ut=uv.reduce((s,v)=>s+v.valorTotal,0);const uhj=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id)&&v.data===hoje()).reduce((s,v)=>s+v.valorTotal,0);return`<div class="met yw"><div class="ml">${san(u.nome)}</div><div class="mv">${fM(ut)}</div><div class="ms">Hoje: ${fM(uhj)} • ${uv.length} vendas</div></div>`;}).join('')}</div>`:''}
+  ${DB.unidades.length>1&&!_fu&&isAdm()?`<div class="g${Math.min(DB.unidades.length,4)}" style="margin-bottom:14px">${DB.unidades.map(u=>{const uv=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id));const ut=uv.reduce((s,v)=>s+(v.valorTotal||v.valor||0),0);const uhj=DB.vendas.filter(v=>v.status!=='cancelado'&&String(v.unidadeId)===String(u.id)&&v.data===hoje()).reduce((s,v)=>s+(v.valorTotal||v.valor||0),0);return`<div class="met yw"><div class="ml">${san(u.nome)}</div><div class="mv">${fM(ut)}</div><div class="ms">Hoje: ${fM(uhj)} • ${uv.length} vendas</div></div>`;}).join('')}</div>`:''}
   <div class="tw"><table><thead><tr><th>Data</th><th>Unidade</th><th>Tipo</th>${thMetas}<th>Valor</th>${thRH}<th>Cupom</th><th>Canal</th><th>Status</th><th></th></tr></thead><tbody>
     ${vs.map(v=>{
       const s=DB.salas.find(x=>x.id==v.salaId);
@@ -10346,7 +10346,7 @@ function rVendas(){
       const cupomInfo=v.cupom?`<span class="bdg b-pu" title="${san(v.cupom.tipo==='percentual'?v.cupom.valor+'%':'R$'+v.cupom.valor)}" style="cursor:help">🎟️ ${san(v.cupom.codigo)}</span>`:'<span style="color:var(--text3);font-size:11px">—</span>';
       const celMetas=podeVerMetas?`<td>${san(s?.nome||v.desc||'—')}</td><td>${v.horario||'—'}</td><td>${v.qtdJogadores||'—'}</td>`:'';
       const celRH=podeVerRH?`<td style="font-size:11px">${san(op?.nome||v.vendidoPor||'—')}</td>`:'';
-      return`<tr><td>${fD(v.data)}</td><td style="font-size:11px">${san(u?.nome||'—')}</td><td>${tp} ${termoIco}</td>${celMetas}<td>${fM(v.valorTotal)}</td>${celRH}<td>${cupomInfo}</td><td>${san(v.canal||'')}</td><td><span class="bdg ${v.status==='cancelado'?'b-no':'b-ok'}">${v.status}</span></td><td style="display:flex;gap:4px">${v.status!=='cancelado'?`<button class="btn bg bxs" title="Reimprimir recibo" onclick="imprimirRecibo(DB.vendas.find(x=>x.id==='${v.id}'))">🖨️</button>`:''}${v.status!=='cancelado'&&v.tipo==='escape'&&(isAdm()||tP('fazer_vendas'))?`<button class="btn bxs" style="background:#25D366;color:#fff" title="WhatsApp cliente" onclick="abrirWhatsApp('${v.id}')">📱</button>`:''} ${v.status!=='cancelado'&&(isAdm()||tP('cancelar_vendas'))?`<button class="btn bg bxs" onclick="abrirCancelComSenha('${v.id}')">Cancelar</button>`:''}</td></tr>`;
+      return`<tr><td>${fD(v.data)}</td><td style="font-size:11px">${san(u?.nome||'—')}</td><td>${tp} ${termoIco}</td>${celMetas}<td>${fM(v.valorTotal||v.valor)}</td>${celRH}<td>${cupomInfo}</td><td>${san(v.canal||'')}</td><td><span class="bdg ${v.status==='cancelado'?'b-no':'b-ok'}">${v.status}</span></td><td style="display:flex;gap:4px">${v.status!=='cancelado'?`<button class="btn bg bxs" title="Reimprimir recibo" onclick="imprimirRecibo(DB.vendas.find(x=>x.id==='${v.id}'))">🖨️</button>`:''}${v.status!=='cancelado'&&v.tipo==='escape'&&(isAdm()||tP('fazer_vendas'))?`<button class="btn bxs" style="background:#25D366;color:#fff" title="WhatsApp cliente" onclick="abrirWhatsApp('${v.id}')">📱</button>`:''} ${v.status!=='cancelado'&&(isAdm()||tP('cancelar_vendas'))?`<button class="btn bg bxs" onclick="abrirCancelComSenha('${v.id}')">Cancelar</button>`:''}</td></tr>`;
     }).join('')}
   </tbody></table></div></div>`;
 }

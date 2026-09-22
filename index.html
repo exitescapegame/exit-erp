@@ -2942,6 +2942,7 @@ async function carregarDBSeguro(senhaMaster, emailUnidade, senhaUnidade) {
     if (!DB.contasPagar) DB.contasPagar = [];
     if (!DB.contasReceber) DB.contasReceber = [];
     if (!DB.eventos) DB.eventos = [];
+    if (!DB.pagamentosEventos) DB.pagamentosEventos = []; // [v98]
     if (!DB.caixaUnidades) DB.caixaUnidades = {};
     if (!DB.config) DB.config = dc(DBD.config);
     else {
@@ -3881,7 +3882,8 @@ function _capturarBaseline() {
   // Chamado APENAS após carga confirmada (dados reais em DB). Registra o que veio populado.
   window._BASE_TINHA_UNIDADES = Array.isArray(DB.unidades) && DB.unidades.length > 0;
   const chaves = ['jogosTabuleiro','contasPagar','contasReceber','eventos','sessoesTabuleiro',
-    'termosTabuleiro','alertsGM','chatGM','sessoesSenior','pontos','manutencoes','mensagens','ajustesFinanceiros'];
+    'termosTabuleiro','alertsGM','chatGM','sessoesSenior','pontos','manutencoes','mensagens','ajustesFinanceiros',
+    'pagamentosEventos']; // [v98]
   const base = {};
   chaves.forEach(k => { base[k] = Array.isArray(DB[k]) && DB[k].length > 0; });
   window._BASE_CFG = base;
@@ -4019,7 +4021,9 @@ async function sDBSupabase() {
     jogosTabuleiro: DB.jogosTabuleiro, contasPagar: DB.contasPagar, contasReceber: DB.contasReceber,
     eventos: DB.eventos, sessoesTabuleiro: DB.sessoesTabuleiro, termosTabuleiro: DB.termosTabuleiro,
     alertsGM: DB.alertsGM, chatGM: DB.chatGM, sessoesSenior: DB.sessoesSenior, pontos: DB.pontos,
-    manutencoes: DB.manutencoes, mensagens: DB.mensagens, fechamentosCaixa: DB.fechamentosCaixa
+    manutencoes: DB.manutencoes, mensagens: DB.mensagens, fechamentosCaixa: DB.fechamentosCaixa,
+    // [v98] pagamentosEventos ficava só no navegador: eventos pagos apareciam como "nada pago" ao recarregar
+    pagamentosEventos: DB.pagamentosEventos
   };
   for (const _k in _cfgArrays) {
     const _v = _cfgGuard(_k, _cfgArrays[_k]);
@@ -4208,6 +4212,7 @@ async function lDBSupabase() {
       manutencoes: cfg.manutencoes || [],
       mensagens: cfg.mensagens || [],
       ajustesFinanceiros: cfg.ajustesFinanceiros || [], // [BUG1-FIX] campo era salvo mas nunca carregado do Supabase
+      pagamentosEventos: cfg.pagamentosEventos || [], // [v98] pagamentos de eventos nunca eram carregados da nuvem
       unidades: _unidadesDedup,
       salas: (saRows||[]).map(r => { const s=r.dados; if(s&&r.unidade_id)s.unidadeId=String(r.unidade_id); return s; }), // [RLS-v59] fonte de verdade: coluna unidade_id
       colaboradores: (coRows||[]).map(r => {
@@ -6231,7 +6236,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v97] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado)');
+  console.log('🔒 [INTEGRIDADE v98] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -10337,6 +10342,7 @@ function rVendas(){
       <option value="cartao_debito" ${_fPgto==='cartao_debito'?'selected':''}>💳 Débito</option>
       <option value="cartao_credito" ${_fPgto==='cartao_credito'?'selected':''}>💳 Crédito</option>
       <option value="credito_cliente" ${_fPgto==='credito_cliente'?'selected':''}>🎟️ Crédito cliente</option>
+      <option value="boleto" ${_fPgto==='boleto'?'selected':''}>📄 Boleto</option>
     </select>
     <select title="Cliente" style="width:130px" onchange="window._vendasFiltroCliente=this.value;renderPage()">
       <option value="">👥 Todos os clientes</option>
@@ -10648,6 +10654,40 @@ function receberConta(id){
   sDB();renderPage();toast('Recebimento confirmado!','success');
   registrarAuditoria('CONTA_RECEBIDA',`Conta "${c.desc}" — ${fM(c.valor)} confirmada por ${UA.nome}`,UA.id,{antes:{recebido:false},depois:{recebido:true,valor:c.valor}});
 }
+// [v98] Recebimento de conta a receber VINCULADA A EVENTO (inclui boleto).
+// Antes: só lançava no caixa — não entrava no faturamento (DB.vendas), não registrava
+// o pagamento do evento e o evento continuava "em aberto". Agora passa pelo MESMO
+// caminho oficial do pagamento de evento (registrarPagamentoEvento).
+// Contas SEM evento vinculado: comportamento v97 idêntico (função original).
+const _receberConta_v97 = receberConta;
+receberConta = function(id){
+  const c=(DB.contasReceber||[]).find(x=>x.id===id);
+  if(!c || !c.eventoId) return _receberConta_v97(id);
+  const evt=(DB.eventos||[]).find(e=>e.id===c.eventoId);
+  if(!evt || !(evt.valorTotal>0)) return _receberConta_v97(id);
+  if(!tP('ver_financeiro')&&!isAdm()){toast('Sem permissão para confirmar recebimentos.','error');return;}
+  if(c.unidadeId&&!rlsCanAccess(c.unidadeId)){toast('Sem permissão para conta de outra unidade.','error');return;}
+  if(c.recebido){toast('Conta já foi marcada como recebida.','warn');return;}
+  let metodo=c.formaPagamento||(evt.formaPagamento==='boleto'?'boleto':null);
+  if(!metodo){
+    const ops=['pix','dinheiro','cartao_debito','cartao_credito','boleto'];
+    const r=prompt('Forma do recebimento:\n1=PIX  2=Dinheiro  3=Débito  4=Crédito  5=Boleto\nDigite o número:');
+    if(r===null) return;
+    metodo=ops[(parseInt(r)||0)-1];
+    if(!metodo){toast('Forma de pagamento inválida.','error');return;}
+  }
+  const qtdAntes=(DB.pagamentosEventos||[]).length;
+  // Outras parcelas pendentes (ex.: vários boletos): guardamos o valor de cada uma,
+  // porque registrarPagamentoEvento reescreve a 1ª pendente com o saldo total.
+  const outras=(DB.contasReceber||[]).filter(x=>x.eventoId===c.eventoId&&!x.recebido&&x.id!==c.id).map(x=>({x,valor:x.valor}));
+  c.recebido=true; // marcada antes para não ser tratada como "a pendente"
+  registrarPagamentoEvento(evt.id, c.valor, metodo);
+  if((DB.pagamentosEventos||[]).length<=qtdAntes){ c.recebido=false; return; } // valor recusado: nada mudou
+  c.recebidoEm=agora(); c.recebidoPor=UA.id; c.metodoRecebimento=metodo;
+  if(evt.status!=='quitado') outras.forEach(o=>{ o.x.valor=o.valor; });
+  sDB(); renderPage();
+  registrarAuditoria('CONTA_RECEBIDA',`Conta "${c.desc}" — ${fM(c.valor)} (${metodo}) recebida por ${UA.nome} — lançada no faturamento do evento`,UA.id,{antes:{recebido:false},depois:{recebido:true,valor:c.valor,metodo,eventoId:evt.id}});
+};
 function excContaReceber(id){
   if(!isAdm()&&!tP('ver_financeiro')){toast('Sem permissão para excluir contas.','error');return;}
   const c=DB.contasReceber.find(x=>x.id===id);
@@ -11585,7 +11625,7 @@ function rRelVendas(){
       const mt=v.formaPagamento; porForma[mt]=(porForma[mt]||0)+(v.valorTotal||v.valor||0);
     }
   });
-  const metNm={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito cliente',pdv_diaria:'🎫 Diária',pdv:'💰 PDV',outro:'❓ Outro'};
+  const metNm={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',credito_cliente:'🎟️ Crédito cliente',boleto:'📄 Boleto',pdv_diaria:'🎫 Diária',pdv:'💰 PDV',outro:'❓ Outro'};
 
   // ── POR SALA ──
   const porSala=DB.salas.filter(s=>!_fu||String(s.unidadeId)===_fu).map(s=>{
@@ -15477,7 +15517,7 @@ function rReservas(){
           <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">💰 Financeiro</div>
           <div style="font-size:18px;font-weight:900;color:var(--accent)">${(e.valorTotal||0)>0?fM(e.valorTotal):'Sem cobrança'}</div>
           ${(e.valorTotal||0)>0?`<div style="font-size:11px;color:var(--text2);margin-top:2px">Pago: <strong style="color:var(--success)">${fM(pgos)}</strong> · Falta: <strong style="color:${falta>0.01?'var(--danger)':'var(--success)'}">${fM(falta)}</strong></div>`:''}
-          ${e.formaPagamento?`<div style="font-size:10px;color:var(--text3);margin-top:2px">Forma: ${({'dinheiro':'💵 Dinheiro','cartao':'💳 Cartão','pix':'📲 PIX'})[e.formaPagamento]||e.formaPagamento}</div>`:''}
+          ${e.formaPagamento?`<div style="font-size:10px;color:var(--text3);margin-top:2px">Forma: ${({'dinheiro':'💵 Dinheiro','cartao':'💳 Cartão','pix':'📲 PIX','boleto':'📄 Boleto'})[e.formaPagamento]||e.formaPagamento}</div>`:''}
         </div>
       </div>
       <!-- Lista de jogadores -->
@@ -15759,7 +15799,8 @@ function abrirEvento(idParaEditar){
     ['','— Selecione —'],
     ['dinheiro','💵 Dinheiro'],
     ['cartao','💳 Cartão'],
-    ['pix','📲 PIX']
+    ['pix','📲 PIX'],
+    ['boleto','📄 Boleto'] // [v98]
   );
   rowPgFp.appendChild(_fg('Forma de Pagamento *',selFp));
 
@@ -16115,10 +16156,10 @@ function salvarEvento(){
   const erroEl=el('evSalasErro');if(erroEl)erroEl.style.display='none';
 
   // GUARD 5 — forma_pagamento: obrigatório apenas para tipo=evento/reserva
-  const FP_VALIDAS=['dinheiro','cartao','pix'];
+  const FP_VALIDAS=['dinheiro','cartao','pix','boleto']; // [v98] +boleto
   if(_evFormState.tipo==='evento'||_evFormState.tipo==='reserva'){
     if(!_evFormState.formaPagamento||!FP_VALIDAS.includes(_evFormState.formaPagamento)){
-      toast('⛔ Selecione uma forma de pagamento (Dinheiro, Cartão ou PIX).','error');
+      toast('⛔ Selecione uma forma de pagamento (Dinheiro, Cartão, PIX ou Boleto).','error');
       const fpEl=el('evFormaPagamento');
       if(fpEl){fpEl.style.outline='2px solid var(--danger)';fpEl.focus();}
       return;
@@ -16294,7 +16335,9 @@ function salvarEvento(){
     }
 
     // ── [v44] CORREÇÃO FINANCEIRA: lançamento em DB.vendas + caixa ──
-    if(evt.tipo==='evento'&&evt.valorTotal>0&&evt.parcelas===1&&evt.formaPagamento){
+    // [v98] Boleto NÃO é dinheiro recebido: não lança no caixa/faturamento ao salvar —
+    // cai no ramo abaixo (conta a receber) e só entra no faturamento quando for pago.
+    if(evt.tipo==='evento'&&evt.valorTotal>0&&evt.parcelas===1&&evt.formaPagamento&&evt.formaPagamento!=='boleto'){
       if(!DB.vendas)DB.vendas=[];
       const jaVendaEvento=DB.vendas.find(v=>v.eventoId===evt.id&&v.status==='confirmado');
       if(!jaVendaEvento){
@@ -17074,8 +17117,8 @@ function abrirPagamentoEvento(eventoId){
   if(!val)return;
   const v=parseFloat(val.replace(',','.'));
   if(isNaN(v)||v<=0){toast('Valor inválido.','error');return;}
-  const metodos=['pix','dinheiro','cartao_debito','cartao_credito'];
-  const met=prompt('Método de pagamento:\n1=PIX  2=Dinheiro  3=Débito  4=Crédito\nDigite o número:');
+  const metodos=['pix','dinheiro','cartao_debito','cartao_credito','boleto']; // [v98] +boleto
+  const met=prompt('Método de pagamento:\n1=PIX  2=Dinheiro  3=Débito  4=Crédito  5=Boleto\nDigite o número:');
   const metodo=metodos[(parseInt(met)||1)-1]||'pix';
   registrarPagamentoEvento(eventoId,v,metodo);
 }

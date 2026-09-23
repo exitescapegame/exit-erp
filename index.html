@@ -6236,7 +6236,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v99] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem)');
+  console.log('🔒 [INTEGRIDADE v100] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem + v100: Detalhes do evento)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -14534,6 +14534,7 @@ function rEventos(){
           <td>${evNomeSalas(e)}</td>
           <td>${san(u?.nome||'Todas')}</td>
           <td style="display:flex;gap:4px">
+            ${e.tipo!=='bloqueio'?`<button class="btn bg bxs" title="Ver detalhes" onclick="abrirDetalheEvento('${e.id}')">🔎</button>`:''}
             <button class="btn bg bxs" onclick="editarEvento('${e.id}')">✏️</button>
             <button class="btn bg bxs" onclick="excEvento('${e.id}')">🗑</button>
           </td>
@@ -14545,10 +14546,76 @@ function rEventos(){
           <td>${fD(e.data)}</td><td>${e.hora||'—'}</td><td>${e.horaFim||'—'}</td>
           <td><span class="bdg b-gh">${e.tipo==='bloqueio'?'🔒 Bloqueio':'📅 Evento'}</span></td>
           <td>${san(e.desc||'')}</td><td>${evNomeSalas(e)}</td>
-          <td><button class="btn bg bxs" onclick="excEvento('${e.id}')">🗑</button></td>
+          <td style="display:flex;gap:4px">${e.tipo!=='bloqueio'?`<button class="btn bg bxs" title="Ver detalhes" onclick="abrirDetalheEvento('${e.id}')">🔎</button>`:''}<button class="btn bg bxs" onclick="excEvento('${e.id}')">🗑</button></td>
         </tr>`).join('')}
       </tbody></table></div></div>`:''}
   </div>`;
+}
+
+// ── [v100] DETALHES DO EVENTO (somente consulta + botão Receber por parcela) ──
+// Mostra valor, pago, saldo, pagamentos recebidos, contas a receber/boletos e o
+// que já entrou no faturamento. Não altera nada sozinho: o botão Receber usa o
+// caminho oficial receberConta (v98).
+function abrirDetalheEvento(id){
+  const e=(DB.eventos||[]).find(x=>x.id===id);
+  if(!e){toast('Evento não encontrado.','error');return;}
+  if(e.unidadeId&&typeof rlsCanAccess==='function'&&!rlsCanAccess(e.unidadeId)){toast('Sem permissão para evento de outra unidade.','error');return;}
+  const podeFin=isAdm()||tP('ver_financeiro');
+  const u=(DB.unidades||[]).find(x=>String(x.id)===String(e.unidadeId));
+  const nm={dinheiro:'💵 Dinheiro',pix:'📲 PIX',cartao_debito:'💳 Débito',cartao_credito:'💳 Crédito',cartao:'💳 Cartão',boleto:'📄 Boleto',credito_cliente:'🎟️ Crédito cliente'};
+  const pgs=(DB.pagamentosEventos||[]).filter(p=>p.eventoId===e.id).sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
+  const somaPg=+pgs.reduce((s,p)=>s+(+p.valor||0),0).toFixed(2);
+  const pago=pgs.length?somaPg:(+e.totalPago||0);
+  const total=+e.valorTotal||0, saldo=Math.max(0,+(total-pago).toFixed(2));
+  const crs=(DB.contasReceber||[]).filter(c=>c.eventoId===e.id).sort((a,b)=>String(a.vencimento||'').localeCompare(String(b.vencimento||'')));
+  const vds=(DB.vendas||[]).filter(v=>v.eventoId===e.id&&v.status==='confirmado');
+  const somaVd=+vds.reduce((s,v)=>s+(+v.valorTotal||0),0).toFixed(2);
+  const quit=total>0&&saldo<=0.01;
+  const st=total<=0?'—':(quit?'<span class="bdg b-ok">✅ Quitado</span>':'<span class="bdg b-if">⏳ Em aberto</span>');
+  const lin=(k,v)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #eee;font-size:12px"><span style="color:#666">${k}</span><span style="font-weight:600;color:#1a1a2e;text-align:right">${v}</span></div>`;
+  const th='style="padding:6px;text-align:left;color:#666;font-size:10px"';
+  const td='style="padding:6px;font-size:12px;color:#1a1a2e"';
+  const hojeS=hoje();
+  const tabPg=pgs.length?`<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8f8fc"><th ${th}>Data</th><th ${th}>Forma</th><th ${th}>Obs</th><th ${th} style="text-align:right">Valor</th></tr></thead><tbody>${pgs.map(p=>`<tr style="border-bottom:1px solid #eee"><td ${td}>${p.data?fD(p.data):'—'}${p.hora?' '+san(p.hora):''}</td><td ${td}>${nm[p.metodo]||san(p.metodo||'—')}</td><td ${td}>${san(p.obs||'')}</td><td ${td} style="text-align:right;font-weight:700;color:#16a34a">${fM(+p.valor||0)}</td></tr>`).join('')}</tbody></table>`:'<div style="font-size:12px;color:#888;padding:8px 0">Nenhum pagamento recebido ainda.</div>';
+  const tabCr=crs.length?`<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8f8fc"><th ${th}>Vencimento</th><th ${th}>Descrição</th><th ${th}>Situação</th><th ${th} style="text-align:right">Valor</th><th ${th}></th></tr></thead><tbody>${crs.map(c=>{
+      const venc=!c.recebido&&c.vencimento&&c.vencimento<hojeS;
+      const sit=c.recebido?`<span class="bdg b-ok">Recebido${c.recebidoEm?' '+fD(String(c.recebidoEm).slice(0,10)):''}</span>`:(venc?'<span class="bdg b-no">⚠️ Vencido</span>':'<span class="bdg b-if">A receber</span>');
+      const btn=(!c.recebido&&podeFin)?`<button class="btn bp bxs" onclick="receberConta('${c.id}');setTimeout(()=>abrirDetalheEvento('${e.id}'),50)">✅ Receber</button>`:'';
+      return `<tr style="border-bottom:1px solid #eee"><td ${td}>${c.vencimento?fD(c.vencimento):'—'}</td><td ${td}>${san(c.desc||'')}${c.boletoNossoNumero?`<div style="font-size:10px;color:#888">Nosso nº ${san(c.boletoNossoNumero)}</div>`:''}${c.boletoLinhaDigitavel?`<div style="font-size:10px;color:#888;word-break:break-all">${san(c.boletoLinhaDigitavel)}</div>`:''}</td><td ${td}>${sit}</td><td ${td} style="text-align:right;font-weight:700">${fM(+c.valor||0)}</td><td ${td}>${btn}</td></tr>`;}).join('')}</tbody></table>`:'<div style="font-size:12px;color:#888;padding:8px 0">Nenhuma conta a receber vinculada.</div>';
+  const avisoFat=(podeFin&&Math.abs(somaVd-pago)>0.01)?`<div style="margin-top:8px;padding:8px;border-radius:6px;background:#fff8e1;font-size:11px;color:#8a6d00">⚠️ Pago (${fM(pago)}) diferente do lançado no faturamento (${fM(somaVd)}). Vale conferir.</div>`:'';
+  let m=el('mDetEvento'); if(m) m.remove();
+  m=document.createElement('div'); m.className='mo'; m.id='mDetEvento'; document.body.appendChild(m);
+  m.innerHTML=`<div class="md" style="max-width:760px;background:#fff;border:1px solid #d8d8e0">
+    <div class="mh" style="background:#f8f8fc;border-bottom:1px solid #e8e8f0">
+      <span class="mti" style="color:#1a1a2e">🔎 ${san(e.nomeReserva||e.desc||'Evento')}</span>
+      <button class="mc" onclick="CM('mDetEvento')" style="color:#666">×</button>
+    </div>
+    <div class="mb" style="max-height:70vh;overflow-y:auto;background:#fff">
+      ${podeFin&&total>0?`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+        <div style="background:#eef2ff;border-radius:var(--rsm);padding:10px;text-align:center"><div style="font-size:10px;color:#666">Valor total</div><div style="font-size:17px;font-weight:800;color:#1a1a2e">${fM(total)}</div></div>
+        <div style="background:#e8f5e9;border-radius:var(--rsm);padding:10px;text-align:center"><div style="font-size:10px;color:#666">Recebido</div><div style="font-size:17px;font-weight:800;color:#16a34a">${fM(pago)}</div></div>
+        <div style="background:${saldo>0?'#fff8e1':'#f4f4f8'};border-radius:var(--rsm);padding:10px;text-align:center"><div style="font-size:10px;color:#666">Saldo a receber</div><div style="font-size:17px;font-weight:800;color:${saldo>0?'#b8860b':'#888'}">${fM(saldo)}</div></div>
+      </div>`:''}
+      <div style="margin-bottom:14px">
+        ${lin('Evento',san(e.desc||'—'))}
+        ${e.nomeReserva&&e.nomeReserva!==e.desc?lin('Cliente',san(e.nomeReserva)):''}
+        ${lin('Data',fD(e.data)+(e.hora?' às '+san(e.hora):'')+(e.horaFim?' até '+san(e.horaFim):''))}
+        ${lin('Unidade',san(u?.nome||'—'))}
+        ${lin('Sala',evNomeSalas(e)||'—')}
+        ${e.qtdPessoas?lin('Pessoas',san(String(e.qtdPessoas))):''}
+        ${e.telefoneReserva?lin('Telefone',san(e.telefoneReserva)):''}
+        ${podeFin?lin('Forma de pagamento',nm[e.formaPagamento]||san(e.formaPagamento||'—')):''}
+        ${podeFin?lin('Situação',st):''}
+        ${e.obs?lin('Observações',san(e.obs)):''}
+      </div>
+      ${podeFin?`<div style="font-size:12px;font-weight:700;color:#444;margin:6px 0">💰 Pagamentos recebidos</div>${tabPg}
+      <div style="font-size:12px;font-weight:700;color:#444;margin:14px 0 6px">📥 Contas a receber / boletos</div>${tabCr}
+      <div style="font-size:11px;color:#666;margin-top:12px">📊 Lançado no faturamento: <b>${fM(somaVd)}</b> em ${vds.length} lançamento(s)${vds.length?' ('+vds.map(v=>fD(v.data)).join(', ')+')':''}.</div>${avisoFat}`
+      :'<div style="font-size:12px;color:#888">Valores e pagamentos visíveis apenas para quem tem acesso ao financeiro.</div>'}
+    </div>
+    <div class="mf" style="background:#f8f8fc">${e.tipo!=='bloqueio'?`<button class="btn bg" onclick="CM('mDetEvento');editarEvento('${e.id}')">✏️ Editar</button>`:''}<button class="btn bg" onclick="CM('mDetEvento')">Fechar</button></div>
+  </div>`;
+  OM('mDetEvento');
 }
 
 function abrirEventoTipo(tipo){

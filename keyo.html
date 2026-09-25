@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXIT GAMES BRASIL — Fale com o Keyo</title>
+
+<!-- ================= PREVIEW DO LINK (WhatsApp / redes) =================
+     É isto que deixa o link "bonito" quando você cola no WhatsApp.
+     >>> TROQUE a og:image pela URL de uma imagem SUA hospedada (logo/banner),
+         de preferência 1200x630 px. Tem que ser link ABSOLUTO (https://...). -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="EXIT GAMES BRASIL — Fale com o Keyo">
+<meta property="og:description" content="Estamos melhorando o atendimento. Agora você fala com o Keyo, nosso assistente 24h — reservas, dúvidas, horários e valores na hora.">
+<meta property="og:image" content="https://SEU-DOMINIO/keyo-preview.png">
+<meta name="theme-color" content="#0d0b07">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Redirecionamento automático (caso o JS esteja desligado) -->
+<meta http-equiv="refresh" content="3;url=https://wa.me/5571984573737?text=Oi%20Keyo!%20Vim%20pela%20EXIT%20GAMES%20%F0%9F%98%8A">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0d0b07;          /* preto-âmbar profundo */
+    --bg2:#171206;
+    --gold:#e7b53c;        /* dourado EXIT */
+    --gold-soft:#f3d488;
+    --gold-deep:#b8862a;
+    --ink:#f5efe2;         /* texto claro */
+    --ink-dim:#b9ad95;     /* texto secundário */
+    --line:rgba(231,181,60,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% 8%, rgba(231,181,60,.16), transparent 55%),
+      radial-gradient(140% 120% at 50% 120%, rgba(184,134,42,.10), transparent 60%),
+      linear-gradient(180deg,var(--bg) 0%, var(--bg2) 100%);
+    min-height:100dvh;
+    display:flex;align-items:center;justify-content:center;
+    text-align:center;
+    padding:32px 22px;
+    overflow:hidden;
+  }
+  .wrap{max-width:440px;width:100%;position:relative;z-index:2}
+
+  /* eyebrow / wordmark */
+  .brand{
+    font-family:'Bricolage Grotesque',sans-serif;
+    font-weight:800;letter-spacing:.14em;
+    font-size:13px;color:var(--gold);
+    text-transform:uppercase;margin-bottom:30px;
+  }
+  .brand small{display:block;font-weight:500;letter-spacing:.32em;color:var(--ink-dim);font-size:9px;margin-top:6px}
+
+  /* SIGNATURE: a fechadura iluminada */
+  .lock{position:relative;width:128px;height:128px;margin:0 auto 30px}
+  .halo{
+    position:absolute;inset:-40% ;border-radius:50%;
+    background:radial-gradient(circle, rgba(231,181,60,.30), transparent 62%);
+    animation:breathe 4.2s ease-in-out infinite;
+  }
+  .ring{
+    position:absolute;inset:0;border-radius:50%;
+    border:1.5px solid var(--line);
+    background:linear-gradient(160deg, rgba(231,181,60,.10), rgba(13,11,7,.2));
+    box-shadow:inset 0 0 36px rgba(231,181,60,.10), 0 16px 50px rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+  }
+  /* buraco da fechadura desenhado */
+  .keyhole{width:54px;height:62px;display:block}
+  .keyhole circle, .keyhole path{fill:var(--gold)}
+  .keyhole{filter:drop-shadow(0 0 10px rgba(231,181,60,.55))}
+
+  h1{
+    font-family:'Bricolage Grotesque',sans-serif;
+    font-weight:700;line-height:1.08;letter-spacing:-.01em;
+    font-size:clamp(27px,7vw,38px);margin-bottom:16px;
+  }
+  h1 .g{color:var(--gold)}
+  .msg{color:var(--ink-dim);font-size:15.5px;line-height:1.6;margin-bottom:8px}
+  .sorry{color:var(--ink-dim);font-size:13.5px;line-height:1.6;margin-bottom:28px}
+  .sorry b{color:var(--ink);font-weight:600}
+
+  .cta{
+    display:inline-flex;align-items:center;gap:10px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold) 60%,var(--gold-deep));
+    color:#241a05;font-weight:700;font-family:'Inter',sans-serif;font-size:16px;
+    text-decoration:none;padding:15px 26px;border-radius:999px;
+    box-shadow:0 10px 30px rgba(231,181,60,.28), inset 0 1px 0 rgba(255,255,255,.4);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .cta:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(231,181,60,.36)}
+  .cta:focus-visible{outline:3px solid var(--gold-soft);outline-offset:3px}
+  .cta svg{width:20px;height:20px;fill:#241a05}
+
+  .redir{margin-top:18px;font-size:12px;color:var(--ink-dim);min-height:16px}
+  .redir .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);margin:0 1px;animation:blink 1.2s infinite}
+  .redir .dot:nth-child(2){animation-delay:.2s}
+  .redir .dot:nth-child(3){animation-delay:.4s}
+
+  .human{margin-top:30px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-dim)}
+  .human b{color:var(--ink)}
+
+  .slogan{margin-top:26px;font-size:11px;letter-spacing:.04em;color:rgba(185,173,149,.7);font-style:italic}
+
+  @keyframes breathe{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}
+  @keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+  @media (prefers-reduced-motion: reduce){
+    .halo,.redir .dot{animation:none}
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">EXIT GAMES BRASIL<small>SALVADOR · ARACAJU</small></div>
+
+    <div class="lock" aria-hidden="true">
+      <div class="halo"></div>
+      <div class="ring">
+        <svg class="keyhole" viewBox="0 0 54 62" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="27" cy="22" r="16"></circle>
+          <path d="M27 32 L38 58 H16 Z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <h1>Fale com o <span class="g">Keyo</span></h1>
+    <p class="msg">Nosso assistente que atende <b style="color:var(--ink)">24 horas</b> — reservas, dúvidas, horários e valores na hora.</p>
+    <p class="sorry">Estamos <b>melhorando o atendimento</b> e mudamos o canal principal. Desculpe pelo transtorno! 🙏</p>
+
+    <a class="cta" id="go" href="https://wa.me/5571984573737?text=Oi%20Keyo!%20Vim%20pela%20EXIT%20GAMES%20%F0%9F%98%8A">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.477-.911z"/></svg>
+      Abrir conversa no WhatsApp
+    </a>
+
+    <p class="redir" id="redir">Abrindo o WhatsApp<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></p>
+
+    <div class="human">Prefere falar com uma pessoa? É só pedir pro <b>Keyo</b> que um atendente assume. 😊</div>
+    <div class="slogan">Não criamos apenas jogos. Conectamos pessoas.</div>
+  </main>
+
+<script>
+  // Redireciona automaticamente após um instante (mostra a marca primeiro).
+  var DEST = document.getElementById('go').href;
+  setTimeout(function(){ window.location.href = DEST; }, 2600);
+</script>
+</body>
+</html>

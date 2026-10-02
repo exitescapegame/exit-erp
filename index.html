@@ -5082,6 +5082,7 @@ const MENUS=[
   {id:'eventos',lbl:'Eventos',ic:'📅',perm:'ver_relatorios'},
   {id:'reservas',lbl:'Reservas',ic:'🎟️',perm:'ver_pdv',lrqBadge:true},
   {id:'gm',lbl:'Painel GM',ic:'🎮',perm:'ver_painel_gm',gmBadge:true},
+  {id:'_salasvivo',lbl:'Salas ao Vivo',ic:'🧩',perm:'ver_painel_gm',_acao:'abrirSalasAoVivo'}, // [v101] Painel de Salas (cronômetro, dicas, tablet, ESP32) — abre em nova aba
   {id:'comm',lbl:'Mensagens',ic:'💬',perm:'ver_pdv',comm:true},
   {section:'Inteligência'},
   {id:'avaliacoes',lbl:'⭐ Avaliações',ic:'⭐',perm:'ver_relatorios'},
@@ -6236,7 +6237,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v100] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem + v100: Detalhes do evento)');
+  console.log('🔒 [INTEGRIDADE v101] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem + v100: Detalhes do evento + v101: Salas ao Vivo (Painel de Salas no Painel GM))');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}
@@ -13537,6 +13538,17 @@ function rGM(){
     </div>`;
   }
 
+  // [v101] Painel de Salas embutido (sistema separado, mesmo site: painel-salas.html). Só exibe — não lê nem grava nada do ERP.
+  if(_gmTab==='salas'){
+    contentHtml=`<div class="card" style="padding:0;overflow:hidden;height:calc(100vh - 230px);min-height:480px;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--text2)">🧩 Painel de Salas — cronômetro, dicas, tablet e automações</span>
+        <button class="btn bxs" onclick="abrirSalasAoVivo()">↗ Abrir em tela cheia</button>
+      </div>
+      <iframe src="${SALAS_AO_VIVO_URL}" title="Painel de Salas" style="flex:1;width:100%;border:0;background:#f3f4f8" allow="autoplay; fullscreen; clipboard-write"></iframe>
+    </div>`;
+  }
+
   return `<div class="ph" style="background:#0f0f1a;border-bottom:1px solid rgba(255,255,255,.08)">
     <div><div class="pt" style="color:#f0f0f8">🎮 Painel Game Master</div>
     <div class="ps" style="color:rgba(255,255,255,.5)">Operacional exclusivo — ${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</div></div>
@@ -13550,12 +13562,20 @@ function rGM(){
       <div style="${tabStyle('alertas')}" onclick="_gmTab='alertas';renderPage()">
         🔔 Alertas${alertas.length?`<span style="background:var(--danger);color:#fff;font-size:9px;padding:1px 5px;border-radius:10px;margin-left:4px">${alertas.length}</span>`:''}
       </div>
+      <div style="${tabStyle('salas')}"  onclick="_gmTab='salas';renderPage()">🧩 Salas ao vivo</div>
       <div style="${tabStyle('chat')}"   onclick="_gmTab='chat';renderPage()">
         💬 Chat${chatMsgs.length?`<span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:4px">${chatMsgs.length}</span>`:''}
       </div>
     </div>
     ${contentHtml}
   </div>`;
+}
+
+// [v101] Painel de Salas (sistema de salas: cronômetro, dicas, tablet, ESP32). Arquivo painel-salas.html no mesmo site.
+const SALAS_AO_VIVO_URL='painel-salas.html';
+function abrirSalasAoVivo(){
+  try{ const w=window.open(SALAS_AO_VIVO_URL,'_blank'); if(w) w.opener=null; else toast('Libere pop-ups para abrir o Painel de Salas.','warn'); }
+  catch(e){ toast('Não consegui abrir o Painel de Salas.','error'); }
 }
 
 // ── Funções de ação do novo painel GM ────────────────────────────────

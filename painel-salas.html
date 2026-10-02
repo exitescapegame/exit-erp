@@ -121,11 +121,14 @@ html.embed .hdr{margin-bottom:14px}
 .banner.esgotado{background:#fbeedd;border:1px solid #f0cfa5;color:#b4541a}
 .banner.escapou{background:var(--okbg);border:1px solid #b6e3cc;color:var(--ok)}
 .banner.ajuda{background:var(--badbg);border:1px solid #f6b8b8;color:#b42318;animation:pul 1.3s ease-in-out infinite}
+.banner span{flex:0 1 auto}
+.banner a{color:inherit;opacity:.75}
 .banner .x{background:none;border:0;cursor:pointer;color:inherit;opacity:.6;font-size:18px;padding:0 4px;line-height:1}
 .banner .btn{letter-spacing:0;text-transform:none}
 @keyframes pul{50%{box-shadow:0 0 0 4px rgba(229,72,77,.15)}}
 .evh{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:6px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line2)}
 .evh b{font-size:17px}
+.rc-cnt{font-size:12px;color:var(--mute);margin:-4px 0 4px;font-weight:500}
 .rc-un{font-size:12px;color:var(--mute);margin:-4px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rc-un.ev{color:#7a3fb0;font-weight:600}
 .rc-h{display:flex;align-items:center;gap:10px}
@@ -344,7 +347,7 @@ window.CONFIG = { SUPABASE_URL: "https://oykjdtxbgnqigkinpbts.supabase.co", SUPA
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-var VERSAO='v6';
+var VERSAO='v7';
 var $=function(i){return document.getElementById(i)};
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
 var LN={pt:'Português',en:'English',de:'Deutsch',es:'Español',ja:'日本語',fr:'Français',it:'Italiano'};
@@ -458,10 +461,11 @@ async function loadAll(){
     sb.from('placas').select('*').order('criado_em'),
     sb.from('placa_pinos').select('*').order('pino'),
     sb.from('sala_tutoriais').select('*').order('ordem'),
-    sb.from('sessoes').select('*').eq('status','encerrada').gte('encerrada_em',desde).order('encerrada_em',{ascending:false})
+    sb.from('sessoes').select('*').eq('status','encerrada').gte('encerrada_em',desde).order('encerrada_em',{ascending:false}),
+    sb.from('sessoes').select('id,sala_id,resultado,criado_em').gte('criado_em',inicioHoje())
   ]);
   UNIDADES=r[0].data||[];SALAS=r[1].data||[];ENIGMAS=r[2].data||[];DICAS=r[3].data||[];ACOES=r[4].data||[];SESSOES=r[5].data||[];DISPOS=r[6].data||[];
-  G.temPlacas=!r[7].error;PLACAS=r[7].data||[];PINOS=r[8].data||[];G_temTut=!r[9].error;TUT=r[9].data||[];RECENTES=r[10].data||[];
+  G.temPlacas=!r[7].error;PLACAS=r[7].data||[];PINOS=r[8].data||[];G_temTut=!r[9].error;TUT=r[9].data||[];RECENTES=r[10].data||[];HOJE=(r[11].data||[]).filter(function(x){return x.resultado!=='cancelada'});
   var ids=SESSOES.map(function(s){return s.id}),idsR=RECENTES.map(function(s){return s.id}),todos=ids.concat(idsR);
   if(todos.length){
     var r2=await Promise.all([
@@ -494,8 +498,14 @@ function opcoesLocais(sel,comTodas,so){
     +(evs.length?'<optgroup label="Eventos e feiras">'+evs.map(o).join('')+'</optgroup>':'');
 }
 function sesDe(salaId){return SESSOES.filter(function(s){return s.sala_id===salaId})[0]||null}
+var HOJE=[];
+function inicioHoje(){var d=new Date(Date.now()+G.off);d.setHours(0,0,0,0);return d.toISOString()}
+function jogosHoje(salaId){return HOJE.filter(function(x){return x.sala_id===salaId}).length}
+// número do jogo atual no dia (contando o que está rolando)
+function numJogo(ses){var l=HOJE.filter(function(x){return x.sala_id===ses.sala_id}).sort(function(a,b){return Date.parse(a.criado_em)-Date.parse(b.criado_em)});var i=l.findIndex(function(x){return x.id===ses.id});return i>=0?i+1:l.length+1}
+function textoResultado(x){if(!x)return '';if(x.resultado==='escapou')return '🏁 Escaparam em '+fh(Math.max(0,(x.duracao_segundos||0)-(+x.restante_base||0)));if(x.resultado==='cancelada')return '🗑 Sessão descartada';if((+x.restante_base||0)<=0)return '⏱ Tempo esgotado';return '✖ Não escaparam'}
 function fimDe(salaId){if(sesDe(salaId))return null;return RECENTES.filter(function(s){return s.sala_id===salaId&&!dispensadas[s.id]})[0]||null}
-function cardSes(salaId){return sesDe(salaId)||fimDe(salaId)}
+function cardSes(salaId){return sesDe(salaId)}
 function enigmasDe(salaId){return ENIGMAS.filter(function(e){return e.sala_id===salaId})}
 function dicasDe(enigmaId){return DICAS.filter(function(d){return d.enigma_id===enigmaId})}
 function acoesDe(salaId){return ACOES.filter(function(a){return a.sala_id===salaId})}
@@ -642,7 +652,7 @@ async function encerrar(sala,ses,resultado){
   if(u.error){toast('Erro: '+u.error.message);return}
   if(!u.data||!u.data.length){await loadAll();return} // já tinha sido encerrada (pelo servidor)
   if(resultado==='escapou'){var acs=acoesDe(sala.id).filter(function(a){return a.gatilho==='escapou'});for(var i=0;i<acs.length;i++)await fireRaw(ses.id,acs[i],'automatica')}
-  await ev(ses.id,resultado==='escapou'?'Sala escapou':'Tempo esgotado');
+  await ev(ses.id,resultado==='escapou'?'Sala escapou':resultado==='cancelada'?'Sessão descartada (não conta)':(r<=0?'Tempo esgotado':'Não escaparam (encerrado pelo operador)'));
   await loadAll()
 }
 
@@ -855,19 +865,21 @@ function logLinhas(ses,n){
 }
 
 function cardHtml(s){
-  var ses=sesDe(s.id),fim=fimDe(s.id),cs=ses||fim,st=ses?ses.status:'aguardando',op=can('operar');
+  var ses=sesDe(s.id),fim=fimDe(s.id),cs=ses,st=ses?ses.status:'aguardando',op=can('operar');
   var r=remSes(cs,s),ajuda=temAjuda(s.id),tb=cardTab[s.id]||'disp';
   var h='<div class="rc'+(ajuda?' help':'')+'" id="card_'+s.id+'">';
   h+='<div class="rc-top"><select data-lang="'+s.id+'"'+(ses&&op?'':' disabled')+' title="Idioma das dicas">'+Object.keys(LN).map(function(k){return '<option value="'+k+'"'+(((ses&&ses.idioma)||'pt')===k?' selected':'')+'>'+BAND[k]+' '+LN[k]+'</option>'}).join('')+'</select></div>';
   if(ajuda)h+='<div class="banner ajuda">Ajuda solicitada'+(op?' <button class="btn sm" data-atender="'+s.id+'">Atendido</button>':'')+'</div>';
-  if(fim)h+='<div class="banner '+(fim.resultado==='escapou'?'escapou':'esgotado')+'">'+(fim.resultado==='escapou'?'🏁 Escaparam':'⏱ Tempo esgotado')+'<button class="x" data-dispensa="'+fim.id+'" title="Limpar">×</button></div>';
+  if(fim&&fim.resultado!=='cancelada')h+='<div class="banner '+(fim.resultado==='escapou'?'escapou':'esgotado')+'"><span>Último jogo: '+textoResultado(fim)+'</span><a data-log="'+fim.id+'" style="font-size:12px;letter-spacing:0;text-transform:none">registro</a><button class="x" data-dispensa="'+fim.id+'" title="Limpar">×</button></div>';
   var un=unById(s.unidade_id);
+  var nh=jogosHoje(s.id);
+  h+='<div class="rc-cnt">🎮 '+(ses?'Jogo nº '+numJogo(ses)+' de hoje':(nh?nh+(nh===1?' jogo':' jogos')+' hoje':'Nenhum jogo hoje'))+'</div>';
   if(un)h+='<div class="rc-un'+(ehEvento(un)?' ev':'')+'">'+(ehEvento(un)?'🎪 Evento · ':'📍 ')+esc(un.nome)+(ehEvento(un)&&un.local?' · '+esc(un.local):'')+(ehEvento(un)&&periodoEv(un)?' · '+periodoEv(un):'')+(ehEvento(un)&&!unAtiva(un)?' · encerrado':'')+'</div>';
   h+='<div class="rc-h"><span class="rc-name" data-editar="'+s.id+'" title="Editar sala">'+esc(s.nome)+'</span><span class="rc-tm'+(cs?' on':'')+'" data-tm="'+s.id+'">'+fh(r)+'</span>';
   if(op){
     if(st==='em_jogo')h+='<button class="cbtn pause" data-pausar="'+s.id+'" title="Pausar">'+IC.pause+'</button><button class="cbtn stop sm" data-parar="'+s.id+'" title="Encerrar">'+IC.stop+'</button>';
     else if(st==='pausada')h+='<button class="cbtn" data-iniciar="'+s.id+'" title="Retomar">'+IC.play+'</button><button class="cbtn stop sm" data-parar="'+s.id+'" title="Encerrar">'+IC.stop+'</button>';
-    else h+='<button class="cbtn" data-iniciar="'+s.id+'" title="'+(fim?'Nova sessão':'Iniciar')+'">'+IC.play+'</button>';
+    else h+='<button class="cbtn" data-iniciar="'+s.id+'" title="Iniciar novo jogo">'+IC.play+'</button>';
   }
   h+='</div>';
   // trilha com marcadores de eventos
@@ -1029,9 +1041,14 @@ function renderModal(){
   if(M.tipo==='encerrar'){
     $('mt').textContent='Encerrar sessão — '+sala.nome;
     if(!ses){fecharModal();return}
-    mb.innerHTML='<p style="margin-bottom:16px;color:var(--mute)">Como terminou o jogo?</p><div class="form"><button class="btn ok" id="encEsc" style="padding:13px">🏁 Escaparam</button><button class="btn danger" id="encNao" style="padding:13px">Encerrar sem escapar</button><button class="btn ghost" id="encCanc">Voltar</button></div>';
+    mb.innerHTML='<p style="margin-bottom:6px;color:var(--mute)">Como terminou o jogo nº '+numJogo(ses)+' de hoje?</p><p class="note" style="margin-bottom:16px">Tempo usado: <b>'+fh(Math.max(0,ses.duracao_segundos-remSes(ses,sala)))+'</b></p>'
+      +'<div class="form"><button class="btn ok" id="encEsc" style="padding:13px">🏁 Escaparam</button>'
+      +'<button class="btn danger" id="encNao" style="padding:13px">✖ Não escaparam</button>'
+      +'<button class="btn soft" id="encDesc" style="padding:13px">🗑 Descartar sessão <span class="note" style="margin-left:4px">(teste ou erro — não conta)</span></button>'
+      +'<button class="btn ghost" id="encCanc">Voltar ao jogo</button></div>';
     $('encEsc').onclick=function(){this.disabled=true;fecharModal();encerrar(sala,ses,'escapou')};
     $('encNao').onclick=function(){this.disabled=true;fecharModal();encerrar(sala,ses,'tempo_esgotado')};
+    $('encDesc').onclick=function(){this.disabled=true;fecharModal();encerrar(sala,ses,'cancelada')};
     $('encCanc').onclick=fecharModal;return;
   }
   if(M.tipo==='novaSala'){
@@ -1073,21 +1090,25 @@ function renderAnalise(v){
   var ss=AN.dados.filter(function(s){return salasOk.indexOf(s.sala_id)>=0});
   var nomeSala=function(id){var s=salaById(id);return s?s.nome:'—'};
   var data=function(s){return new Date(s.encerrada_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})};
-  var res=function(s){return s.resultado==='escapou'?'<span class="tag ok">Escaparam</span>':'<span class="tag bad">Não escaparam</span>'};
+  var res=function(s){return s.resultado==='escapou'?'<span class="tag ok">Escaparam</span>':s.resultado==='cancelada'?'<span class="tag">Descartada</span>':(+s.restante_base||0)<=0?'<span class="tag bad">Tempo esgotado</span>':'<span class="tag bad">Não escaparam</span>'};
+  var diaDe=function(s){return new Date(s.criado_em||s.encerrada_em).toLocaleDateString('pt-BR')};
+  var numDia={};ss.slice().filter(function(s){return s.resultado!=='cancelada'}).sort(function(a,b){return Date.parse(a.criado_em||a.encerrada_em)-Date.parse(b.criado_em||b.encerrada_em)}).forEach(function(s){var k=s.sala_id+'|'+diaDe(s);numDia[k]=(numDia[k]||0)+1;s._n=numDia[k]});
+  var validas=ss.filter(function(s){return s.resultado!=='cancelada'});
   var per='<select id="anPer">'+[[7,'Últimos 7 dias'],[30,'Últimos 30 dias'],[90,'Últimos 90 dias'],[365,'Último ano']].map(function(p){return '<option value="'+p[0]+'"'+(AN.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select>';
   var h='';
   if(view==='sessoes'){
-    h='<div class="ph"><h1>Sessões</h1><span class="note">Últimas '+ss.length+' sessões encerradas</span></div>';
-    h+=ss.length?'<div class="tblw"><table class="tbl"><tr><th>Data</th><th>Sala</th><th>Resultado</th><th>Tempo usado</th><th>Dicas</th><th></th></tr>'+ss.map(function(s){return '<tr><td>'+data(s)+'</td><td>'+esc(nomeSala(s.sala_id))+'</td><td>'+res(s)+'</td><td class="tnum">'+fh(tempoUsado(s))+'</td><td>'+s._dicas+'</td><td><a data-seslog="'+s.id+'|'+s.sala_id+'">Registro</a></td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma sessão encerrada ainda.</div>';
+    var hj=validas.filter(function(s){return diaDe(s)===new Date().toLocaleDateString('pt-BR')}).length;
+    h='<div class="ph"><div><h1>Sessões</h1><span class="note">'+validas.length+' jogos válidos nas últimas '+ss.length+' sessões · <b>'+hj+' hoje</b> · descartadas não contam</span></div></div>';
+    h+=ss.length?'<div class="tblw"><table class="tbl"><tr><th>Jogo</th><th>Data</th><th>Sala</th><th>Resultado</th><th>Tempo usado</th><th>Dicas</th><th></th></tr>'+ss.map(function(s){var desc=s.resultado==='cancelada';return '<tr'+(desc?' style="opacity:.55"':'')+'><td class="rk">'+(desc?'—':'nº '+s._n)+'</td><td>'+data(s)+'</td><td>'+esc(nomeSala(s.sala_id))+'</td><td>'+res(s)+'</td><td class="tnum">'+fh(tempoUsado(s))+'</td><td>'+s._dicas+'</td><td><a data-seslog="'+s.id+'|'+s.sala_id+'">Registro</a>'+(can('operar')?' · '+(desc?'<a data-sesrest="'+s.id+'">Restaurar</a>':'<a data-sesdesc="'+s.id+'" style="color:#b42318">Descartar</a>'):'')+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma sessão encerrada ainda.</div>';
   }
   if(view==='ranking'){
     var lista=salasFiltradas();if(!AN.salaRk||!salaById(AN.salaRk))AN.salaRk=lista[0]&&lista[0].id;
-    var rk=ss.filter(function(s){return s.sala_id===AN.salaRk&&s.resultado==='escapou'}).sort(function(a,b){return tempoUsado(a)-tempoUsado(b)}).slice(0,20);
+    var rk=validas.filter(function(s){return s.sala_id===AN.salaRk&&s.resultado==='escapou'}).sort(function(a,b){return tempoUsado(a)-tempoUsado(b)}).slice(0,20);
     h='<div class="ph"><div><h1>Ranking</h1><div class="sel-row"><select id="rkSala">'+lista.map(function(s){return '<option value="'+s.id+'"'+(AN.salaRk===s.id?' selected':'')+'>'+esc(s.nome)+'</option>'}).join('')+'</select>'+per+'</div></div></div>';
     h+=rk.length?'<div class="tblw"><table class="tbl"><tr><th>#</th><th>Data</th><th>Tempo</th><th>Dicas</th></tr>'+rk.map(function(s,i){return '<tr><td class="rk">'+(i+1)+'º</td><td>'+data(s)+'</td><td class="tnum"><b>'+fh(tempoUsado(s))+'</b></td><td>'+s._dicas+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma fuga registrada nesta sala no período.</div>';
   }
   if(view==='stats'){
-    var esc1=ss.filter(function(s){return s.resultado==='escapou'});
+    ss=validas;var esc1=ss.filter(function(s){return s.resultado==='escapou'});
     var med=function(a,fn){return a.length?a.reduce(function(t,x){return t+fn(x)},0)/a.length:0};
     h='<div class="ph"><div><h1>Estatísticas</h1><div class="sel-row">'+per+'</div></div></div>';
     h+='<div class="kpis"><div class="kpi"><small>Sessões</small><b>'+ss.length+'</b></div><div class="kpi"><small>Taxa de fuga</small><b>'+(ss.length?Math.round(esc1.length/ss.length*100):0)+'%</b></div><div class="kpi"><small>Tempo médio (quem escapou)</small><b>'+fh(med(esc1,tempoUsado))+'</b></div><div class="kpi"><small>Dicas por sessão</small><b>'+med(ss,function(s){return s._dicas}).toFixed(1).replace('.',',')+'</b></div></div>';
@@ -1097,6 +1118,14 @@ function renderAnalise(v){
   v.innerHTML=h;
   if($('anPer'))$('anPer').onchange=function(){AN.periodo=+this.value;AN.chave='';renderView()};
   if($('rkSala'))$('rkSala').onchange=function(){AN.salaRk=this.value;renderView()};
+  v.querySelectorAll('[data-sesdesc]').forEach(function(a){a.onclick=async function(){if(a.dataset.c!=='1'){a.dataset.c='1';a.textContent='Confirmar descarte?';return}
+    var x=AN.dados.filter(function(s){return s.id===a.dataset.sesdesc})[0];if(!x)return;x._res_antes=x.resultado;
+    var r=await sb.from('sessoes').update({resultado:'cancelada'}).eq('id',x.id);if(r.error){toast('Erro: '+r.error.message);return}
+    await ev(x.id,'Sessão descartada depois de encerrada (antes: '+(x.resultado==='escapou'?'escaparam':'não escaparam')+')');x.resultado='cancelada';toast('Sessão descartada. Não conta mais nas estatísticas.');renderView()}});
+  v.querySelectorAll('[data-sesrest]').forEach(function(a){a.onclick=async function(){var x=AN.dados.filter(function(s){return s.id===a.dataset.sesrest})[0];if(!x)return;
+    var novo=(+x.restante_base||0)<=0?'tempo_esgotado':(x._res_antes||'tempo_esgotado');
+    var r=await sb.from('sessoes').update({resultado:novo}).eq('id',x.id);if(r.error){toast('Erro: '+r.error.message);return}
+    await ev(x.id,'Sessão restaurada');x.resultado=novo;toast('Sessão restaurada.');renderView()}});
   v.querySelectorAll('[data-seslog]').forEach(function(a){a.onclick=async function(){var k=a.dataset.seslog.split('|');var r=await sb.from('eventos').select('*').eq('sessao_id',k[0]).order('criado_em',{ascending:false});
     abrirModal('log',k[1],{sesId:k[0],evs:r.data||[]})}});
 }

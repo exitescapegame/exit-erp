@@ -124,6 +124,8 @@ html.embed .hdr{margin-bottom:14px}
 .banner .x{background:none;border:0;cursor:pointer;color:inherit;opacity:.6;font-size:18px;padding:0 4px;line-height:1}
 .banner .btn{letter-spacing:0;text-transform:none}
 @keyframes pul{50%{box-shadow:0 0 0 4px rgba(229,72,77,.15)}}
+.evh{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:6px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line2)}
+.evh b{font-size:17px}
 .rc-un{font-size:12px;color:var(--mute);margin:-4px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rc-un.ev{color:#7a3fb0;font-weight:600}
 .rc-h{display:flex;align-items:center;gap:10px}
@@ -314,6 +316,7 @@ html.embed .hdr{margin-bottom:14px}
     <div class="lg" role="img" aria-label="Exit Games"></div>
     <div class="nav-g">OPERAÇÕES</div>
     <button class="nav" data-view="salas"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Salas<span class="cnt hide" id="navAjuda"></span></button>
+    <button class="nav" data-view="eventos"><svg class="i" viewBox="0 0 24 24"><path d="M3 20h18M5 20 12 4l7 16M12 4v16M9 20l3-6 3 6"/></svg>Eventos e feiras<span class="cnt hide" id="navAjudaEv"></span></button>
     <button class="nav" data-view="sessoes"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>Sessões</button>
     <div class="nav-g">ANÁLISES</div>
     <button class="nav" data-view="ranking"><svg class="i" viewBox="0 0 24 24"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>Ranking</button>
@@ -341,7 +344,7 @@ window.CONFIG = { SUPABASE_URL: "https://oykjdtxbgnqigkinpbts.supabase.co", SUPA
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-var VERSAO='v5';
+var VERSAO='v6';
 var $=function(i){return document.getElementById(i)};
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
 var LN={pt:'Português',en:'English',de:'Deutsch',es:'Español',ja:'日本語',fr:'Français',it:'Italiano'};
@@ -483,10 +486,10 @@ function ehEvento(u){return !!(u&&u.tipo==='evento')}
 function unAtiva(u){return !u||u.ativa!==false}
 function fData(d){if(!d)return '';var p=String(d).split('-');return p[2]+'/'+p[1]}
 function periodoEv(u){if(!u||(!u.data_inicio&&!u.data_fim))return '';return fData(u.data_inicio)+(u.data_fim&&u.data_fim!==u.data_inicio?'–'+fData(u.data_fim):'')}
-function opcoesLocais(sel,comTodas){
-  var un=UNIDADES.filter(function(u){return !ehEvento(u)}),evs=UNIDADES.filter(function(u){return ehEvento(u)});
+function opcoesLocais(sel,comTodas,so){
+  var un=so==='evento'?[]:UNIDADES.filter(function(u){return !ehEvento(u)}),evs=so==='unidade'?[]:UNIDADES.filter(function(u){return ehEvento(u)});
   var o=function(u){return '<option value="'+u.id+'"'+(sel===u.id?' selected':'')+'>'+esc(u.nome)+(ehEvento(u)&&!unAtiva(u)?' (encerrado)':'')+'</option>'};
-  return (comTodas?'<option value="todas"'+(sel==='todas'?' selected':'')+'>Todas as unidades e eventos</option>':'')
+  return (comTodas?'<option value="todas"'+(sel==='todas'?' selected':'')+'>'+(so==='unidade'?'Todas as unidades':so==='evento'?'Todos os eventos':'Todas as unidades e eventos')+'</option>':'')
     +(un.length?'<optgroup label="Unidades">'+un.map(o).join('')+'</optgroup>':'')
     +(evs.length?'<optgroup label="Eventos e feiras">'+evs.map(o).join('')+'</optgroup>':'');
 }
@@ -783,40 +786,65 @@ function renderAll(){
   if(digitando())return;
   renderUnidadeFiltro();
   document.querySelectorAll('[data-view]').forEach(function(b){b.classList.toggle('on',b.dataset.view===view)});
-  var nA=SALAS.filter(function(s){return temAjuda(s.id)}).length;$('navAjuda').textContent=nA;$('navAjuda').classList.toggle('hide',!nA);
+  var ehSalaEv=function(s){return ehEvento(unById(s.unidade_id))};
+  var nA=SALAS.filter(function(s){return temAjuda(s.id)&&!ehSalaEv(s)}).length;$('navAjuda').textContent=nA;$('navAjuda').classList.toggle('hide',!nA);
+  var nE=SALAS.filter(function(s){return temAjuda(s.id)&&ehSalaEv(s)}).length;if($('navAjudaEv')){$('navAjudaEv').textContent=nE;$('navAjudaEv').classList.toggle('hide',!nE)}
   renderView();renderModal();
 }
 function renderUnidadeFiltro(){
   var sel=$('filtroUnidade');
-  sel.innerHTML=opcoesLocais(filtroUnidade,true);
+  sel.innerHTML=opcoesLocais(filtroUnidade,true,view==='salas'?'unidade':view==='eventos'?'evento':null);
   sel.value=filtroUnidade;
 }
 $('filtroUnidade').onchange=function(){filtroUnidade=this.value;renderView()};
-function irPara(v){view=v;AN.chave='';pendingDelete=null;if(v==='usuarios'){sb.from('profiles').select('id,nome,papel').then(function(r){USUARIOS=r.data||[];renderAll()})}renderAll();window.scrollTo(0,0)}
+function irPara(v){if((v==='salas'||v==='eventos')&&v!==view){filtroUnidade='todas';chip='todas'}view=v;AN.chave='';pendingDelete=null;if(v==='usuarios'){sb.from('profiles').select('id,nome,papel').then(function(r){USUARIOS=r.data||[];renderAll()})}renderAll();window.scrollTo(0,0)}
 // em "todas", salas de eventos já encerrados ficam escondidas (aparecem escolhendo o evento no filtro)
-function salasFiltradas(){return SALAS.filter(function(s){return filtroUnidade==='todas'?unAtiva(unById(s.unidade_id)):s.unidade_id===filtroUnidade})}
+function salasFiltradas(modo){return SALAS.filter(function(s){var u=unById(s.unidade_id),ev=ehEvento(u);
+  if(modo==='unidade'&&ev)return false;
+  if(modo==='evento'&&!ev)return false;
+  if(filtroUnidade!=='todas')return s.unidade_id===filtroUnidade;
+  return modo==='evento'?(verEncerrados||unAtiva(u)):unAtiva(u)})}
+var verEncerrados=false;
 
 function renderView(){
   var v=$('view');
-  if(view==='salas')return renderSalas(v);
+  if(view==='salas')return renderSalas(v,'unidade');
+  if(view==='eventos')return renderSalas(v,'evento');
   if(view==='unidades'){v.innerHTML='<div class="ph"><h1>Unidades e eventos</h1></div><div id="unidadesBox"></div>';return renderUnidadesBox()}
   if(view==='usuarios'){v.innerHTML='<div class="ph"><h1>Usuários</h1></div><div id="usuariosBox"></div>';return renderUsuariosBox()}
   if(view==='sessoes'||view==='ranking'||view==='stats')return renderAnalise(v);
 }
 
 /* ---------- SALAS (cards) ---------- */
-function renderSalas(v){
-  var base=salasFiltradas();
+function renderSalas(v,modo){
+  var base=salasFiltradas(modo),ehEv=modo==='evento';
   var cont={todas:base.length,ativas:base.filter(function(s){return sesDe(s.id)}).length,ajuda:base.filter(function(s){return temAjuda(s.id)}).length,inativas:base.filter(function(s){return !sesDe(s.id)}).length};
   var lista=base.filter(function(s){return chip==='todas'||(chip==='ativas'&&sesDe(s.id))||(chip==='ajuda'&&temAjuda(s.id))||(chip==='inativas'&&!sesDe(s.id))});
-  var h='<div class="ph"><div><h1>Salas</h1><div class="chips">'
+  var h='<div class="ph"><div><h1>'+(ehEv?'🎪 Eventos e feiras':'Salas')+'</h1><div class="chips">'
     +[['todas','Todas'],['ativas','Ativas'],['ajuda','Ajuda solicitada'],['inativas','Inativas']].map(function(c){return '<button class="chip'+(chip===c[0]?' on':'')+'" data-chip="'+c[0]+'">'+c[1]+(c[0]==='ajuda'&&cont.ajuda?'<span class="n">'+cont.ajuda+'</span>':'')+'</button>'}).join('')
-    +'</div></div>'+(can2editar()?'<button class="btn" id="novaSalaBtn" style="padding:11px 20px;font-size:14px">+ Cadastrar sala</button>':'')+'</div>';
-  h+='<div class="grid">'+lista.map(cardHtml).join('')+'</div>';
-  if(!lista.length)h+='<div class="empty">'+(chip==='todas'?'Nenhuma sala nesta unidade ainda.':'Nenhuma sala neste filtro.')+'</div>';
+    +(ehEv?'<button class="chip'+(verEncerrados?' on':'')+'" id="verEnc">'+(verEncerrados?'Ocultar encerrados':'Mostrar encerrados')+'</button>':'')
+    +'</div></div><div class="actions">'+(ehEv&&can2editar()?'<button class="btn soft" id="novoEvBtn" style="padding:11px 18px;font-size:14px">+ Novo evento</button>':'')+(can2editar()?'<button class="btn" id="novaSalaBtn" style="padding:11px 20px;font-size:14px">+ Cadastrar sala</button>':'')+'</div></div>';
+  if(!ehEv){
+    h+='<div class="grid">'+lista.map(cardHtml).join('')+'</div>';
+    if(!lista.length)h+='<div class="empty">'+(chip==='todas'?'Nenhuma sala nesta unidade ainda.':'Nenhuma sala neste filtro.')+'</div>';
+  } else {
+    var evs=UNIDADES.filter(function(u){return ehEvento(u)&&(filtroUnidade==='todas'?(verEncerrados||unAtiva(u)):u.id===filtroUnidade)});
+    evs.sort(function(a,b){return String(a.data_inicio||'9999').localeCompare(String(b.data_inicio||'9999'))});
+    if(!evs.length)h+='<div class="empty">Nenhum evento '+(verEncerrados?'':'ativo ')+'cadastrado. '+(can2editar()?'Clique em <b>+ Novo evento</b> para criar uma feira, congresso ou ação fora das unidades.':'')+'</div>';
+    evs.forEach(function(u){
+      var ss=lista.filter(function(s){return s.unidade_id===u.id});
+      h+='<div class="evh"><div><b>'+esc(u.nome)+'</b> <span class="tag '+(unAtiva(u)?'ok':'')+'">'+(unAtiva(u)?'ativo':'encerrado')+'</span><div class="note">'+[u.local?'📍 '+esc(u.local):'',periodoEv(u)?'📅 '+periodoEv(u):'',ss.length+' sala(s)'].filter(Boolean).join(' · ')+'</div></div>'
+        +(can2editar()?'<div class="actions"><button class="btn soft sm" data-evsala="'+u.id+'">+ Sala neste evento</button><button class="btn ghost sm" data-evger="1">Editar evento</button></div>':'')+'</div>';
+      h+=ss.length?'<div class="grid" style="margin-bottom:26px">'+ss.map(cardHtml).join('')+'</div>':'<div class="note" style="margin:-4px 0 26px">'+(chip==='todas'?'Nenhuma sala cadastrada neste evento ainda.':'Nenhuma sala neste filtro.')+'</div>';
+    });
+  }
   v.innerHTML=h;
   v.querySelectorAll('[data-chip]').forEach(function(b){b.onclick=function(){chip=b.dataset.chip;renderView()}});
-  if($('novaSalaBtn'))$('novaSalaBtn').onclick=function(){abrirModal('novaSala')};
+  if($('novaSalaBtn'))$('novaSalaBtn').onclick=function(){abrirModal('novaSala',null,{modo:modo})};
+  if($('novoEvBtn'))$('novoEvBtn').onclick=function(){irPara('unidades');setTimeout(function(){var i=$('evNome');if(i){i.scrollIntoView({block:'center'});i.focus()}},150)};
+  if($('verEnc'))$('verEnc').onclick=function(){verEncerrados=!verEncerrados;renderView()};
+  v.querySelectorAll('[data-evsala]').forEach(function(b){b.onclick=function(){abrirModal('novaSala',null,{modo:'evento',un:b.dataset.evsala})}});
+  v.querySelectorAll('[data-evger]').forEach(function(b){b.onclick=function(){irPara('unidades')}});
   lista.forEach(function(s){bindCard(s)});
   tick();
 }
@@ -1008,7 +1036,7 @@ function renderModal(){
   }
   if(M.tipo==='novaSala'){
     $('mt').textContent='Cadastrar sala';
-    mb.innerHTML='<div class="field"><label>Nome da sala</label><input id="novaSalaNome"></div><div class="field"><label>Unidade ou evento</label><select id="novaSalaUnidade">'+opcoesLocais(filtroUnidade,false)+'</select></div><div class="actions" style="justify-content:flex-end"><button class="btn soft" id="nsCancel">Cancelar</button><button class="btn" id="novaSalaSalvar">Cadastrar</button></div>';
+    mb.innerHTML='<div class="field"><label>Nome da sala</label><input id="novaSalaNome"></div><div class="field"><label>'+(M.extra.modo==='evento'?'Evento':M.extra.modo==='unidade'?'Unidade':'Unidade ou evento')+'</label><select id="novaSalaUnidade">'+opcoesLocais(M.extra.un||(filtroUnidade!=='todas'?filtroUnidade:''),false,M.extra.modo||null)+'</select></div><div class="actions" style="justify-content:flex-end"><button class="btn soft" id="nsCancel">Cancelar</button><button class="btn" id="novaSalaSalvar">Cadastrar</button></div>';
     $('nsCancel').onclick=fecharModal;
     $('novaSalaSalvar').onclick=async function(){
       var nome=$('novaSalaNome').value.trim();if(!nome){toast('Dê um nome à sala.');return}

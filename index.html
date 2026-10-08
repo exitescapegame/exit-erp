@@ -4025,6 +4025,32 @@ async function sDBSupabase() {
     // [v98] pagamentosEventos ficava só no navegador: eventos pagos apareciam como "nada pago" ao recarregar
     pagamentosEventos: DB.pagamentosEventos
   };
+  // [v102 FIX-FECHAMENTOS-MERGE] Uma tela aberta ANTES de um fechamento ser gravado
+  // (por outro aparelho ou lançamento direto no banco) tinha a lista antiga na memória
+  // e, ao salvar, regravava por cima — apagando fechamentos (incidentes 26/07 e 22/09).
+  // O _cfgGuard só protege quem abriu com a lista cheia. Agora, antes de gravar, lê a
+  // lista do banco e JUNTA por id: nada que está no banco é apagado por esta gravação.
+  // Se a leitura falhar e a lista local estiver vazia, não grava (não arrisca apagar).
+  try {
+    const _fechServ = await supaFetch('config?chave=eq.fechamentosCaixa&select=valor');
+    const _fechLocal = Array.isArray(DB.fechamentosCaixa) ? DB.fechamentosCaixa : [];
+    if (Array.isArray(_fechServ)) {
+      const _lsServ = (_fechServ[0] && Array.isArray(_fechServ[0].valor)) ? _fechServ[0].valor : [];
+      const _idF = f => (f && f.id != null) ? 'id|' + String(f.id) : 'js|' + JSON.stringify(f);
+      const _jaTem = new Set(_fechLocal.map(_idF));
+      const _faltam = _lsServ.filter(f => !_jaTem.has(_idF(f)));
+      if (_faltam.length) {
+        console.warn('[v102 FECHAMENTOS-MERGE] ' + _faltam.length + ' fechamento(s) do banco não estavam nesta tela — incorporados, nada foi apagado.');
+        DB.fechamentosCaixa = _fechLocal.concat(_faltam);
+      }
+      _cfgArrays.fechamentosCaixa = DB.fechamentosCaixa || _fechLocal;
+    } else if (_fechLocal.length === 0) {
+      delete _cfgArrays.fechamentosCaixa; // leitura falhou e nada local: não sobrescreve a nuvem
+    }
+  } catch (_eFech) {
+    console.warn('[v102 FECHAMENTOS-MERGE] falha ao mesclar:', _eFech);
+    if (!Array.isArray(DB.fechamentosCaixa) || DB.fechamentosCaixa.length === 0) delete _cfgArrays.fechamentosCaixa;
+  }
   for (const _k in _cfgArrays) {
     const _v = _cfgGuard(_k, _cfgArrays[_k]);
     if (_v !== null) _cfgRows.push({ chave: _k, valor: _v });
@@ -6237,7 +6263,7 @@ function _v74_verificarIntegridade(){
       '\n⚠️ Alguma alteração quebrou o sistema! Verifique FUNCIONA_NAO_MEXER.md e desfaça a última mudança.');
     return {ok:false, faltando};
   }
-  console.log('🔒 [INTEGRIDADE v101] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem + v100: Detalhes do evento + v101: Salas ao Vivo (Painel de Salas no Painel GM))');
+  console.log('🔒 [INTEGRIDADE v102] Todas as '+_V74_FUNCOES_CRITICAS.length+' funções críticas presentes ✅ (BLINDAGEM ANTI-WIPE + XSS hardening + Geração de Imagem IA + Watchdog de Conexão + Fix dinheiro venda avulsa retroativa + Botão Chegada/Atraso manual no slot + Fix e-mail relatório shopping truncado + Fix recibo de pagamento validado contra o banco + Merge anti-perda do caixa multi-aparelho + Slots vencidos exibem Encerrado + v98: pagamentos de eventos salvos na nuvem, Receber de evento lança no faturamento, forma Boleto + v99: fechamento não duplica pagamentos de evento/reserva/totem + v100: Detalhes do evento + v101: Salas ao Vivo (Painel de Salas no Painel GM) + v102: fechamentos de caixa não são mais apagados por tela antiga)');
   return {ok:true, faltando:[]};
 }
 try{ setTimeout(_v74_verificarIntegridade,1500); }catch(e){}

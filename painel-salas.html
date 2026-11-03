@@ -508,10 +508,11 @@ function fimDe(salaId){if(sesDe(salaId))return null;return RECENTES.filter(funct
 function cardSes(salaId){return sesDe(salaId)}
 function enigmasDe(salaId){return ENIGMAS.filter(function(e){return e.sala_id===salaId})}
 function dicasDe(enigmaId){return DICAS.filter(function(d){return d.enigma_id===enigmaId})}
+var IDIOMA_PRE={}; // [v2 03/11] idioma escolhido no card antes de iniciar o jogo
 function acoesDe(salaId){return ACOES.filter(function(a){return a.sala_id===salaId})}
 // [v2 02/11] Som da dica: se a sala tiver uma ação chamada "Som da dica" (Som no tablet, com arquivo), ele toca junto com cada dica enviada
-// Áudio próprio da dica: ação com o nome "<enigma> - <dica>" (ex.: "Tapete - Dica 1"). Se existir, toca ela no lugar do "Som da dica"
-async function somDaDica(sala,sessaoId,nomeDica){try{if(!sala||!sessaoId)return;var som=function(n){n=String(n||'').trim().toLowerCase();return acoesDe(sala.id).find(function(x){return x.alvo==='tablet_som'&&x.arquivo_som&&String(x.nome||'').trim().toLowerCase()===n})};var a=(nomeDica&&som(nomeDica))||som('som da dica');if(a)await sb.from('sons_disparados').insert({sessao_id:sessaoId,arquivo:a.arquivo_som})}catch(e){}}
+// Áudio próprio da dica: ação com o nome "<enigma> - <dica>" (ex.: "Tapete - Dica 1"). Se for ação de PLACA (ex.: palhaço do Circo), a placa fala a dica; se for som no tablet, toca no tablet; senão toca o "Som da dica"
+async function somDaDica(sala,sessaoId,nomeDica){try{if(!sala||!sessaoId)return;var som=function(n){n=String(n||'').trim().toLowerCase();return acoesDe(sala.id).find(function(x){return x.alvo==='tablet_som'&&x.arquivo_som&&String(x.nome||'').trim().toLowerCase()===n})};var placa=function(n){n=String(n||'').trim().toLowerCase();return acoesDe(sala.id).find(function(x){return x.pino_id&&String(x.nome||'').trim().toLowerCase()===n})};var pl=nomeDica&&placa(nomeDica);if(pl){await fireRaw(sessaoId,pl,'manual');return}var a=(nomeDica&&som(nomeDica))||som('som da dica');if(a)await sb.from('sons_disparados').insert({sessao_id:sessaoId,arquivo:a.arquivo_som})}catch(e){}}
 function placasDe(salaId){return PLACAS.filter(function(p){return p.sala_id===salaId})}
 function pinosDe(placaId){return PINOS.filter(function(p){return p.placa_id===placaId})}
 function pinoById(id){return PINOS.filter(function(p){return p.id===id})[0]}
@@ -601,7 +602,7 @@ function tick(){
 async function iniciar(sala){
   var ses=sesDe(sala.id);
   if(!ses){
-    var r=await sb.from('sessoes').insert({sala_id:sala.id,duracao_segundos:sala.duracao_segundos,restante_base:sala.duracao_segundos,idioma:'pt',status:'em_jogo',retomou_em:nowS(),criado_por:G.uid}).select().single();
+    var r=await sb.from('sessoes').insert({sala_id:sala.id,duracao_segundos:sala.duracao_segundos,restante_base:sala.duracao_segundos,idioma:(IDIOMA_PRE[sala.id]||'pt'),status:'em_jogo',retomou_em:nowS(),criado_por:G.uid}).select().single();
     if(r.error){toast('Erro: '+r.error.message);return}
     ses=r.data;
     var novasAcoes=acoesDe(sala.id).filter(function(a){return a.gatilho==='inicio'});
@@ -872,7 +873,7 @@ function cardHtml(s){
   var ses=sesDe(s.id),fim=fimDe(s.id),cs=ses,st=ses?ses.status:'aguardando',op=can('operar');
   var r=remSes(cs,s),ajuda=temAjuda(s.id),tb=cardTab[s.id]||'disp';
   var h='<div class="rc'+(ajuda?' help':'')+'" id="card_'+s.id+'">';
-  h+='<div class="rc-top"><select data-lang="'+s.id+'"'+(ses&&op?'':' disabled')+' title="Idioma das dicas">'+Object.keys(LN).map(function(k){return '<option value="'+k+'"'+(((ses&&ses.idioma)||'pt')===k?' selected':'')+'>'+BAND[k]+' '+LN[k]+'</option>'}).join('')+'</select></div>';
+  h+='<div class="rc-top"><select data-lang="'+s.id+'"'+(op?'':' disabled')+' title="Idioma das dicas">'+Object.keys(LN).map(function(k){return '<option value="'+k+'"'+(((ses&&ses.idioma)||IDIOMA_PRE[s.id]||'pt')===k?' selected':'')+'>'+BAND[k]+' '+LN[k]+'</option>'}).join('')+'</select></div>';
   if(ajuda)h+='<div class="banner ajuda">Ajuda solicitada'+(op?' <button class="btn sm" data-atender="'+s.id+'">Atendido</button>':'')+'</div>';
   if(fim&&fim.resultado!=='cancelada')h+='<div class="banner '+(fim.resultado==='escapou'?'escapou':'esgotado')+'"><span>Último jogo: '+textoResultado(fim)+'</span><a data-log="'+fim.id+'" style="font-size:12px;letter-spacing:0;text-transform:none">registro</a><button class="x" data-dispensa="'+fim.id+'" title="Limpar">×</button></div>';
   var un=unById(s.unidade_id);
@@ -971,7 +972,7 @@ function bindCard(s){
   q('[data-parar]',function(b){b.onclick=function(){abrirModal('encerrar',s.id)}});
   q('[data-atender]',function(b){b.onclick=async function(){var ses=sesDe(s.id);await sb.from('pedidos_ajuda').update({atendido:true}).eq('sessao_id',ses.id).eq('atendido',false);await loadAll()}});
   q('[data-dispensa]',function(b){b.onclick=function(){dispensadas[b.dataset.dispensa]=1;renderView()}});
-  q('[data-lang]',function(sel){sel.onchange=async function(){var ses=sesDe(s.id);if(!ses)return;await sb.from('sessoes').update({idioma:sel.value}).eq('id',ses.id);await ev(ses.id,'Idioma: '+LN[sel.value]);await loadAll()}});
+  q('[data-lang]',function(sel){sel.onchange=async function(){var ses=sesDe(s.id);if(!ses){IDIOMA_PRE[s.id]=sel.value;toast('Idioma do próximo jogo: '+LN[sel.value]);renderView();return}await sb.from('sessoes').update({idioma:sel.value}).eq('id',ses.id);await ev(ses.id,'Idioma: '+LN[sel.value]);await loadAll()}});
   q('[data-log]',function(a){a.onclick=function(){abrirModal('log',s.id,{sesId:a.dataset.log})}});
   q('[data-ctab]',function(b){b.onclick=function(){cardTab[s.id]=b.dataset.ctab.split('|')[1];renderView()}});
   q('[data-editar]',function(b){b.onclick=function(){if(!can2editar()&&!b.classList.contains('rc-name'))return;tab=b.dataset.etab||'enigmas';abrirModal('editar',s.id)}});

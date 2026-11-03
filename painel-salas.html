@@ -353,7 +353,7 @@ var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
 var LN={pt:'Português',en:'English',de:'Deutsch',es:'Español',ja:'日本語',fr:'Français',it:'Italiano'};
 var BAND={pt:'BR',en:'EN',de:'DE',es:'ES',ja:'JP',fr:'FR',it:'IT'};
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function tr(t,lang){return (!lang||lang==='pt')?t:'['+lang.toUpperCase()+'] '+t}
+function tr(t,lang){return t} // [v2 02/11] sem o falso "[EN] texto": a dica instantânea vai como foi escrita
 function toast(msg){var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
 var pendingDelete=null;
 function askDelete(key,doIt){if(pendingDelete===key){pendingDelete=null;doIt()}else{pendingDelete=key;renderModal()}}
@@ -509,6 +509,8 @@ function cardSes(salaId){return sesDe(salaId)}
 function enigmasDe(salaId){return ENIGMAS.filter(function(e){return e.sala_id===salaId})}
 function dicasDe(enigmaId){return DICAS.filter(function(d){return d.enigma_id===enigmaId})}
 function acoesDe(salaId){return ACOES.filter(function(a){return a.sala_id===salaId})}
+// [v2 02/11] Som da dica: se a sala tiver uma ação chamada "Som da dica" (Som no tablet, com arquivo), ele toca junto com cada dica enviada
+async function somDaDica(sala,sessaoId){try{if(!sala||!sessaoId)return;var a=acoesDe(sala.id).find(function(x){return x.alvo==='tablet_som'&&x.arquivo_som&&String(x.nome||'').trim().toLowerCase()==='som da dica'});if(a)await sb.from('sons_disparados').insert({sessao_id:sessaoId,arquivo:a.arquivo_som})}catch(e){}}
 function placasDe(salaId){return PLACAS.filter(function(p){return p.sala_id===salaId})}
 function pinosDe(placaId){return PINOS.filter(function(p){return p.placa_id===placaId})}
 function pinoById(id){return PINOS.filter(function(p){return p.id===id})[0]}
@@ -635,6 +637,7 @@ async function liberar(sala,ses,en,d,origem){
   var r=await sb.from('dicas_liberadas').insert({sessao_id:ses.id,dica_id:d.id,texto:texto,idioma:ses.idioma,origem:origem});
   if(r.error&&r.error.code!=='23505'){toast('Erro: '+r.error.message);return}
   if(!r.error)await ev(ses.id,'Dica ('+origem+'): '+en.nome+' — '+texto);
+  if(!r.error)await somDaDica(sala,ses.id);
   if(origem==='manual')toast('Dica enviada ao tablet.');
   await loadAll()
 }
@@ -1019,12 +1022,12 @@ function renderModal(){
   }
   if(M.tipo==='inst'){
     $('mt').textContent='Dica instantânea — '+sala.nome;
-    mb.innerHTML='<div class="form"><textarea id="instTxt" rows="4" placeholder="Escreva a dica em português"></textarea>'+(ses&&ses.idioma!=='pt'?'<div class="note">Tradução ('+LN[ses.idioma]+'): <b id="instTr"></b></div>':'')+'<div class="actions" style="justify-content:flex-end"><button class="btn soft" id="instCancel">Cancelar</button><button class="btn" id="instSend">Enviar ao tablet</button></div></div>';
+    mb.innerHTML='<div class="form"><textarea id="instTxt" rows="4" placeholder="Escreva a dica em português"></textarea>'+(ses&&ses.idioma!=='pt'?'<div class="note">Tablet em '+LN[ses.idioma]+': escreva a dica já nesse idioma (dica instantânea não é traduzida). <b id="instTr" style="display:none"></b></div>':'')+'<div class="actions" style="justify-content:flex-end"><button class="btn soft" id="instCancel">Cancelar</button><button class="btn" id="instSend">Enviar ao tablet</button></div></div>';
     var upd=function(){var tt=$('instTr');if(tt)tt.textContent=tr($('instTxt').value,ses?ses.idioma:'pt')};$('instTxt').oninput=upd;
     $('instCancel').onclick=fecharModal;
     $('instSend').onclick=async function(){var v=$('instTxt').value.trim();if(!v){toast('Escreva a dica primeiro.');return}if(!ses){toast('Inicie a sala primeiro.');return}
       $('instSend').disabled=true;var texto=tr(v,ses.idioma);var r=await sb.from('dicas_liberadas').insert({sessao_id:ses.id,texto:texto,idioma:ses.idioma,origem:'instantanea'});
-      if(r.error){$('instSend').disabled=false;toast('Erro: '+r.error.message);return}await ev(ses.id,'Dica instantânea: '+texto);$('instTxt').value='';fecharModal();toast('Dica enviada ao tablet.');await loadAll()};
+      if(r.error){$('instSend').disabled=false;toast('Erro: '+r.error.message);return}await somDaDica(sala,ses.id);await ev(ses.id,'Dica instantânea: '+texto);$('instTxt').value='';fecharModal();toast('Dica enviada ao tablet.');await loadAll()};
     return;
   }
   if(M.tipo==='tempo'){
@@ -1146,7 +1149,7 @@ function pane(sala,ses){
     var usados=ses?LIB.filter(function(l){return l.sessao_id===ses.id&&l.origem==='balao'}).length:0;
     h+='<div class="balao"><div><b>Balões de dicas</b><div class="note">'+usados+' de '+sala.limite_baloes+' usados. '+(can2editar()?'<button class="linkbtn" id="editlim">alterar limite</button>':'')+(editandoLimite?' <input id="limInput" type="number" min="1" value="'+sala.limite_baloes+'" style="width:60px;padding:4px 6px"> <button class="btn sm" id="limSalvar">Salvar</button>':'')+'</div></div>'+(can('operar')?'<button class="btn'+(ses&&ses.baloes_ativos?' ok':' soft')+'" id="bl">'+(ses&&ses.baloes_ativos?'Ligados':'Desligados')+'</button>':'')+'</div>';
     if(showInstant){
-      h+='<div class="inst"><b>Dica instantânea</b><textarea id="instTxt" rows="2" placeholder="Escreva a dica em português"></textarea>'+(ses&&ses.idioma!=='pt'?'<div class="note">Tradução ('+LN[ses.idioma]+'): <b id="instTr" style="color:var(--gold2)"></b></div>':'')+'<div class="actions"><button class="btn" id="instSend">Enviar ao tablet</button><button class="btn soft" id="instCancel">Cancelar</button></div></div>';
+      h+='<div class="inst"><b>Dica instantânea</b><textarea id="instTxt" rows="2" placeholder="Escreva a dica em português"></textarea>'+(ses&&ses.idioma!=='pt'?'<div class="note">Tablet em '+LN[ses.idioma]+': escreva a dica já nesse idioma (dica instantânea não é traduzida). <b id="instTr" style="display:none"></b></div>':'')+'<div class="actions"><button class="btn" id="instSend">Enviar ao tablet</button><button class="btn soft" id="instCancel">Cancelar</button></div></div>';
     }
     var ens=enigmasDe(sala.id);
     if(!ens.length)h+='<div class="empty">Nenhum enigma cadastrado nesta sala.</div>';
@@ -1163,7 +1166,7 @@ function pane(sala,ses){
         if(editD===x.id){
           h+='<div class="form" style="margin-top:8px"><label class="note">Nome<input data-fn="'+x.id+'" value="'+esc(x.nome)+'" style="width:100%"></label><label class="note">Texto<textarea rows="2" data-ft="'+x.id+'">'+esc(x.texto_pt)+'</textarea></label><label class="note">Liberação <select data-fm="'+x.id+'"><option value="manual"'+(x.modo==='manual'?' selected':'')+'>Manual</option><option value="automatica"'+(x.modo==='automatica'?' selected':'')+'>Automática</option><option value="balao"'+(x.modo==='balao'?' selected':'')+'>Balão</option></select></label><label class="note" style="'+(x.modo!=='manual'?'':'display:none')+'">Minuto (automática: quando envia · balão: quando libera) <input type="number" min="0" data-fmin="'+x.id+'" value="'+x.minuto+'" style="width:70px"></label><div class="actions"><button class="btn" data-savedica="'+en.id+'|'+x.id+'">Salvar</button><button class="btn soft" data-canceld="1">Fechar</button></div></div>';
         } else {
-          h+='<div class="ht">'+esc(x.texto_pt)+(ses&&ses.idioma!=='pt'?'<br><i>Tradução: '+esc(tr(x.texto_pt,ses.idioma))+'</i>':'')+'</div><div class="ctlrow">'+(can2editar()?'<select data-m="'+en.id+'|'+x.id+'"><option value="manual"'+(x.modo==='manual'?' selected':'')+'>Manual</option><option value="automatica"'+(x.modo==='automatica'?' selected':'')+'>Automática</option><option value="balao"'+(x.modo==='balao'?' selected':'')+'>Balão</option></select>'+(x.modo!=='manual'?'<span class="note">'+(x.modo==='balao'?'libera aos':'aos')+'</span><input type="number" min="0" value="'+x.minuto+'" data-mn="'+x.id+'"><span class="note">min</span>':''):'')+(can('operar')&&x.modo==='manual'&&!done&&ses?'<button class="btn sm" data-r="'+en.id+'|'+x.id+'">Enviar agora</button>':'')+'</div>';
+          h+='<div class="ht">'+esc(x.texto_pt)+(ses&&ses.idioma!=='pt'?'<br><i>'+LN[ses.idioma]+': '+esc((x.traducoes||{})[ses.idioma]||'sem tradução — vai em português')+'</i>':'')+'</div><div class="ctlrow">'+(can2editar()?'<select data-m="'+en.id+'|'+x.id+'"><option value="manual"'+(x.modo==='manual'?' selected':'')+'>Manual</option><option value="automatica"'+(x.modo==='automatica'?' selected':'')+'>Automática</option><option value="balao"'+(x.modo==='balao'?' selected':'')+'>Balão</option></select>'+(x.modo!=='manual'?'<span class="note">'+(x.modo==='balao'?'libera aos':'aos')+'</span><input type="number" min="0" value="'+x.minuto+'" data-mn="'+x.id+'"><span class="note">min</span>':''):'')+(can('operar')&&x.modo==='manual'&&!done&&ses?'<button class="btn sm" data-r="'+en.id+'|'+x.id+'">Enviar agora</button>':'')+'</div>';
         }
         h+='</div>'
       });
@@ -1374,7 +1377,7 @@ function bindPane(sala,ses){
   if($('instTxt')){var upd=function(){var tt=$('instTr');if(tt)tt.textContent=tr($('instTxt').value,ses?ses.idioma:'pt')};$('instTxt').oninput=upd;upd();
     $('instSend').onclick=async function(){var v=$('instTxt').value.trim();if(!v){toast('Escreva a dica primeiro.');return}if(!ses){toast('Inicie a sala primeiro.');return}
       var texto=tr(v,ses.idioma);var r=await sb.from('dicas_liberadas').insert({sessao_id:ses.id,texto:texto,idioma:ses.idioma,origem:'instantanea'});
-      if(r.error){toast('Erro: '+r.error.message);return}await ev(ses.id,'Dica instantânea: '+texto);showInstant=false;$('instTxt').value='';toast('Dica enviada ao tablet.');await loadAll()};
+      if(r.error){toast('Erro: '+r.error.message);return}await somDaDica(sala,ses.id);await ev(ses.id,'Dica instantânea: '+texto);showInstant=false;$('instTxt').value='';toast('Dica enviada ao tablet.');await loadAll()};
     $('instCancel').onclick=function(){showInstant=false;$('instTxt').value='';renderDetail()}}
   if($('upLogo'))$('upLogo').onchange=async function(){var fl=this.files[0];if(!fl)return;
     var path=sala.id+'-logo-'+Date.now()+'-'+fl.name.replace(/[^a-zA-Z0-9_.-]/g,'_');

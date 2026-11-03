@@ -510,7 +510,8 @@ function enigmasDe(salaId){return ENIGMAS.filter(function(e){return e.sala_id===
 function dicasDe(enigmaId){return DICAS.filter(function(d){return d.enigma_id===enigmaId})}
 function acoesDe(salaId){return ACOES.filter(function(a){return a.sala_id===salaId})}
 // [v2 02/11] Som da dica: se a sala tiver uma ação chamada "Som da dica" (Som no tablet, com arquivo), ele toca junto com cada dica enviada
-async function somDaDica(sala,sessaoId){try{if(!sala||!sessaoId)return;var a=acoesDe(sala.id).find(function(x){return x.alvo==='tablet_som'&&x.arquivo_som&&String(x.nome||'').trim().toLowerCase()==='som da dica'});if(a)await sb.from('sons_disparados').insert({sessao_id:sessaoId,arquivo:a.arquivo_som})}catch(e){}}
+// Áudio próprio da dica: ação com o nome "<enigma> - <dica>" (ex.: "Tapete - Dica 1"). Se existir, toca ela no lugar do "Som da dica"
+async function somDaDica(sala,sessaoId,nomeDica){try{if(!sala||!sessaoId)return;var som=function(n){n=String(n||'').trim().toLowerCase();return acoesDe(sala.id).find(function(x){return x.alvo==='tablet_som'&&x.arquivo_som&&String(x.nome||'').trim().toLowerCase()===n})};var a=(nomeDica&&som(nomeDica))||som('som da dica');if(a)await sb.from('sons_disparados').insert({sessao_id:sessaoId,arquivo:a.arquivo_som})}catch(e){}}
 function placasDe(salaId){return PLACAS.filter(function(p){return p.sala_id===salaId})}
 function pinosDe(placaId){return PINOS.filter(function(p){return p.placa_id===placaId})}
 function pinoById(id){return PINOS.filter(function(p){return p.id===id})[0]}
@@ -637,7 +638,7 @@ async function liberar(sala,ses,en,d,origem){
   var r=await sb.from('dicas_liberadas').insert({sessao_id:ses.id,dica_id:d.id,texto:texto,idioma:ses.idioma,origem:origem});
   if(r.error&&r.error.code!=='23505'){toast('Erro: '+r.error.message);return}
   if(!r.error)await ev(ses.id,'Dica ('+origem+'): '+en.nome+' — '+texto);
-  if(!r.error)await somDaDica(sala,ses.id);
+  if(!r.error)await somDaDica(sala,ses.id,en.nome+' - '+d.nome);
   if(origem==='manual')toast('Dica enviada ao tablet.');
   await loadAll()
 }

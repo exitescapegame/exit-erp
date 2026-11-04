@@ -143,10 +143,16 @@ function show(id,on){$(id).classList.toggle('hide',!on)}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function aviso(txt){var a=el('div','aviso',txt);document.body.appendChild(a);setTimeout(function(){a.remove()},4000)}
+function msgRede(m){m=String(m||'');return /fetch|network|load failed|internet/i.test(m)?'Este tablet não está conseguindo acessar o servidor. Confira o Wi-Fi/internet do tablet e toque em Conectar de novo.':m}
+async function garantirSessao(){
+  try{var r=await sb.auth.getSession();if(r.data&&r.data.session)return '';
+    var a=await sb.auth.signInAnonymously();if(a.error)return msgRede(a.error.message);return ''}
+  catch(e){return msgRede(e.message)}
+}
 async function start(){
   try{
   var r=await sb.auth.getSession();
-  if(!r.data.session){var a=await sb.auth.signInAnonymously();if(a.error){show('boot',false);show('pair',true);$('err').textContent='Não foi possível iniciar: '+a.error.message+' (confira se o login anônimo está ligado no Supabase)';return}}
+  var se=await garantirSessao();if(se){show('boot',false);show('pair',true);$('err').textContent=se;return}
   var qc='';try{qc=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');if(location.search)history.replaceState(null,'',location.pathname)}catch(e){}
   var d=await sb.from('dispositivos').select('sala_id').maybeSingle();
   if(qc.length===6){
@@ -163,10 +169,12 @@ async function start(){
 }
 $('go').onclick=async function(){
   var c=$('cod').value.trim();if(c.length!==6){$('err').textContent='Digite os 6 números do código.';return}
-  $('go').disabled=true;
+  $('go').disabled=true;$('err').textContent='Conectando...';
+  var se=await garantirSessao();if(se){$('go').disabled=false;$('err').textContent=se;return}
   var r=await sb.rpc('parear_tablet',{p_codigo:c});
   $('go').disabled=false;
-  if(r.error){$('err').textContent=r.error.message;return}
+  if(r.error){$('err').textContent=msgRede(r.error.message);return}
+  $('err').textContent='';
   show('pair',false);boot(r.data)
 };
 $('cod').onkeydown=function(e){if(e.key==='Enter')$('go').click()};

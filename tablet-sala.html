@@ -78,10 +78,10 @@ img.slogo{max-height:64px;align-self:flex-start}
 .bi.pronta .tt{font-family:Inter,system-ui,sans-serif;color:#1a1405;font-size:16px;font-weight:700}
 .bi.pronta .sub{color:#3a2c08}
 .bi.abrindo .ring{animation:none;opacity:.6}
-.dock{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.tb{display:inline-flex;align-items:center;gap:8px;background:var(--s2);color:var(--text);border:1px solid var(--line);border-radius:30px;padding:10px 16px;font-size:15px;font-weight:600;position:relative}
-.tb svg{width:18px;height:18px;stroke:var(--gold2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-.tb .n{background:var(--gold);color:#17130a;border-radius:10px;font-size:12px;padding:1px 7px}
+.dock{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.tb{display:inline-flex;align-items:center;gap:12px;background:var(--s2);color:var(--text);border:1.5px solid var(--line);border-radius:40px;padding:18px 28px;font-size:21px;font-weight:700;position:relative;min-height:64px}
+.tb svg{width:28px;height:28px;stroke:var(--gold2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.tb .n{background:var(--gold);color:#17130a;border-radius:14px;font-size:17px;padding:2px 11px}
 .tb.call{border-color:rgba(239,91,91,.45)}
 .tb.call svg{stroke:#ff8a8a}
 .tb.called{background:rgba(239,91,91,.16);border-color:var(--bad);color:#ffb3b3;animation:beat 1.2s ease-in-out infinite}
@@ -216,6 +216,7 @@ async function boot(salaId){
   sb.channel('tablet').on('postgres_changes',{event:'*',schema:'public',table:'sessoes'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'dicas_liberadas'},load)
     .on('postgres_changes',{event:'*',schema:'public',table:'sala_tutoriais'},load)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'salas'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){tocar(p.new.arquivo)})
     .subscribe(function(st){rtOk=st==='SUBSCRIBED';setConn();if(rtOk)load()});
   function sinal(){sb.rpc('sinal_tablet').then(function(){},function(){})}setInterval(sinal,20000);sinal();
@@ -223,7 +224,14 @@ async function boot(salaId){
   setInterval(draw,500);
   setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000)
 }
-function tocar(f){if(!f)return;try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));a.play()}catch(e){}}
+var SONS=[];
+function volume(){var v=sala&&sala.volume_som!=null?+sala.volume_som:100;return Math.max(0,Math.min(100,v))/100}
+function aplicarVolume(){var v=volume();SONS.forEach(function(a){try{a.volume=v}catch(e){}})}
+function tocar(f){if(!f)return;try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));SONS.push(a);try{a.volume=volume()}catch(e){}a.onended=function(){SONS=SONS.filter(function(x){return x!==a})};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}}
+// o som acompanha o jogo: pausa junto, volta junto e para quando o jogo é encerrado
+function pararSons(){SONS.forEach(function(a){try{a.pause();a.currentTime=0}catch(e){}});SONS=[]}
+function pausarSons(){SONS.forEach(function(a){try{a.pause()}catch(e){}})}
+function retomarSons(){SONS.forEach(function(a){try{var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}})}
 async function load(){
   if(!sala)return;
   if(carreg){denovo=true;return}
@@ -245,7 +253,11 @@ async function carregar(){
       if(falt.length){var bi=await sb.rpc('balao_info',{p_ids:falt});(bi.data||[]).forEach(function(x){BINFO[x.dica_id]=x})}}
   }
   if(!offOk){try{var tg=await sb.rpc('agora');if(tg.data){off=Date.parse(tg.data)-Date.now();offOk=true}}catch(e){}}
-  if(rs.data)sala=rs.data;ses=r.data;if(!rt.error)tut=rt.data||[];lib=nlib;bal=nbal;
+  var antes=ses,depois=r.data;
+  if(antes&&(!depois||depois.id!==antes.id||depois.status==='aguardando'))pararSons();
+  else if(antes&&depois&&antes.status==='em_jogo'&&depois.status==='pausada')pausarSons();
+  else if(antes&&depois&&antes.status==='pausada'&&depois.status==='em_jogo')retomarSons();
+  if(rs.data)sala=rs.data;ses=r.data;aplicarVolume();if(!rt.error)tut=rt.data||[];lib=nlib;bal=nbal;
   online=true;ultimoOk=Date.now();setConn();
   var sndt=$('sndt');if(sndt)sndt.textContent=(ses&&ses.status!=='aguardando')?'Toque para continuar o jogo':'Toque para iniciar o jogo';
   render();

@@ -121,7 +121,7 @@ img.slogo{max-height:64px;align-self:flex-start}
   <div class="dock" id="dock"></div>
 </div>
 <div id="ov" class="ov hide"><div class="ov-h"><b id="ovt"></b><button class="alt" id="ovx">Fechar ✕</button></div><div class="ov-b" id="ovb"></div></div>
-<div id="snd" class="center hide"><div class="logo"></div><b>Toque para ativar o som da sala</b><button id="sndb">Ativar som</button></div>
+<div id="snd" class="center hide"><div class="logo"></div><b>Toque para iniciar o jogo</b><button id="sndb">Iniciar</button></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 window.CONFIG = {
@@ -147,7 +147,16 @@ async function start(){
   try{
   var r=await sb.auth.getSession();
   if(!r.data.session){var a=await sb.auth.signInAnonymously();if(a.error){show('boot',false);show('pair',true);$('err').textContent='Não foi possível iniciar: '+a.error.message+' (confira se o login anônimo está ligado no Supabase)';return}}
+  var qc='';try{qc=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');if(location.search)history.replaceState(null,'',location.pathname)}catch(e){}
   var d=await sb.from('dispositivos').select('sala_id').maybeSingle();
+  if(qc.length===6){
+    $('cod').value=qc;$('bm').textContent='Conectando o tablet...';
+    var pr=await sb.rpc('parear_tablet',{p_codigo:qc});
+    show('boot',false);
+    if(!pr.error){boot(pr.data);return}
+    if(d.data){boot(d.data.sala_id);setTimeout(function(){aviso('Código vencido ou inválido. O tablet continua na sala de antes.')},1500);return}
+    show('pair',true);$('err').textContent=pr.error.message+' — gere um código novo no painel.';return
+  }
   show('boot',false);
   if(d.data)boot(d.data.sala_id);else{show('pair',true);$('cod').focus()}
   }catch(e){show('boot',false);show('pair',true);$('err').textContent='Erro ao conectar: '+e.message}

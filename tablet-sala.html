@@ -122,7 +122,8 @@ img.slogo{max-height:64px;align-self:flex-start}
 </div>
 <div id="ov" class="ov hide"><div class="ov-h"><b id="ovt"></b><button class="alt" id="ovx">Fechar ✕</button></div><div class="ov-b" id="ovb"></div></div>
 <div id="snd" class="center hide"><div class="logo"></div><b>Toque para iniciar o jogo</b><button id="sndb">Iniciar</button></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"><\/script>')</script>
 <script>
 window.CONFIG = {
   SUPABASE_URL: "https://oykjdtxbgnqigkinpbts.supabase.co",
@@ -132,13 +133,16 @@ window.CONFIG = {
 <script>
 var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
+if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';setTimeout(function(){location.reload()},10000);throw new Error('biblioteca do servidor não carregou')}
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
-var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
+var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,offOk=false,online=true,rtOk=false,ultimoOk=0,carreg=false,denovo=false,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
 var SV={
   lock:'<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   bell:'<svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>',
   bulb:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/></svg>'
 };
+function esperar(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function setConn(){var ok=online&&rtOk;var c=$('conn');if(!c)return;c.textContent=ok?'Conectado':(online?'Reconectando...':'Sem internet — o tempo continua');$('connw').classList.toggle('off',!ok)}
 function show(id,on){$(id).classList.toggle('hide',!on)}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
@@ -154,7 +158,8 @@ async function start(){
   var r=await sb.auth.getSession();
   var se=await garantirSessao();if(se){show('boot',false);show('pair',true);$('err').textContent=se;return}
   var qc='';try{qc=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');if(location.search)history.replaceState(null,'',location.pathname)}catch(e){}
-  var d=await sb.from('dispositivos').select('sala_id').maybeSingle();
+  var d;for(var i=0;;i++){d=await sb.from('dispositivos').select('sala_id').maybeSingle();if(!d.error)break;$('bm').textContent='Sem conexão com o servidor. Tentando de novo...';await esperar(Math.min(15000,3000*(i+1)))}
+  $('bm').textContent='';
   if(qc.length===6){
     $('cod').value=qc;$('bm').textContent='Conectando o tablet...';
     var pr=await sb.rpc('parear_tablet',{p_codigo:qc});
@@ -187,36 +192,56 @@ function chime(){
 }
 function travaTela(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}}
 async function boot(salaId){
-  var s=await sb.from('salas').select('*').eq('id',salaId).single();sala=s.data;
-  var t=await sb.rpc('agora');if(t.data)off=Date.parse(t.data)-Date.now();
+  for(var i=0;;i++){
+    var s;try{s=await sb.from('salas').select('*').eq('id',salaId).maybeSingle()}catch(e){s={error:e}}
+    if(s.data){sala=s.data;break}
+    if(!s.error){show('boot',false);show('pair',true);$('err').textContent='A sala deste tablet não existe mais. Gere um código novo no painel.';return}
+    show('boot',true);$('bm').textContent='Sem conexão com o servidor. Tentando de novo...';await esperar(Math.min(15000,3000*(i+1)))
+  }
+  show('boot',false);$('bm').textContent='';
+  try{var t=await sb.rpc('agora');if(t.data){off=Date.parse(t.data)-Date.now();offOk=true}}catch(e){}
   $('sala').textContent=sala.nome;show('app',true);show('snd',true);
   $('sndb').onclick=function(){show('snd',false);somAtivo=true;travaTela();try{var a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');a.play()}catch(e){}
     try{actx=new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
     try{var de=document.documentElement;if(de.requestFullscreen)de.requestFullscreen().catch(function(){})}catch(e){}};
   travaTela();
   document.addEventListener('visibilitychange',function(){if(!document.hidden){travaTela();load()}});
+  window.addEventListener('online',function(){load()});window.addEventListener('offline',function(){online=false;setConn()});
   await load();
   sb.channel('tablet').on('postgres_changes',{event:'*',schema:'public',table:'sessoes'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'dicas_liberadas'},load)
     .on('postgres_changes',{event:'*',schema:'public',table:'sala_tutoriais'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){tocar(p.new.arquivo)})
-    .subscribe(function(st){var ok=st==='SUBSCRIBED';$('conn').textContent=ok?'Conectado':'Reconectando...';$('connw').classList.toggle('off',!ok)});
+    .subscribe(function(st){rtOk=st==='SUBSCRIBED';setConn();if(rtOk)load()});
   setInterval(function(){sb.rpc('sinal_tablet')},20000);sb.rpc('sinal_tablet');
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
-  setInterval(draw,500);setInterval(load,15000)
+  setInterval(draw,500);
+  setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000)
 }
 function tocar(f){if(!f)return;try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));a.play()}catch(e){}}
 async function load(){
-  var rs=await sb.from('salas').select('*').eq('id',sala.id).maybeSingle();if(rs.data)sala=rs.data;
-  var r=await sb.from('sessoes').select('*').eq('sala_id',sala.id).neq('status','encerrada').maybeSingle();ses=r.data;
-  var rt=await sb.from('sala_tutoriais').select('*').eq('sala_id',sala.id).order('ordem');tut=rt.error?[]:(rt.data||[]);
-  lib=[];bal=[];
-  if(ses){
-    var l=await sb.from('dicas_liberadas').select('*').eq('sessao_id',ses.id).order('criado_em',{ascending:false});lib=l.data||[];
-    if(ses.status!=='aguardando'&&ses.baloes_ativos){var b=await sb.rpc('baloes_disponiveis');bal=b.data||[];
-      var falt=bal.map(function(x){return x.dica_id}).filter(function(id){return !BINFO[id]});
-      if(falt.length){var bi=await sb.rpc('balao_info',{p_ids:falt});(bi.data||[]).forEach(function(r){BINFO[r.dica_id]=r})}}
+  if(!sala)return;
+  if(carreg){denovo=true;return}
+  carreg=true;
+  try{await carregar()}catch(e){online=false;setConn()}
+  finally{carreg=false;if(denovo){denovo=false;load()}}
+}
+// só troca o que está na tela quando TUDO chegou certo: queda de internet nunca zera cronômetro nem some com dicas
+async function carregar(){
+  var falha=function(){online=false;setConn()};
+  var rs=await sb.from('salas').select('*').eq('id',sala.id).maybeSingle();if(rs.error)return falha();
+  var r=await sb.from('sessoes').select('*').eq('sala_id',sala.id).neq('status','encerrada').maybeSingle();if(r.error)return falha();
+  var rt=await sb.from('sala_tutoriais').select('*').eq('sala_id',sala.id).order('ordem');
+  var nlib=[],nbal=[];
+  if(r.data){
+    var l=await sb.from('dicas_liberadas').select('*').eq('sessao_id',r.data.id).order('criado_em',{ascending:false});if(l.error)return falha();nlib=l.data||[];
+    if(r.data.status!=='aguardando'&&r.data.baloes_ativos){var b=await sb.rpc('baloes_disponiveis');if(b.error)return falha();nbal=b.data||[];
+      var falt=nbal.map(function(x){return x.dica_id}).filter(function(id){return !BINFO[id]});
+      if(falt.length){var bi=await sb.rpc('balao_info',{p_ids:falt});(bi.data||[]).forEach(function(x){BINFO[x.dica_id]=x})}}
   }
+  if(!offOk){try{var tg=await sb.rpc('agora');if(tg.data){off=Date.parse(tg.data)-Date.now();offOk=true}}catch(e){}}
+  if(rs.data)sala=rs.data;ses=r.data;if(!rt.error)tut=rt.data||[];lib=nlib;bal=nbal;
+  online=true;ultimoOk=Date.now();setConn();
   render();
   if(ovAberto==='dicas')abrirDicas();
 }

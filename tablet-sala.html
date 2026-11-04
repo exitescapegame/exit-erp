@@ -121,9 +121,9 @@ img.slogo{max-height:64px;align-self:flex-start}
   <div class="dock" id="dock"></div>
 </div>
 <div id="ov" class="ov hide"><div class="ov-h"><b id="ovt"></b><button class="alt" id="ovx">Fechar ✕</button></div><div class="ov-b" id="ovb"></div></div>
-<div id="snd" class="center hide"><div class="logo"></div><b>Toque para iniciar o jogo</b><button id="sndb">Iniciar</button></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
-<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"><\/script>')</script>
+<div id="snd" class="center hide"><div class="logo"></div><b id="sndt">Toque para iniciar o jogo</b><button id="sndb">Iniciar</button></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"><\/script>')</script>
 <script>
 window.CONFIG = {
   SUPABASE_URL: "https://oykjdtxbgnqigkinpbts.supabase.co",
@@ -133,7 +133,7 @@ window.CONFIG = {
 <script>
 var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
-if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';setTimeout(function(){location.reload()},10000);throw new Error('biblioteca do servidor não carregou')}
+if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,{global:{fetch:fetchComTempo}});
 var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,offOk=false,online=true,rtOk=false,ultimoOk=0,carreg=false,denovo=false,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
@@ -168,7 +168,7 @@ async function start(){
     var pr=await sb.rpc('parear_tablet',{p_codigo:qc});
     show('boot',false);
     if(!pr.error){boot(pr.data);return}
-    if(d.data){boot(d.data.sala_id);setTimeout(function(){aviso('Código vencido ou inválido. O tablet continua na sala de antes.')},1500);return}
+    if(d.data){boot(d.data.sala_id);var msgq=/já está ligado/.test(pr.error.message)?'Este tablet já está ligado a uma sala. Para trocar, use Desvincular no painel.':'Código vencido ou inválido. O tablet continua na sala de antes.';setTimeout(function(){aviso(msgq)},1500);return}
     show('pair',true);$('err').textContent=pr.error.message+' — gere um código novo no painel.';return
   }
   show('boot',false);
@@ -218,7 +218,7 @@ async function boot(salaId){
     .on('postgres_changes',{event:'*',schema:'public',table:'sala_tutoriais'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){tocar(p.new.arquivo)})
     .subscribe(function(st){rtOk=st==='SUBSCRIBED';setConn();if(rtOk)load()});
-  setInterval(function(){sb.rpc('sinal_tablet')},20000);sb.rpc('sinal_tablet');
+  function sinal(){sb.rpc('sinal_tablet').then(function(){},function(){})}setInterval(sinal,20000);sinal();
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
   setInterval(draw,500);
   setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000)
@@ -233,9 +233,9 @@ async function load(){
 }
 // só troca o que está na tela quando TUDO chegou certo: queda de internet nunca zera cronômetro nem some com dicas
 async function carregar(){
-  var falha=function(){online=false;setConn()};
-  var rs=await sb.from('salas').select('*').eq('id',sala.id).maybeSingle();if(rs.error)return falha();
-  var r=await sb.from('sessoes').select('*').eq('sala_id',sala.id).neq('status','encerrada').maybeSingle();if(r.error)return falha();
+  var falha=function(x){online=false;setConn();if(x&&x.status===401)sb.auth.refreshSession().then(function(){},function(){})};
+  var rs=await sb.from('salas').select('*').eq('id',sala.id).maybeSingle();if(rs.error)return falha(rs);
+  var r=await sb.from('sessoes').select('*').eq('sala_id',sala.id).neq('status','encerrada').maybeSingle();if(r.error)return falha(r);
   var rt=await sb.from('sala_tutoriais').select('*').eq('sala_id',sala.id).order('ordem');
   var nlib=[],nbal=[];
   if(r.data){
@@ -247,6 +247,7 @@ async function carregar(){
   if(!offOk){try{var tg=await sb.rpc('agora');if(tg.data){off=Date.parse(tg.data)-Date.now();offOk=true}}catch(e){}}
   if(rs.data)sala=rs.data;ses=r.data;if(!rt.error)tut=rt.data||[];lib=nlib;bal=nbal;
   online=true;ultimoOk=Date.now();setConn();
+  var sndt=$('sndt');if(sndt)sndt.textContent=(ses&&ses.status!=='aguardando')?'Toque para continuar o jogo':'Toque para iniciar o jogo';
   render();
   if(ovAberto==='dicas')abrirDicas();
 }

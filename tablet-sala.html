@@ -134,7 +134,8 @@ window.CONFIG = {
 var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';setTimeout(function(){location.reload()},10000);throw new Error('biblioteca do servidor não carregou')}
-var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
+function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
+var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,{global:{fetch:fetchComTempo}});
 var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,offOk=false,online=true,rtOk=false,ultimoOk=0,carreg=false,denovo=false,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
 var SV={
   lock:'<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
@@ -147,7 +148,7 @@ function show(id,on){$(id).classList.toggle('hide',!on)}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function aviso(txt){var a=el('div','aviso',txt);document.body.appendChild(a);setTimeout(function(){a.remove()},4000)}
-function msgRede(m){m=String(m||'');return /fetch|network|load failed|internet/i.test(m)?'Este tablet não está conseguindo acessar o servidor. Confira o Wi-Fi/internet do tablet e toque em Conectar de novo.':m}
+function msgRede(m){m=String(m||'');return /fetch|network|load failed|internet|abort|timeout|tempo esgotado/i.test(m)?'Este tablet não está conseguindo acessar o servidor. Confira o Wi-Fi/internet do tablet e toque em Conectar de novo.':m}
 async function garantirSessao(){
   try{var r=await sb.auth.getSession();if(r.data&&r.data.session)return '';
     var a=await sb.auth.signInAnonymously();if(a.error)return msgRede(a.error.message);return ''}
@@ -156,7 +157,9 @@ async function garantirSessao(){
 async function start(){
   try{
   var r=await sb.auth.getSession();
-  var se=await garantirSessao();if(se){show('boot',false);show('pair',true);$('err').textContent=se;return}
+  var se;for(var k=0;;k++){se=await garantirSessao();if(!se||!/acessar o servidor/.test(se))break;$('bm').textContent='Sem conexão com o servidor. Tentando de novo...';await esperar(Math.min(15000,3000*(k+1)))}
+  $('bm').textContent='';
+  if(se){show('boot',false);show('pair',true);$('err').textContent=se;return}
   var qc='';try{qc=(new URLSearchParams(location.search).get('c')||'').replace(/\D/g,'');if(location.search)history.replaceState(null,'',location.pathname)}catch(e){}
   var d;for(var i=0;;i++){d=await sb.from('dispositivos').select('sala_id').maybeSingle();if(!d.error)break;$('bm').textContent='Sem conexão com o servidor. Tentando de novo...';await esperar(Math.min(15000,3000*(i+1)))}
   $('bm').textContent='';
@@ -178,7 +181,9 @@ $('go').onclick=async function(){
   var se=await garantirSessao();if(se){$('go').disabled=false;$('err').textContent=se;return}
   var r=await sb.rpc('parear_tablet',{p_codigo:c});
   $('go').disabled=false;
-  if(r.error){$('err').textContent=msgRede(r.error.message);return}
+  if(r.error){
+    if(/já está ligado/.test(r.error.message)){var dj=await sb.from('dispositivos').select('sala_id').maybeSingle();if(dj.data){$('err').textContent='';show('pair',false);boot(dj.data.sala_id);return}}
+    $('err').textContent=msgRede(r.error.message);return}
   $('err').textContent='';
   show('pair',false);boot(r.data)
 };

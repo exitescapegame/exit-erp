@@ -135,6 +135,9 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
+var VERSAO_ARQ='t14';
+// atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
+function checarVersao(atual,podeAgora){try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([^']+)'/);if(m&&m[1]!==atual){var tenta=function(){if(podeAgora())location.reload();else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,{global:{fetch:fetchComTempo}});
 var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,offOk=false,online=true,rtOk=false,ultimoOk=0,carreg=false,denovo=false,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
 var SV={
@@ -206,7 +209,7 @@ async function boot(salaId){
   show('boot',false);$('bm').textContent='';
   try{var t=await sb.rpc('agora');if(t.data){off=Date.parse(t.data)-Date.now();offOk=true}}catch(e){}
   $('sala').textContent=sala.nome;show('app',true);show('snd',true);
-  $('sndb').onclick=function(){show('snd',false);somAtivo=true;travaTela();try{var a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');a.play()}catch(e){}
+  $('sndb').onclick=function(){show('snd',false);somAtivo=true;travaTela();setTimeout(tocarPendentes,300);try{var a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');a.play()}catch(e){}
     try{actx=new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
     try{var de=document.documentElement;if(de.requestFullscreen)de.requestFullscreen().catch(function(){})}catch(e){}};
   travaTela();
@@ -222,14 +225,23 @@ async function boot(salaId){
   function sinal(){sb.rpc('sinal_tablet').then(function(){},function(){})}setInterval(sinal,20000);sinal();
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
   setInterval(draw,500);
-  setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000)
+  setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000);
+  setInterval(function(){checarVersao(VERSAO_ARQ,function(){return !ses||ses.status==='aguardando'})},180000)
 }
 var SONS=[];
 function volume(){var v=sala&&sala.volume_som!=null?+sala.volume_som:100;return Math.max(0,Math.min(100,v))/100}
 function aplicarVolume(){var v=volume();SONS.forEach(function(a){try{a.volume=v}catch(e){}})}
-function tocar(f){if(!f)return;try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));SONS.push(a);try{a.volume=volume()}catch(e){}a.onended=function(){SONS=SONS.filter(function(x){return x!==a})};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}}
+var FILA=[];
+function tocar(f){if(!f)return;if(!somAtivo){FILA.push(f);return}try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));SONS.push(a);try{a.volume=volume()}catch(e){}a.onended=function(){SONS=SONS.filter(function(x){return x!==a})};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}}
 // o som acompanha o jogo: pausa junto, volta junto e para quando o jogo é encerrado
-function pararSons(){SONS.forEach(function(a){try{a.pause();a.currentTime=0}catch(e){}});SONS=[]}
+function pararSons(){FILA=[];SONS.forEach(function(a){try{a.pause();a.currentTime=0}catch(e){}});SONS=[]}
+// som que chegou antes do toque na tela (o navegador bloqueia som sem toque): toca assim que alguém tocar
+async function tocarPendentes(){
+  var f=FILA;FILA=[];
+  if(!f.length&&ses&&ses.status==='em_jogo'){try{var r=await sb.from('sons_disparados').select('arquivo,criado_em').eq('sessao_id',ses.id).order('criado_em');
+    var ini=Date.parse(ses.criado_em||0);(r.data||[]).forEach(function(x){if(Math.abs(Date.parse(x.criado_em)-ini)<5000)f.push(x.arquivo)})}catch(e){}}
+  f.forEach(function(x){tocar(x)})
+}
 function pausarSons(){SONS.forEach(function(a){try{a.pause()}catch(e){}})}
 function retomarSons(){SONS.forEach(function(a){try{var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}})}
 async function load(){

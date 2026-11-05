@@ -462,7 +462,7 @@ async function boot(){
   var pr=await sb.rpc('processar_sala',{p_sala:(SALAS[0]&&SALAS[0].id)||'00000000-0000-0000-0000-000000000000'});
   G.servidor=!pr.error;
   console.log('🔒 [INTEGRIDADE '+VERSAO+'] painel carregado · relógio no servidor: '+(G.servidor?'SIM':'NÃO (usando o navegador)')+' · placas: '+(G.temPlacas?'SIM':'NÃO'));
-  var ch=sb.channel('painel');['salas','unidades','enigmas','dicas','acoes','sessoes','dicas_liberadas','acoes_disparadas','enigmas_resolvidos','pedidos_ajuda','dispositivos','placa_pinos','eventos','sala_tutoriais'].forEach(function(tt){ch.on('postgres_changes',{event:'*',schema:'public',table:tt},function(p){G.rtVisto=Date.now();try{if(tt==='dispositivos'&&p&&p.eventType==='UPDATE'&&p.new){var d=DISPOS.filter(function(x){return x.id===p.new.id})[0];if(d){var era=tabletOnline(d);Object.assign(d,p.new);if(era===tabletOnline(d))return}}}catch(e){}agendarLoad()})});ch.subscribe(function(st){G.rt=st==='SUBSCRIBED';avisoRede();if(G.rt)agendarLoad()});
+  var ch=sb.channel('painel');['salas','unidades','enigmas','dicas','acoes','sessoes','dicas_liberadas','acoes_disparadas','enigmas_resolvidos','pedidos_ajuda','dispositivos','placa_pinos','eventos','sala_tutoriais'].forEach(function(tt){ch.on('postgres_changes',{event:'*',schema:'public',table:tt},function(p){G.rtVisto=Date.now();try{if(tt==='dispositivos'&&p&&p.eventType==='UPDATE'&&p.new){var d=DISPOS.filter(function(x){return x.id===p.new.id})[0];if(d){var era=tabletOnline(d),eraSom=d.som_ok;Object.assign(d,p.new);if(era===tabletOnline(d)&&eraSom===d.som_ok)return}}}catch(e){}agendarLoad()})});ch.subscribe(function(st){G.rt=st==='SUBSCRIBED';avisoRede();if(G.rt)agendarLoad()});
   document.addEventListener('visibilitychange',function(){if(!document.hidden)agendarLoad()});
   window.addEventListener('online',function(){agendarLoad()});window.addEventListener('offline',function(){G.offline=true;avisoRede()});
   setInterval(function(){if(document.hidden)return;var jogo=SESSOES.some(function(x){return x.status!=='encerrada'});if(G.offline||!G.rt||Date.now()-(G.ultimoOk||0)>(jogo?15000:60000))loadAll()},5000);
@@ -525,7 +525,7 @@ async function loadAll(){
   if(r2){LIB=r2[0].data||[];DISP2=r2[1].data||[];ENRES=r2[2].data||[];AJUDA=r2[3].data||[];EVENTOS=r2[4].data||[]}
   else {LIB=[];DISP2=[];ENRES=[];AJUDA=[];EVENTOS=[]}
   G.offline=false;G.ultimoOk=Date.now();avisoRede();
-  alertaAjuda();
+  alertaAjuda();alertaInicioTablet();
   renderAll();
   }catch(e){G.offline=true;avisoRede()}finally{carregando=false;if(recarregar){recarregar=false;loadAll()}}
 }
@@ -577,6 +577,7 @@ function checarSala(s){var r=[],ens=enigmasDe(s.id),acs=acoesDe(s.id),t=tabletDe
   if(!t)r.push({g:'erro',t:'Nenhum tablet conectado à sala.',a:'disp'});
   else if(!tabletOnline(t)){var _q=t.ultimo_sinal?new Date(t.ultimo_sinal):null,_h=_q?((Date.now()+G.off-_q.getTime())>20*3600000?_q.toLocaleDateString('pt-BR')+' ':'')+_q.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
     r.push({g:sesDe(s.id)?'erro':'aviso',t:(sesDe(s.id)?'Jogo rodando, mas o tablet está desligado ou fechado: os jogadores não veem o tempo nem ouvem os sons. ':'Tablet desligado ou fechado. ')+(_h?'Último sinal: '+_h+'. ':'')+'No tablet, abra exitsystem.net/tablet e toque na tela.',a:'disp'})}
+  else if(t.som_ok===false)r.push({g:sesDe(s.id)?'erro':'aviso',t:'Som do tablet ainda bloqueado pelo navegador: toque uma vez em qualquer lugar da tela do tablet (vale para o dia todo).',a:'disp'});
   if(!ens.length)r.push({g:'erro',t:'Nenhum enigma cadastrado.',a:'enigmas'});
   else{if(!ens.some(function(e){return e.final}))r.push({g:'aviso',t:'Nenhum enigma marcado como final.',a:'enigmas'});
     var semD=ens.filter(function(e){return !dicasDe(e.id).length});if(semD.length)r.push({g:'aviso',t:'Enigma sem dica: '+nomesCurtos(semD)+'.',a:'enigmas'});
@@ -607,6 +608,13 @@ function destravarSom(){try{audioCtx=audioCtx||new (window.AudioContext||window.
 document.addEventListener('pointerdown',destravarSom);
 function bip(){try{destravarSom();var t=audioCtx.currentTime;[0,.32,.64].forEach(function(d){var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=d===.32?1175:880;g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.12,t+d+.02);g.gain.exponentialRampToValueAtTime(.001,t+d+.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+d);o.stop(t+d+.3)})}catch(e){}}
 function salasPedindo(){return SALAS.filter(function(s){return temAjuda(s.id)})}
+var tabVistas=null;
+function alertaInicioTablet(){try{var ids=SESSOES.filter(function(x){return x.origem==='tablet'}).map(function(x){return x.id});
+  var novos=tabVistas?ids.filter(function(i){return tabVistas.indexOf(i)<0}):[];tabVistas=ids;if(!novos.length||!can('operar'))return;
+  var nomes=novos.map(function(id){var x=SESSOES.filter(function(y){return y.id===id})[0],sa=x&&salaById(x.sala_id);return sa?sa.nome:'Sala'}).join(', ');
+  bip();toast('▶ '+nomes+': os jogadores iniciaram o jogo pelo tablet.');
+  try{if(window.Notification&&Notification.permission==='granted')new Notification('▶ Jogo iniciado pelo tablet',{body:nomes,tag:'exit-inicio'})}catch(e){}
+  if(navigator.vibrate)try{navigator.vibrate([200,100,200])}catch(e){}}catch(e){}}
 function alertaAjuda(){
   if(!can('operar'))return;
   var ids=AJUDA.map(function(a){return a.id||a.sessao_id}),novos=ajudaVistas?ids.filter(function(i){return ajudaVistas.indexOf(i)<0}):[];
@@ -1025,7 +1033,7 @@ function segPane(s,ses,tb){
   if(tb==='disp'){
     var t=tabletDe(s.id),pls=placasDe(s.id),sons=acoesDe(s.id).filter(function(a){return a.alvo==='tablet_som'&&a.gatilho==='manual'});
     if(!t&&!pls.length)return '<div class="empty-dev"><b>Nenhum dispositivo disponível</b>'+(can2editar()?'<a data-editar="'+s.id+'" data-etab="disp">Clique aqui para adicionar um dispositivo</a>':'')+'</div>';
-    if(t){var on=tabletOnline(t);h+='<div class="devr"><span class="wifi '+(on?'on':'off')+'" title="'+(on?'Online':'Offline')+'">'+(on?IC.wifi:IC.wifioff)+'</span><span class="nm">Tablet</span>'
+    if(t){var on=tabletOnline(t);h+='<div class="devr"><span class="wifi '+(on?'on':'off')+'" title="'+(on?'Online':'Offline')+'">'+(on?IC.wifi:IC.wifioff)+'</span><span class="nm">Tablet'+(on&&t.som_ok===false?'<small style="display:block;color:var(--bad);font-size:11px;font-weight:600">🔇 Som bloqueado: toque uma vez na tela do tablet</small>':'')+'</span>'
       +(op?'<span class="volw" title="Volume do som no tablet (no iPad/iPhone o volume é pelos botões do aparelho)">'+IC.sound+'<input type="range" min="0" max="100" step="5" value="'+(s.volume_som==null?100:s.volume_som)+'" data-vol="'+s.id+'" aria-label="Volume do som no tablet"></span>':'')+'</div>'}
     pls.forEach(function(pl){var on=placaOnline(pl);
       h+='<div class="devr"><span class="wifi '+(on?'on':'off')+'" data-pwifi="'+pl.id+'" title="'+esc(placaInfo(pl))+'">'+(on?IC.wifi:IC.wifioff)+'</span><span class="nm">'+esc(pl.nome)+'</span>'
@@ -1210,21 +1218,30 @@ function renderAnalise(v){
   if(view==='sessoes'){
     var hj=validas.filter(function(s){return diaDe(s)===new Date().toLocaleDateString('pt-BR')}).length;
     h='<div class="ph"><div><h1>Sessões</h1><span class="note">'+validas.length+' jogos válidos nas últimas '+ss.length+' sessões · <b>'+hj+' hoje</b> · descartadas não contam</span></div></div>';
-    h+=ss.length?'<div class="tblw"><table class="tbl"><tr><th>Jogo</th><th>Data</th><th>Sala</th><th>Resultado</th><th>Tempo usado</th><th>Dicas</th><th></th></tr>'+ss.map(function(s){var desc=s.resultado==='cancelada';return '<tr'+(desc?' style="opacity:.55"':'')+'><td class="rk">'+(desc?'—':'nº '+s._n)+'</td><td>'+data(s)+'</td><td>'+esc(nomeSala(s.sala_id))+'</td><td>'+res(s)+'</td><td class="tnum">'+fh(tempoUsado(s))+'</td><td>'+s._dicas+'</td><td><a data-seslog="'+s.id+'|'+s.sala_id+'">Registro</a>'+(can('operar')?' · '+(desc?'<a data-sesrest="'+s.id+'">Restaurar</a>':'<a data-sesdesc="'+s.id+'" style="color:#b42318">Descartar</a>'):'')+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma sessão encerrada ainda.</div>';
+    h+=ss.length?'<div class="tblw"><table class="tbl"><tr><th>Jogo</th><th>Data</th><th>Sala</th><th>Resultado</th><th>Jogadores</th><th>Tempo usado</th><th>Dicas</th><th></th></tr>'+ss.map(function(s){var desc=s.resultado==='cancelada';return '<tr'+(desc?' style="opacity:.55"':'')+'><td class="rk">'+(desc?'—':'nº '+s._n)+'</td><td>'+data(s)+'</td><td>'+esc(nomeSala(s.sala_id))+'</td><td>'+res(s)+'</td><td>'+(s.jogadores||'—')+'</td><td class="tnum">'+fh(tempoUsado(s))+'</td><td>'+s._dicas+'</td><td><a data-seslog="'+s.id+'|'+s.sala_id+'">Registro</a>'+(can('operar')?' · '+(desc?'<a data-sesrest="'+s.id+'">Restaurar</a>':'<a data-sesdesc="'+s.id+'" style="color:#b42318">Descartar</a>'):'')+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma sessão encerrada ainda.</div>';
   }
   if(view==='ranking'){
     var lista=salasFiltradas();if(!AN.salaRk||!salaById(AN.salaRk))AN.salaRk=lista[0]&&lista[0].id;
     var rk=validas.filter(function(s){return s.sala_id===AN.salaRk&&s.resultado==='escapou'}).sort(function(a,b){return tempoUsado(a)-tempoUsado(b)}).slice(0,20);
     h='<div class="ph"><div><h1>Ranking</h1><div class="sel-row"><select id="rkSala">'+lista.map(function(s){return '<option value="'+s.id+'"'+(AN.salaRk===s.id?' selected':'')+'>'+esc(s.nome)+'</option>'}).join('')+'</select>'+per+'</div></div></div>';
-    h+=rk.length?'<div class="tblw"><table class="tbl"><tr><th>#</th><th>Data</th><th>Tempo</th><th>Dicas</th></tr>'+rk.map(function(s,i){return '<tr><td class="rk">'+(i+1)+'º</td><td>'+data(s)+'</td><td class="tnum"><b>'+fh(tempoUsado(s))+'</b></td><td>'+s._dicas+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma fuga registrada nesta sala no período.</div>';
+    h+=rk.length?'<div class="tblw"><table class="tbl"><tr><th>#</th><th>Data</th><th>Jogadores</th><th>Tempo</th><th>Dicas</th></tr>'+rk.map(function(s,i){return '<tr><td class="rk">'+(i+1)+'º</td><td>'+data(s)+'</td><td>'+(s.jogadores||'—')+'</td><td class="tnum"><b>'+fh(tempoUsado(s))+'</b></td><td>'+s._dicas+'</td></tr>'}).join('')+'</table></div>':'<div class="empty">Nenhuma fuga registrada nesta sala no período.</div>';
   }
   if(view==='stats'){
     ss=validas;var esc1=ss.filter(function(s){return s.resultado==='escapou'});
     var med=function(a,fn){return a.length?a.reduce(function(t,x){return t+fn(x)},0)/a.length:0};
     h='<div class="ph"><div><h1>Estatísticas</h1><div class="sel-row">'+per+'</div></div></div>';
-    h+='<div class="kpis"><div class="kpi"><small>Sessões</small><b>'+ss.length+'</b></div><div class="kpi"><small>Taxa de fuga</small><b>'+(ss.length?Math.round(esc1.length/ss.length*100):0)+'%</b></div><div class="kpi"><small>Tempo médio (quem escapou)</small><b>'+fh(med(esc1,tempoUsado))+'</b></div><div class="kpi"><small>Dicas por sessão</small><b>'+med(ss,function(s){return s._dicas}).toFixed(1).replace('.',',')+'</b></div></div>';
-    var porSala=salasFiltradas().map(function(sa){var x=ss.filter(function(s){return s.sala_id===sa.id}),e=x.filter(function(s){return s.resultado==='escapou'});return{nome:sa.nome,n:x.length,taxa:x.length?Math.round(e.length/x.length*100):0,tm:med(e,tempoUsado),dic:med(x,function(s){return s._dicas})}});
-    h+='<div class="tblw"><table class="tbl"><tr><th>Sala</th><th>Sessões</th><th>Taxa de fuga</th><th>Tempo médio</th><th>Dicas/sessão</th></tr>'+porSala.map(function(p){return '<tr><td>'+esc(p.nome)+'</td><td>'+p.n+'</td><td>'+p.taxa+'%</td><td class="tnum">'+(p.tm?fh(p.tm):'—')+'</td><td>'+p.dic.toFixed(1).replace('.',',')+'</td></tr>'}).join('')+'</table></div>';
+    h+='<div class="kpis"><div class="kpi"><small>Sessões</small><b>'+ss.length+'</b></div><div class="kpi"><small>Jogadores</small><b>'+ss.reduce(function(t,s){return t+(+s.jogadores||0)},0)+'</b></div><div class="kpi"><small>Taxa de fuga</small><b>'+(ss.length?Math.round(esc1.length/ss.length*100):0)+'%</b></div><div class="kpi"><small>Tempo médio (quem escapou)</small><b>'+fh(med(esc1,tempoUsado))+'</b></div><div class="kpi"><small>Dicas por sessão</small><b>'+med(ss,function(s){return s._dicas}).toFixed(1).replace('.',',')+'</b></div></div>';
+    var porSala=salasFiltradas().map(function(sa){var x=ss.filter(function(s){return s.sala_id===sa.id}),e=x.filter(function(s){return s.resultado==='escapou'});return{nome:sa.nome,n:x.length,taxa:x.length?Math.round(e.length/x.length*100):0,tm:med(e,tempoUsado),dic:med(x,function(s){return s._dicas}),jog:x.reduce(function(t,s){return t+(+s.jogadores||0)},0)}});
+    h+='<div class="tblw"><table class="tbl"><tr><th>Sala</th><th>Sessões</th><th>Jogadores</th><th>Taxa de fuga</th><th>Tempo médio</th><th>Dicas/sessão</th></tr>'+porSala.map(function(p){return '<tr><td>'+esc(p.nome)+'</td><td>'+p.n+'</td><td>'+p.jog+'</td><td>'+p.taxa+'%</td><td class="tnum">'+(p.tm?fh(p.tm):'—')+'</td><td>'+p.dic.toFixed(1).replace('.',',')+'</td></tr>'}).join('')+'</table></div>';
+    // jogadores por sala, por dia (data em que o jogo começou)
+    var sfs=salasFiltradas(),dias={};
+    ss.forEach(function(x){var dt=new Date(x.criado_em),k=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+('0'+dt.getDate()).slice(-2);var d=dias[k]||(dias[k]={k:k,dt:dt,s:{}});var c=d.s[x.sala_id]||(d.s[x.sala_id]={j:0,n:0});c.j+=(+x.jogadores||0);c.n++});
+    var ld=Object.keys(dias).sort().reverse().map(function(k){return dias[k]});
+    h+='<h2 style="margin:22px 0 10px;font-size:18px">Jogadores por dia</h2>';
+    h+=ld.length?'<div class="tblw"><table class="tbl"><tr><th>Dia</th>'+sfs.map(function(sa){return '<th>'+esc(sa.nome)+'</th>'}).join('')+'<th>Total</th></tr>'+ld.map(function(d){var tj=0,tn=0;
+        var cel=sfs.map(function(sa){var c=d.s[sa.id];if(!c)return '<td style="color:var(--mute)">—</td>';tj+=c.j;tn+=c.n;return '<td><b>'+c.j+'</b> <span class="note">('+c.n+' jogo'+(c.n>1?'s':'')+')</span></td>'}).join('');
+        return '<tr><td>'+d.dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+'</td>'+cel+'<td><b>'+tj+'</b> <span class="note">('+tn+')</span></td></tr>'}).join('')+'</table></div>'
+      :'<div class="empty">Nenhum jogo no período.</div>';
   }
   v.innerHTML=h;
   if($('anPer'))$('anPer').onchange=function(){AN.periodo=+this.value;AN.chave='';renderView()};
@@ -1350,7 +1367,8 @@ function pane(sala,ses){
         +'<div class="field2"><div class="field"><label>Logo'+(sala.logo_url?'<br><img src="'+esc(sala.logo_url)+'" style="max-height:36px;margin:4px 0">':'')+'</label><input type="file" accept="image/*" id="upLogo"></div>'
         +'<div class="field"><label>Foto da sala'+(sala.foto_url?'<br><img src="'+esc(sala.foto_url)+'" style="max-height:56px;margin:4px 0;border-radius:6px">':'')+'</label><input type="file" accept="image/*" id="upFoto"></div></div>'
         +'<div class="field"><label>Introdução (aparece no tablet antes do jogo)</label><textarea id="saIntro" rows="2">'+esc(sala.intro)+'</textarea></div>'
-        +'<div class="field"><label>Regras (uma por linha)</label><textarea id="saRegras" rows="3">'+esc(sala.regras)+'</textarea></div>'
+        +'<div class="balao"><div><b>Jogadores podem iniciar pelo tablet</b><div class="note">Aparece o botão "Iniciar jogo" na tela de espera. Quando eles tocam, o jogo começa e você recebe o aviso aqui. Você também pode iniciar pelo painel a qualquer momento.</div></div><button class="tg'+(sala.inicio_tablet!==false?' on':'')+'" id="inicioTab"'+(can2editar()?'':' disabled')+' aria-label="Jogadores podem iniciar pelo tablet"></button></div>'
+        +'<div class="field"><label>Regras (uma por linha · linha toda em MAIÚSCULAS vira título de caixa)</label><textarea id="saRegras" rows="10">'+esc(sala.regras)+'</textarea></div>'
         +'<div class="field"><label>Guia de operação (só a equipe vê)</label><textarea id="saGuia" rows="2">'+esc(sala.guia||'')+'</textarea></div>'
         +'<div class="actions"><button class="btn" id="saSalvar">Salvar configurações</button><span style="flex:1"></span><button class="btn danger" id="delSala">Excluir esta sala</button></div>';
     } else h+='<div class="empty">Só administrador e técnico configuram a sala.'+(sala.guia?'<div class="callout" style="margin-top:12px;text-align:left"><b>Guia de operação</b><br>'+esc(sala.guia).replace(/\n/g,'<br>')+'</div>':'')+'</div>';
@@ -1360,7 +1378,7 @@ function pane(sala,ses){
     else{
       var its=TUT.filter(function(x){return x.sala_id===sala.id});
       h+='<div class="balao"><div><b>Botão "Como abrir cadeados" no tablet</b><div class="note">Fotos, vídeos e textos que os jogadores podem abrir a qualquer momento.</div></div><button class="tg'+(sala.tutorial_ativo!==false?' on':'')+'" id="tutAtivo"'+(can2editar()?'':' disabled')+' aria-label="Mostrar no tablet"></button></div>';
-      if(!its.length)h+='<div class="note" style="margin-bottom:12px">Nenhum conteúdo ainda. Adicione abaixo — o botão só aparece no tablet quando tiver pelo menos um item.</div>';
+      if(!its.length)h+='<div class="note" style="margin-bottom:12px">O botão já abre o guia animado dos cadeados (direcional, números, letras e disco). Se quiser, adicione abaixo fotos ou vídeos dos cadeados desta sala — eles aparecem depois do guia.</div>';
       its.forEach(function(x,i){var dk='tut:'+x.id;
         h+='<div class="box"><div class="box-h"><div class="nm"><span class="tag gold">'+({texto:'Texto',foto:'Foto',video:'Vídeo'})[x.tipo]+'</span>'+esc(x.titulo||'(sem título)')+'</div>'
           +(can2editar()?'<div class="actions"><button class="btn ghost sm" data-tutmv="'+x.id+'|-1"'+(i?'':' disabled')+' title="Subir">↑</button><button class="btn ghost sm" data-tutmv="'+x.id+'|1"'+(i<its.length-1?'':' disabled')+' title="Descer">↓</button><button class="btn danger sm'+(pendingDelete===dk?' confirm':'')+'" data-tutdel="'+x.id+'">'+(pendingDelete===dk?'Confirmar?':'Excluir')+'</button></div>':'')+'</div>'
@@ -1433,6 +1451,7 @@ function paneplacas(sala){
 
 function bindPane(sala,ses){
   var P=$('pane');
+  if($('inicioTab'))$('inicioTab').onclick=async function(){var r=await sb.from('salas').update({inicio_tablet:sala.inicio_tablet===false}).eq('id',sala.id);if(r.error){toast('Erro: '+r.error.message);return}await loadAll()};
   if($('tutAtivo'))$('tutAtivo').onclick=async function(){var r=await sb.from('salas').update({tutorial_ativo:sala.tutorial_ativo===false}).eq('id',sala.id);if(r.error){toast('Erro: '+r.error.message);return}await loadAll()};
   P.querySelectorAll('[data-tuttipo]').forEach(function(b){b.onclick=function(){tutTipo=b.dataset.tuttipo;renderModal()}});
   P.querySelectorAll('[data-tutdel]').forEach(function(b){var key='tut:'+b.dataset.tutdel;b.onclick=function(){askDelete(key,async function(){await sb.from('sala_tutoriais').delete().eq('id',b.dataset.tutdel);await loadAll()})}});

@@ -170,7 +170,7 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
-var VERSAO_ARQ='t20';
+var VERSAO_ARQ='t21';
 // atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
 var _esperandoAtualizar=false;
 function checarVersao(atual,podeAgora){if(_esperandoAtualizar)return;try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([a-z]\d+)'/);if(m&&m[1]!==atual&&!_esperandoAtualizar){_esperandoAtualizar=true;var tenta=function(){if(podeAgora())location.replace(location.pathname+'?v='+m[1]);else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
@@ -410,13 +410,13 @@ function fecharOv(){ovAberto=null;show('ov',false);$('ovb').querySelectorAll('vi
 function ytEmbed(u){var m=String(u||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{6,})/);return m?'https://www.youtube.com/embed/'+m[1]+'?rel=0&playsinline=1':null}
 function abrirCadeados(){
   ovAberto='cad';$('ovt').textContent='Como abrir cadeados';var b=$('ovb');b.innerHTML='';
-  var gf=el('iframe','guia');gf.src='guia-cadeados.html';gf.title='Como abrir os cadeados';b.appendChild(gf);
-  tut.forEach(function(x){
+    tut.forEach(function(x){
     var it=el('div','it');if(x.titulo)it.appendChild(el('h3',null,x.titulo));
     if(x.tipo==='foto'&&x.url){var im=el('img');im.src=x.url;im.alt=x.titulo||'Foto';it.appendChild(im)}
     if(x.tipo==='video'&&x.url){var y=ytEmbed(x.url);if(y){var fr=el('iframe');fr.src=y;fr.allow='autoplay; encrypted-media; fullscreen';fr.allowFullscreen=true;it.appendChild(fr)}else{var v=el('video');v.src=x.url;v.controls=true;v.playsInline=true;v.preload='metadata';it.appendChild(v)}}
     if(x.texto)it.appendChild(el('p',null,x.texto));
     b.appendChild(it)});
+  var gf=el('iframe','guia');gf.src='guia-cadeados.html';gf.title='Como abrir os cadeados';b.appendChild(gf);
   show('ov',true);
 }
 function abrirDicas(){

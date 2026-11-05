@@ -100,6 +100,7 @@ img.slogo{max-height:64px;align-self:flex-start}
 .dl{display:flex;gap:14px;align-items:flex-start}
 .dl .k{font-family:var(--mono);color:var(--gold2);font-size:15px;padding-top:4px;flex-shrink:0}
 .dl p{font-size:22px;line-height:1.4}
+.vid{position:fixed;inset:0;z-index:40;background:#000;display:flex;align-items:center;justify-content:center}.vid video{width:100%;height:100%;object-fit:contain;background:#000}
 .aviso{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--s2);border:1px solid var(--bad);color:#ffd0d0;padding:14px 22px;border-radius:16px;font-size:18px;font-weight:600;z-index:30;text-align:center;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 </style>
 </head>
@@ -135,9 +136,10 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
-var VERSAO_ARQ='t14';
+var VERSAO_ARQ='t17';
 // atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
-function checarVersao(atual,podeAgora){try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([^']+)'/);if(m&&m[1]!==atual){var tenta=function(){if(podeAgora())location.reload();else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
+var _esperandoAtualizar=false;
+function checarVersao(atual,podeAgora){if(_esperandoAtualizar)return;try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([a-z]\d+)'/);if(m&&m[1]!==atual&&!_esperandoAtualizar){_esperandoAtualizar=true;var tenta=function(){if(podeAgora())location.replace(location.pathname+'?v='+m[1]);else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
 var sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,{global:{fetch:fetchComTempo}});
 var sala=null,ses=null,lib=[],bal=[],tut=[],off=0,offOk=false,online=true,rtOk=false,ultimoOk=0,carreg=false,denovo=false,ajudaAte=0,ultimaDica=null,somAtivo=false,actx=null,ovAberto=null;
 var SV={
@@ -199,17 +201,19 @@ function chime(){
   }catch(e){}
 }
 function travaTela(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}}
+var _bootou=false;
 async function boot(salaId){
+  if(_bootou){location.replace(location.pathname);return}
   for(var i=0;;i++){
     var s;try{s=await sb.from('salas').select('*').eq('id',salaId).maybeSingle()}catch(e){s={error:e}}
     if(s.data){sala=s.data;break}
     if(!s.error){show('boot',false);show('pair',true);$('err').textContent='A sala deste tablet não existe mais. Gere um código novo no painel.';return}
     show('boot',true);$('bm').textContent='Sem conexão com o servidor. Tentando de novo...';await esperar(Math.min(15000,3000*(i+1)))
   }
-  show('boot',false);$('bm').textContent='';
+  _bootou=true;show('boot',false);$('bm').textContent='';
   try{var t=await sb.rpc('agora');if(t.data){off=Date.parse(t.data)-Date.now();offOk=true}}catch(e){}
   $('sala').textContent=sala.nome;show('app',true);show('snd',true);
-  $('sndb').onclick=function(){show('snd',false);somAtivo=true;travaTela();setTimeout(tocarPendentes,300);try{var a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');a.play()}catch(e){}
+  $('sndb').onclick=function(){show('snd',false);somAtivo=true;liberarVideo();travaTela();setTimeout(tocarPendentes,300);try{var a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');a.play()}catch(e){}
     try{actx=new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
     try{var de=document.documentElement;if(de.requestFullscreen)de.requestFullscreen().catch(function(){})}catch(e){}};
   travaTela();
@@ -220,30 +224,50 @@ async function boot(salaId){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'dicas_liberadas'},load)
     .on('postgres_changes',{event:'*',schema:'public',table:'sala_tutoriais'},load)
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'salas'},load)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){tocar(p.new.arquivo)})
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){if(p.new.tipo==='video')mostrarVideo(p.new.arquivo);else tocar(p.new.arquivo)})
     .subscribe(function(st){rtOk=st==='SUBSCRIBED';setConn();if(rtOk)load()});
   function sinal(){sb.rpc('sinal_tablet').then(function(){},function(){})}setInterval(sinal,20000);sinal();
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
   setInterval(draw,500);
   setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000);
-  setInterval(function(){checarVersao(VERSAO_ARQ,function(){return !ses||ses.status==='aguardando'})},180000)
+  setInterval(function(){checarVersao(VERSAO_ARQ,function(){return (!ses||ses.status==='aguardando')&&!VID&&!SONS.some(function(a){return !a.paused})})},180000)
 }
 var SONS=[];
 function volume(){var v=sala&&sala.volume_som!=null?+sala.volume_som:100;return Math.max(0,Math.min(100,v))/100}
-function aplicarVolume(){var v=volume();SONS.forEach(function(a){try{a.volume=v}catch(e){}})}
-var FILA=[];
-function tocar(f){if(!f)return;if(!somAtivo){FILA.push(f);return}try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));SONS.push(a);try{a.volume=volume()}catch(e){}a.onended=function(){SONS=SONS.filter(function(x){return x!==a})};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}}
+function aplicarVolume(){var v=volume();SONS.forEach(function(a){try{a.volume=v}catch(e){}});if(VID)try{VID.v.volume=v}catch(e){}}
+var FILA=[],VID=null;
+// vídeo em tela cheia por cima de tudo; fecha sozinho quando termina
+var VIDEL=null;
+// um único player de vídeo, "liberado" no toque de Iniciar: depois disso o vídeo toca sempre COM som, sem pedir nada
+function playerVideo(){if(!VIDEL){VIDEL=document.createElement('video');VIDEL.playsInline=true;VIDEL.setAttribute('playsinline','');VIDEL.preload='auto'}return VIDEL}
+function liberarVideo(){var v=playerVideo();try{v.muted=false;v.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';var p=v.play();if(p&&p.then)p.then(function(){v.pause()},function(){})}catch(e){}}
+function fecharVideo(){if(!VID)return;clearTimeout(VID.t);var v=VID.v;v.onended=v.onerror=v.onwaiting=v.onstalled=v.onplaying=null;try{v.pause();v.removeAttribute('src');v.load()}catch(e){}VID.box.remove();VID=null}
+function mostrarVideo(url){if(!url)return;if(!somAtivo){FILA.push({video:url,t:Date.now()});return}fecharVideo();
+  var box=el('div','vid'),v=playerVideo();v.muted=false;try{v.volume=volume()}catch(e){}v.src=url;
+  box.appendChild(v);document.body.appendChild(box);VID={box:box,v:v,t0:Date.now()};v.onended=fecharVideo;v.onerror=fecharVideo;
+  // vigia: se o vídeo travar (internet lenta) por 15 s, a tela cheia fecha e o cronômetro volta
+  var vigia=function(){if(!VID||VID.v!==v)return;clearTimeout(VID.t);VID.t=setTimeout(function(){if(VID&&VID.v===v&&!(ses&&ses.status==='pausada'))fecharVideo()},15000)};
+  v.onwaiting=vigia;v.onstalled=vigia;v.onplaying=function(){if(VID&&VID.v===v)clearTimeout(VID.t)};vigia();
+  var pr=v.play();if(pr&&pr.catch)pr.catch(function(){v.muted=true;v.play().catch(fecharVideo)})}
+function tocar(f){if(!f)return;if(!somAtivo){FILA.push({som:f,t:Date.now()});return}try{var a=new Audio(/^https?:\/\//.test(f)?f:'sons/'+encodeURIComponent(f));a._t=Date.now();SONS.push(a);try{a.volume=volume()}catch(e){}a.onended=a.onerror=function(){SONS=SONS.filter(function(x){return x!==a})};var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}}
 // o som acompanha o jogo: pausa junto, volta junto e para quando o jogo é encerrado
-function pararSons(){FILA=[];SONS.forEach(function(a){try{a.pause();a.currentTime=0}catch(e){}});SONS=[]}
+function pararSons(){fecharVideo();FILA=[];SONS.forEach(function(a){try{a.pause();a.currentTime=0}catch(e){}});SONS=[]}
+// fim do jogo: para só a música ambiente (sons longos); vitória, derrota e vídeos finais tocam até o fim
+function ehLongo(a){var d=a.duration,velho=Date.now()-(a._t||0)>8000;return velho&&(!isFinite(d)||d>30)}
+function pararAmbiente(){if(VID&&Date.now()-VID.t0>8000&&(VID.v.paused||VID.v.readyState<3))fecharVideo();FILA=[];SONS=SONS.filter(function(a){if(ehLongo(a)){try{a.pause();a.currentTime=0}catch(e){}return false}return true})}
 // som que chegou antes do toque na tela (o navegador bloqueia som sem toque): toca assim que alguém tocar
 async function tocarPendentes(){
-  var f=FILA;FILA=[];
-  if(!f.length&&ses&&ses.status==='em_jogo'){try{var r=await sb.from('sons_disparados').select('arquivo,criado_em').eq('sessao_id',ses.id).order('criado_em');
-    var ini=Date.parse(ses.criado_em||0);(r.data||[]).forEach(function(x){if(Math.abs(Date.parse(x.criado_em)-ini)<5000)f.push(x.arquivo)})}catch(e){}}
-  f.forEach(function(x){tocar(x)})
+  var agora=Date.now(),fila=FILA;FILA=[];
+  // o que chegou antes do toque: a música de início sempre; demais sons só se forem recentes (15 s); vídeo só o último
+  var sons=fila.filter(function(x){return x.som}),vids=fila.filter(function(x){return x.video}),f=[];
+  if(sons.length)f.push(sons[0].som);if(sons.length>1&&agora-sons[sons.length-1].t<15000)f.push(sons[sons.length-1].som);
+  if(!f.length&&ses&&ses.status==='em_jogo'){try{var r=await sb.from('sons_disparados').select('arquivo,criado_em,tipo').eq('sessao_id',ses.id).order('criado_em');
+    var ini=Date.parse(ses.criado_em||0);(r.data||[]).forEach(function(x){if(x.tipo!=='video'&&Math.abs(Date.parse(x.criado_em)-ini)<5000)f.push(x.arquivo)})}catch(e){}}
+  f.forEach(function(x){tocar(x)});
+  if(vids.length&&agora-vids[vids.length-1].t<60000)mostrarVideo(vids[vids.length-1].video)
 }
-function pausarSons(){SONS.forEach(function(a){try{a.pause()}catch(e){}})}
-function retomarSons(){SONS.forEach(function(a){try{var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}})}
+function pausarSons(){SONS.forEach(function(a){try{a.pause()}catch(e){}});if(VID)try{VID.v.pause()}catch(e){}}
+function retomarSons(){if(VID)try{VID.v.play().catch(function(){})}catch(e){}SONS.forEach(function(a){try{var pr=a.play();if(pr&&pr.catch)pr.catch(function(){})}catch(e){}})}
 async function load(){
   if(!sala)return;
   if(carreg){denovo=true;return}
@@ -266,7 +290,8 @@ async function carregar(){
   }
   if(!offOk){try{var tg=await sb.rpc('agora');if(tg.data){off=Date.parse(tg.data)-Date.now();offOk=true}}catch(e){}}
   var antes=ses,depois=r.data;
-  if(antes&&(!depois||depois.id!==antes.id||depois.status==='aguardando'))pararSons();
+  if(antes&&(!depois||depois.status==='aguardando'))pararAmbiente();
+  else if(antes&&depois&&depois.id!==antes.id)pararSons();
   else if(antes&&depois&&antes.status==='em_jogo'&&depois.status==='pausada')pausarSons();
   else if(antes&&depois&&antes.status==='pausada'&&depois.status==='em_jogo')retomarSons();
   if(rs.data)sala=rs.data;ses=r.data;aplicarVolume();if(!rt.error)tut=rt.data||[];lib=nlib;bal=nbal;

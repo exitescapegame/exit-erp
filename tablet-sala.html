@@ -101,6 +101,12 @@ img.slogo{max-height:64px;align-self:flex-start}
 .dl .k{font-family:var(--mono);color:var(--gold2);font-size:15px;padding-top:4px;flex-shrink:0}
 .dl p{font-size:22px;line-height:1.4}
 .vid{position:fixed;inset:0;z-index:40;background:#000;display:flex;align-items:center;justify-content:center}.vid video{width:100%;height:100%;object-fit:contain;background:#000}
+.av{position:fixed;inset:0;z-index:35;background:rgba(5,6,8,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center}
+.av h2{font-size:clamp(26px,4.2vw,42px);font-weight:600;line-height:1.2}.av .sl{font-size:20px;color:var(--mute)}
+.av .st{display:flex;gap:clamp(8px,2vw,22px)}.av .st button{background:none;border:0;padding:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.av .st svg{width:clamp(64px,11vw,120px);height:clamp(64px,11vw,120px);fill:transparent;stroke:var(--gold);stroke-width:1.6;stroke-linejoin:round;transition:fill .15s,transform .15s}
+.av .st button.on svg{fill:var(--gold2);stroke:var(--gold2);transform:scale(1.06)}
+.av .ok{font-size:28px;font-weight:600;color:var(--gold2)}
 .aviso{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--s2);border:1px solid var(--bad);color:#ffd0d0;padding:14px 22px;border-radius:16px;font-size:18px;font-weight:600;z-index:30;text-align:center;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 </style>
 </head>
@@ -136,7 +142,7 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
-var VERSAO_ARQ='t17';
+var VERSAO_ARQ='t18';
 // atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
 var _esperandoAtualizar=false;
 function checarVersao(atual,podeAgora){if(_esperandoAtualizar)return;try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([a-z]\d+)'/);if(m&&m[1]!==atual&&!_esperandoAtualizar){_esperandoAtualizar=true;var tenta=function(){if(podeAgora())location.replace(location.pathname+'?v='+m[1]);else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
@@ -151,6 +157,32 @@ function esperar(ms){return new Promise(function(r){setTimeout(r,ms)})}
 function setConn(){var ok=online&&rtOk;var c=$('conn');if(!c)return;c.textContent=ok?'Conectado':(online?'Reconectando...':'Sem internet — o tempo continua');$('connw').classList.toggle('off',!ok)}
 function show(id,on){$(id).classList.toggle('hide',!on)}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+// ===== avaliação da sala (1 a 5 estrelas) no fim do jogo
+var AVAL=null,avalChecado=false,avalTimer=null;
+var ESTRELA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg>';
+function fecharAvaliacao(){AVAL=null;clearTimeout(avalTimer);var o=$('aval');if(o)o.remove()}
+function abrirAvaliacao(sx){if(!sx||(AVAL&&AVAL.id===sx.id))return;fecharAvaliacao();AVAL=sx;
+  var o=el('div','av');o.id='aval';o.setAttribute('role','dialog');
+  o.appendChild(el('h2',null,sx.resultado==='escapou'?'Parabéns! Como foi a experiência?':'Obrigado por jogar! Como foi a experiência?'));
+  o.appendChild(el('div','sl','Toque nas estrelas para avaliar a sala '+(sala&&sala.nome||'')));
+  var st=el('div','st'),bs=[];
+  for(var i=1;i<=5;i++)(function(n){var b=el('button');b.innerHTML=ESTRELA;b.setAttribute('aria-label',n+(n===1?' estrela':' estrelas'));b.onclick=function(){votar(n)};bs.push(b);st.appendChild(b)})(i);
+  o.appendChild(st);document.body.appendChild(o);
+  var enviado=false;
+  async function votar(n){if(enviado)return;enviado=true;bs.forEach(function(b,i){b.classList.toggle('on',i<n)});
+    var ok=false;for(var t=0;t<3&&!ok;t++){try{var r=await sb.rpc('avaliar_sessao',{p_sessao:sx.id,p_nota:n});ok=!r.error}catch(e){}if(!ok)await new Promise(function(r){setTimeout(r,2000)})}
+    if(AVAL!==sx)return;st.style.pointerEvents='none';var m=el('div','ok','Obrigado pela avaliação!');o.appendChild(m);clearTimeout(avalTimer);avalTimer=setTimeout(fecharAvaliacao,5000)}
+  // ninguém avaliou: some sozinha em 5 minutos
+  avalTimer=setTimeout(fecharAvaliacao,300000)}
+async function verAvaliacao(antes,depois){try{
+  if(depois){if(AVAL)fecharAvaliacao();avalChecado=true;return}
+  var id=null;
+  if(antes&&antes.status!=='aguardando')id=antes.id;
+  else if(!avalChecado&&!antes){avalChecado=true;var u=await sb.from('sessoes').select('id').eq('sala_id',sala.id).eq('status','encerrada').order('encerrada_em',{ascending:false}).limit(1);if(u.data&&u.data[0])id=u.data[0].id}
+  avalChecado=true;if(!id)return;
+  var r=await sb.from('sessoes').select('id,status,resultado,avaliacao,encerrada_em').eq('id',id).maybeSingle();var x=r.data;
+  if(x&&x.status==='encerrada'&&x.resultado!=='cancelada'&&x.avaliacao==null&&x.encerrada_em&&(Date.now()+off-Date.parse(x.encerrada_em))<300000&&!ses)abrirAvaliacao(x)
+}catch(e){}}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function aviso(txt){var a=el('div','aviso',txt);document.body.appendChild(a);setTimeout(function(){a.remove()},4000)}
 function msgRede(m){m=String(m||'');return /fetch|network|load failed|internet|abort|timeout|tempo esgotado/i.test(m)?'Este tablet não está conseguindo acessar o servidor. Confira o Wi-Fi/internet do tablet e toque em Conectar de novo.':m}
@@ -230,7 +262,7 @@ async function boot(salaId){
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
   setInterval(draw,500);
   setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000);
-  setInterval(function(){checarVersao(VERSAO_ARQ,function(){return (!ses||ses.status==='aguardando')&&!VID&&!SONS.some(function(a){return !a.paused})})},180000)
+  setInterval(function(){checarVersao(VERSAO_ARQ,function(){return (!ses||ses.status==='aguardando')&&!VID&&!AVAL&&!SONS.some(function(a){return !a.paused})})},180000)
 }
 var SONS=[];
 function volume(){var v=sala&&sala.volume_som!=null?+sala.volume_som:100;return Math.max(0,Math.min(100,v))/100}
@@ -290,6 +322,7 @@ async function carregar(){
   }
   if(!offOk){try{var tg=await sb.rpc('agora');if(tg.data){off=Date.parse(tg.data)-Date.now();offOk=true}}catch(e){}}
   var antes=ses,depois=r.data;
+  verAvaliacao(antes,depois);
   if(antes&&(!depois||depois.status==='aguardando'))pararAmbiente();
   else if(antes&&depois&&depois.id!==antes.id)pararSons();
   else if(antes&&depois&&antes.status==='em_jogo'&&depois.status==='pausada')pausarSons();

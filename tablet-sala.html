@@ -170,7 +170,7 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
-var VERSAO_ARQ='t24';
+var VERSAO_ARQ='t25';
 // atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
 var _esperandoAtualizar=false;
 function checarVersao(atual,podeAgora){if(_esperandoAtualizar)return;try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([a-z]\d+)'/);if(m&&m[1]!==atual&&!_esperandoAtualizar){_esperandoAtualizar=true;var tenta=function(){if(podeAgora())location.replace(location.pathname+'?v='+m[1]);else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
@@ -289,7 +289,11 @@ function chime(){
     [880,1318.5].forEach(function(fq,i){var o=actx.createOscillator(),g=actx.createGain();o.type='sine';o.frequency.value=fq;g.gain.setValueAtTime(0,t+i*.14);g.gain.linearRampToValueAtTime(.18,t+i*.14+.02);g.gain.exponentialRampToValueAtTime(.001,t+i*.14+.9);o.connect(g);g.connect(actx.destination);o.start(t+i*.14);o.stop(t+i*.14+1)})
   }catch(e){}
 }
-function travaTela(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}}
+// tela sempre acesa: o Android solta a trava em várias situações; pede de novo sempre que soltar e confere a cada 30 s
+var TRAVA=null,pedindoTrava=false;
+function travaTela(){try{if(!navigator.wakeLock||TRAVA||pedindoTrava||document.hidden)return;pedindoTrava=true;
+  navigator.wakeLock.request('screen').then(function(l){TRAVA=l;pedindoTrava=false;l.addEventListener('release',function(){TRAVA=null;setTimeout(travaTela,1000)})},function(){pedindoTrava=false})}catch(e){pedindoTrava=false}}
+setInterval(travaTela,30000);document.addEventListener('pointerdown',function(){travaTela()},{capture:true,passive:true});
 var _bootou=false;
 async function boot(salaId){
   if(_bootou){location.replace(location.pathname);return}
@@ -322,7 +326,7 @@ async function boot(salaId){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'salas'},load)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'sons_disparados'},function(p){if(p.new.id){if(SVISTOS[p.new.id])return;SVISTOS[p.new.id]=1}if(p.new.tipo==='video')mostrarVideo(p.new.arquivo);else tocar(p.new.arquivo)})
     .subscribe(function(st){rtOk=st==='SUBSCRIBED';setConn();if(rtOk)load()});
-  function sinal(){sb.rpc('sinal_tablet',{p_som:!!somAtivo}).then(function(){},function(){})}window._sinal=sinal;setInterval(sinal,20000);sinal();
+  function sinal(){sb.rpc('sinal_tablet',{p_som:!!somAtivo}).then(function(){},function(){})}window._sinal=sinal;setInterval(sinal,5000);sinal();
   setInterval(function(){if(ses&&ses.status==='em_jogo')sb.rpc('processar_sala',{p_sala:sala.id}).then(function(){},function(){})},5000);
   setInterval(draw,500);
   setInterval(function(){if(!online||!rtOk||Date.now()-ultimoOk>15000)load()},5000);setInterval(conferirRapido,1500);

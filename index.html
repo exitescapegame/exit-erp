@@ -27032,6 +27032,400 @@ function runFinancialTests() {
   console.info('[VIGIA] 🛡️ Vigia de sincronização v92 ativo — renovação de sessão a cada 15 min, envio a cada 2 min e alarme se a nuvem parar de aceitar. Diagnóstico: _statusNuvem()');
 })();
   </script>
+  <script>
+// ═══════════════════════════════════════════════════════════════════
+// [v103] FLUXO DE CAIXA DIÁRIO + JOGADORES POR SALA NO DASHBOARD
+// 100% aditivo: não altera nenhuma função existente. Usa o mesmo padrão
+// de "embrulhar" o renderPage já usado no sistema (v742, v746, v748...).
+// Saídas ficam na chave 'fluxoSaidas' da tabela config — chave NOVA,
+// gravada só por este módulo (o sDB não a conhece, então nunca a apaga).
+// Cada gravação lê o banco e JUNTA por id antes de gravar (nada é apagado;
+// excluir = marcar excluido:true). Depois confere no banco se gravou.
+// Reverter: remover este bloco <script> inteiro (volta à v102).
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+  var FX_CHAVE = 'fluxoSaidas';
+  var FX_CACHE = 'exit_fluxo_saidas_cache';
+  var FX_CATS = ['Fornecedor','Manutenção','Material','Equipe','Alimentação','Impostos e taxas','Aluguel e contas','Marketing','Outros'];
+  var FX_FORMAS = {pix:'PIX', dinheiro:'Dinheiro', cartao:'Cartão', boleto:'Boleto', transferencia:'Transferência'};
+  // Salas que já existiram e foram removidas do cadastro (vendas antigas ainda apontam para elas)
+  var SALAS_ANTIGAS = {'209':'Loira do Banheiro','1782481336066':'Bob Esponja','1782481534241':'Stinger Things'};
+
+  window._FX = null;           // lista de saídas carregada (null = ainda não carregou)
+  window._fxModo = 'dia';      // 'dia' | 'mes'
+  window._fxDia = null;        // AAAA-MM-DD
+  window._fxMes = null;        // AAAA-MM
+  window._fxUnid = null;       // id da unidade ('' = todas)
+  window._fxStatus = '';       // mensagem de carga
+
+  function _hj(){ return (typeof hoje==='function') ? hoje() : new Date().toISOString().slice(0,10); }
+  function _num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+  function _valVenda(v){ return _num(v.valorTotal != null ? v.valorTotal : v.valor); }
+  function _cancelada(v){ return v.status==='cancelado' || v.status==='cancelada'; }
+  function _vendasVisiveis(){ try { return (typeof rlsVendas==='function') ? rlsVendas() : (DB.vendas||[]); } catch(e){ return DB.vendas||[]; } }
+  function _nomeUnid(id){ var u=(DB.unidades||[]).find(function(x){return String(x.id)===String(id);}); return u ? u.nome : ('Unidade '+id); }
+  function _fmtDiaSemana(d){ try { var p=d.split('-'); var dt=new Date(+p[0],+p[1]-1,+p[2]); return ['dom','seg','ter','qua','qui','sex','sáb'][dt.getDay()]; } catch(e){ return ''; } }
+  function _mesNome(m){ var n=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']; var p=m.split('-'); return n[(+p[1])-1]+' de '+p[0]; }
+  function _mesAnterior(m){ var p=m.split('-'); var y=+p[0], mm=+p[1]-1; if(mm<1){mm=12;y--;} return y+'-'+String(mm).padStart(2,'0'); }
+  function _diasDoMes(m){ var p=m.split('-'); var n=new Date(+p[0],+p[1],0).getDate(); var r=[]; for(var i=1;i<=n;i++) r.push(m+'-'+String(i).padStart(2,'0')); return r; }
+
+  // ── PERSISTÊNCIA ─────────────────────────────────────────────
+  function _cacheSalvar(){ try { localStorage.setItem(FX_CACHE, JSON.stringify(window._FX||[])); } catch(e){} }
+  function _cacheLer(){ try { var r=localStorage.getItem(FX_CACHE); return r ? JSON.parse(r) : null; } catch(e){ return null; } }
+
+  async function _fxLerServidor(){
+    if (typeof supaFetch!=='function') return null;
+    var r = await supaFetch('config?chave=eq.'+FX_CHAVE+'&select=valor');
+    if (!Array.isArray(r)) return null;                       // falha de leitura
+    return (r[0] && Array.isArray(r[0].valor)) ? r[0].valor : [];  // [] = ainda não existe
+  }
+
+  // Junta duas listas por id; no mesmo id fica a versão mais recente (atualizadoEm)
+  function _fxJuntar(a, b){
+    var mapa = {};
+    (a||[]).concat(b||[]).forEach(function(it){
+      if(!it || it.id==null) return;
+      var k = String(it.id), atual = mapa[k];
+      if(!atual || String(it.atualizadoEm||'') > String(atual.atualizadoEm||'')) mapa[k] = it;
+    });
+    return Object.keys(mapa).map(function(k){ return mapa[k]; });
+  }
+
+  async function _fxCarregar(){
+    window._fxStatus = 'carregando';
+    var serv = null;
+    try { serv = await _fxLerServidor(); } catch(e){ serv = null; }
+    if (serv) { window._FX = _fxJuntar(serv, []); window._fxStatus = 'ok'; _cacheSalvar(); }
+    else { window._FX = _cacheLer() || []; window._fxStatus = 'offline'; }
+    if (typeof PA!=='undefined' && PA==='fluxo' && typeof renderPage==='function') renderPage();
+  }
+  window._fxCarregar = _fxCarregar;
+
+  // Grava um item (novo ou alterado). Retorna true só se CONFERIU no banco.
+  async function _fxGravarItem(item){
+    var serv = await _fxLerServidor();
+    if (!serv) return false;                                   // sem leitura = não arrisca gravar
+    var junta = _fxJuntar(serv, (window._FX||[]).concat([item]));
+    await supaFetch('config', 'POST', [{ chave: FX_CHAVE, valor: junta }]);
+    var conf = await _fxLerServidor();                         // confere de verdade
+    if (!conf) return false;
+    var achou = conf.find(function(x){ return String(x.id)===String(item.id); });
+    if (!achou || String(achou.atualizadoEm)!==String(item.atualizadoEm)) return false;
+    window._FX = _fxJuntar(conf, []);
+    _cacheSalvar();
+    return true;
+  }
+
+  // ── CÁLCULOS ─────────────────────────────────────────────────
+  function _fxSaidas(unid, filtroData){
+    return (window._FX||[]).filter(function(s){
+      if (s.excluido) return false;
+      if (unid && String(s.unidadeId)!==String(unid)) return false;
+      return filtroData(s.data||'');
+    });
+  }
+  function _fxEntradas(unid, filtroData){
+    return _vendasVisiveis().filter(function(v){
+      if (_cancelada(v)) return false;
+      if (unid && String(v.unidadeId)!==String(unid)) return false;
+      return filtroData(v.data||'');
+    });
+  }
+  function _somaPorForma(vendas){
+    var f = {};
+    vendas.forEach(function(v){
+      if (v.pagamentos && v.pagamentos.length){ v.pagamentos.forEach(function(p){ var m=p.metodo||'outro'; f[m]=(f[m]||0)+_num(p.valor); }); }
+      else { var m=v.formaPagamento||'outro'; f[m]=(f[m]||0)+_valVenda(v); }
+    });
+    return f;
+  }
+  var NOME_METODO = {dinheiro:'Dinheiro', pix:'PIX', cartao_debito:'Débito', cartao_credito:'Crédito', credito_cliente:'Crédito cliente', boleto:'Boleto', outro:'Outro'};
+
+  // ── TELA ─────────────────────────────────────────────────────
+  function _estilos(){
+    return '<style>'+
+    '.fx-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}'+
+    '.fx-tab{border:1px solid var(--border2);background:#fff;color:var(--text2);padding:8px 16px;border-radius:20px;font-weight:600;font-size:13px;cursor:pointer}'+
+    '.fx-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}'+
+    '.fx-in{background:#fff;color:#1a1a2e;padding:8px 10px;border-radius:var(--rsm);border:1px solid #ccc;font-weight:600;font-size:13px}'+
+    '.fx-nav{border:1px solid var(--border2);background:#fff;border-radius:var(--rsm);padding:7px 11px;cursor:pointer;font-weight:700}'+
+    '.fx-big{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}'+
+    '.fx-box{border-radius:12px;padding:18px;border:1px solid var(--border)}'+
+    '.fx-box .l{font-size:12px;font-weight:600;opacity:.8;margin-bottom:6px}.fx-box .v{font-size:26px;font-weight:800}'+
+    '.fx-e{background:rgba(22,163,74,.08);color:#15803d}.fx-s{background:rgba(220,38,38,.07);color:#b91c1c}.fx-r{background:rgba(201,168,76,.12);color:#8a6d1f}'+
+    '.fx-add{width:100%;padding:16px;font-size:16px;font-weight:800;border-radius:12px;border:none;background:#dc2626;color:#fff;cursor:pointer;margin-bottom:16px}'+
+    '.fx-it{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border)}'+
+    '.fx-it:last-child{border-bottom:none}.fx-it .d{flex:1;min-width:0}.fx-it .d b{display:block;font-size:13px}.fx-it .d span{font-size:11px;color:var(--text3)}'+
+    '.fx-it .x{border:none;background:none;color:var(--text3);cursor:pointer;font-size:12px;padding:4px 6px}'+
+    '.fx-tb{width:100%;border-collapse:collapse;font-size:13px}.fx-tb th{text-align:right;padding:8px;color:var(--text3);font-size:11px;border-bottom:2px solid var(--border)}'+
+    '.fx-tb th:first-child,.fx-tb td:first-child{text-align:left}.fx-tb td{text-align:right;padding:8px;border-bottom:1px solid var(--border)}'+
+    '.fx-tb tr.lk{cursor:pointer}.fx-tb tr.lk:hover{background:var(--bg3)}.fx-tb tr.tot td{font-weight:800;border-top:2px solid var(--border2)}'+
+    '.fx-pos{color:#15803d}.fx-neg{color:#b91c1c}'+
+    '.fx-chips{display:flex;flex-wrap:wrap;gap:6px}.fx-chip{border:1px solid var(--border2);background:#fff;padding:7px 12px;border-radius:18px;font-size:12px;cursor:pointer}'+
+    '.fx-chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}'+
+    '@media(max-width:700px){.fx-big{grid-template-columns:1fr}.fx-box .v{font-size:22px}}'+
+    '</style>';
+  }
+
+  function rFluxo(){
+    if (!(typeof isAdm==='function' && isAdm())) return '<div class="pb"><div class="card"><div class="empty">Acesso restrito ao administrador.</div></div></div>';
+    if (window._FX===null && window._fxStatus!=='carregando') { _fxCarregar(); }
+    if (!window._fxDia) window._fxDia = _hj();
+    if (!window._fxMes) window._fxMes = window._fxDia.slice(0,7);
+    if (window._fxUnid===null) window._fxUnid = (typeof UA!=='undefined' && UA && UA.unidadeId) ? String(UA.unidadeId) : '';
+    var unid = window._fxUnid;
+    var aviso = window._fxStatus==='carregando' ? '<div style="font-size:12px;color:var(--text3);margin-bottom:10px">⏳ Carregando saídas da nuvem…</div>'
+      : window._fxStatus==='offline' ? '<div style="font-size:12px;color:#b45309;background:rgba(217,119,6,.1);padding:8px 12px;border-radius:8px;margin-bottom:10px">⚠️ Sem conexão com a nuvem: mostrando a última cópia deste aparelho. Lançar saídas só funciona com a nuvem.</div>' : '';
+
+    var selUnid = (DB.unidades||[]).length>1
+      ? '<select class="fx-in" onchange="window._fxUnid=this.value;renderPage()"><option value="">Todas as unidades</option>'+DB.unidades.map(function(u){return '<option value="'+san(u.id)+'"'+(String(u.id)===String(unid)?' selected':'')+'>'+san(u.nome)+'</option>';}).join('')+'</select>' : '';
+
+    var top = '<div class="fx-top">'+
+      '<button class="fx-tab '+(window._fxModo==='dia'?'on':'')+'" onclick="window._fxModo=\'dia\';renderPage()">📅 Dia</button>'+
+      '<button class="fx-tab '+(window._fxModo==='mes'?'on':'')+'" onclick="window._fxModo=\'mes\';renderPage()">🗓️ Mês</button>'+
+      (window._fxModo==='dia'
+        ? '<button class="fx-nav" onclick="_fxPularDia(-1)">‹</button><input type="date" class="fx-in" value="'+window._fxDia+'" onchange="if(this.value){window._fxDia=this.value;renderPage()}"><button class="fx-nav" onclick="_fxPularDia(1)">›</button>'+(window._fxDia!==_hj()?'<button class="fx-nav" onclick="window._fxDia=\''+_hj()+'\';renderPage()">Hoje</button>':'')
+        : '<input type="month" class="fx-in" value="'+window._fxMes+'" onchange="if(this.value){window._fxMes=this.value;renderPage()}">')+
+      selUnid+'</div>';
+
+    var corpo = window._fxModo==='dia' ? _telaDia(unid) : _telaMes(unid);
+    return _estilos()+'<div class="ph"><div><div class="pt">📒 Fluxo de Caixa</div><div class="ps">Entradas das vendas e saídas da empresa, dia a dia</div></div></div>'+
+      '<div class="pb">'+aviso+top+corpo+'</div>';
+  }
+
+  function _telaDia(unid){
+    var d = window._fxDia;
+    var vendas = _fxEntradas(unid, function(x){ return x===d; });
+    var saidas = _fxSaidas(unid, function(x){ return x===d; }).sort(function(a,b){ return String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')); });
+    var tE = vendas.reduce(function(s,v){ return s+_valVenda(v); },0);
+    var tS = saidas.reduce(function(s,x){ return s+_num(x.valor); },0);
+    var saldo = tE - tS;
+    var formas = _somaPorForma(vendas);
+    var formasHtml = Object.keys(formas).filter(function(k){return formas[k]>0;}).map(function(k){ return '<span style="margin-right:12px">'+san(NOME_METODO[k]||k)+': <b>'+fM(formas[k])+'</b></span>'; }).join('');
+    var p = d.split('-');
+    return '<div style="font-size:15px;font-weight:700;margin-bottom:12px">'+_fmtDiaSemana(d)+', '+p[2]+'/'+p[1]+'/'+p[0]+(unid?' — '+san(_nomeUnid(unid)):'')+'</div>'+
+      '<div class="fx-big">'+
+        '<div class="fx-box fx-e"><div class="l">↑ ENTRADAS (vendas)</div><div class="v">'+fM(tE)+'</div><div style="font-size:11px;margin-top:4px">'+vendas.length+' venda(s)</div></div>'+
+        '<div class="fx-box fx-s"><div class="l">↓ SAÍDAS</div><div class="v">'+fM(tS)+'</div><div style="font-size:11px;margin-top:4px">'+saidas.length+' lançamento(s)</div></div>'+
+        '<div class="fx-box fx-r"><div class="l">= SALDO DO DIA</div><div class="v '+(saldo<0?'fx-neg':'')+'">'+fM(saldo)+'</div></div>'+
+      '</div>'+
+      '<button class="fx-add" onclick="_fxAbrirSaida()">➖ Lançar saída</button>'+
+      '<div class="card"><div class="ct">↓ Saídas do dia</div>'+
+        (saidas.length ? saidas.map(function(s){
+          return '<div class="fx-it"><div class="d"><b>'+san(s.descricao||'—')+'</b><span>'+san(s.categoria||'')+' · '+san(FX_FORMAS[s.forma]||s.forma||'')+(s.criadoPorNome?' · por '+san(s.criadoPorNome):'')+'</span></div>'+
+            '<div class="fx-neg" style="font-weight:800;white-space:nowrap">− '+fM(s.valor)+'</div>'+
+            '<button class="x" title="Excluir" onclick="_fxExcluir(\''+san(String(s.id))+'\')">🗑️</button></div>';
+        }).join('') : '<div class="empty" style="padding:14px"><div>Nenhuma saída lançada neste dia.</div></div>')+
+      '</div>'+
+      '<div class="card"><div class="ct">↑ Entradas do dia</div>'+
+        (vendas.length ? '<div style="font-size:12px;color:var(--text2)">'+formasHtml+'</div>' : '<div class="empty" style="padding:14px"><div>Nenhuma venda neste dia.</div></div>')+
+      '</div>';
+  }
+
+  function _telaMes(unid){
+    var m = window._fxMes, dias = _diasDoMes(m), hj = _hj();
+    var vendas = _fxEntradas(unid, function(x){ return x.slice(0,7)===m; });
+    var saidas = _fxSaidas(unid, function(x){ return x.slice(0,7)===m; });
+    var porDiaE = {}, porDiaS = {};
+    vendas.forEach(function(v){ porDiaE[v.data]=(porDiaE[v.data]||0)+_valVenda(v); });
+    saidas.forEach(function(s){ porDiaS[s.data]=(porDiaS[s.data]||0)+_num(s.valor); });
+    var acum = 0, tE = 0, tS = 0, linhas = '';
+    dias.forEach(function(d){
+      if (d > hj && !porDiaE[d] && !porDiaS[d]) return;     // não mostra dias futuros vazios
+      var e = porDiaE[d]||0, s = porDiaS[d]||0, sd = e - s; acum += sd; tE += e; tS += s;
+      var p = d.split('-');
+      linhas += '<tr class="lk" onclick="window._fxDia=\''+d+'\';window._fxModo=\'dia\';renderPage()"><td>'+p[2]+'/'+p[1]+' <span style="color:var(--text3);font-size:11px">'+_fmtDiaSemana(d)+'</span></td>'+
+        '<td class="fx-pos">'+(e?fM(e):'—')+'</td><td class="fx-neg">'+(s?'− '+fM(s):'—')+'</td>'+
+        '<td class="'+(sd<0?'fx-neg':'')+'">'+fM(sd)+'</td><td class="'+(acum<0?'fx-neg':'')+'" style="font-weight:700">'+fM(acum)+'</td></tr>';
+    });
+    var cats = {};
+    saidas.forEach(function(s){ var c=s.categoria||'Outros'; cats[c]=(cats[c]||0)+_num(s.valor); });
+    var catHtml = Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(c){ return '<div class="fx-it"><div class="d"><b>'+san(c)+'</b></div><div class="fx-neg" style="font-weight:700">− '+fM(cats[c])+'</div></div>'; }).join('');
+    return '<div style="font-size:15px;font-weight:700;margin-bottom:12px">'+_mesNome(m)+(unid?' — '+san(_nomeUnid(unid)):'')+'</div>'+
+      '<div class="fx-big">'+
+        '<div class="fx-box fx-e"><div class="l">↑ ENTRADAS DO MÊS</div><div class="v">'+fM(tE)+'</div></div>'+
+        '<div class="fx-box fx-s"><div class="l">↓ SAÍDAS DO MÊS</div><div class="v">'+fM(tS)+'</div></div>'+
+        '<div class="fx-box fx-r"><div class="l">= SALDO DO MÊS</div><div class="v '+(tE-tS<0?'fx-neg':'')+'">'+fM(tE-tS)+'</div></div>'+
+      '</div>'+
+      '<div class="card"><div class="ct">Dia a dia <span style="font-weight:400;font-size:11px;color:var(--text3)">(clique num dia para ver e lançar saídas)</span></div>'+
+        '<div style="overflow-x:auto"><table class="fx-tb"><thead><tr><th>Dia</th><th>Entradas</th><th>Saídas</th><th>Saldo do dia</th><th>Acumulado</th></tr></thead><tbody>'+
+        (linhas||'<tr><td colspan="5" style="text-align:center;color:var(--text3)">Sem movimento neste mês.</td></tr>')+
+        (linhas?'<tr class="tot"><td>Total</td><td class="fx-pos">'+fM(tE)+'</td><td class="fx-neg">− '+fM(tS)+'</td><td></td><td>'+fM(tE-tS)+'</td></tr>':'')+
+        '</tbody></table></div></div>'+
+      (catHtml ? '<div class="card"><div class="ct">↓ Saídas por categoria</div>'+catHtml+'</div>' : '');
+  }
+
+  // ── AÇÕES ────────────────────────────────────────────────────
+  window._fxPularDia = function(n){
+    var p = window._fxDia.split('-'); var dt = new Date(+p[0], +p[1]-1, +p[2]+n);
+    window._fxDia = dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    renderPage();
+  };
+
+  window._fxAbrirSaida = function(){
+    var m = document.getElementById('mFxSaida'); if (m) m.remove();
+    m = document.createElement('div'); m.className = 'mo open'; m.id = 'mFxSaida';
+    var unidPadrao = window._fxUnid || ((typeof UA!=='undefined'&&UA&&UA.unidadeId)?String(UA.unidadeId):'');
+    var selU = (DB.unidades||[]).length>1
+      ? '<div class="fg"><label>Unidade</label><select id="fxU" class="fx-in" style="width:100%">'+DB.unidades.map(function(u){return '<option value="'+san(u.id)+'"'+(String(u.id)===String(unidPadrao)?' selected':'')+'>'+san(u.nome)+'</option>';}).join('')+'</select></div>' : '';
+    m.innerHTML = '<div class="md" style="max-width:440px">'+
+      '<div class="mh"><span class="mti">➖ Lançar saída</span><button class="mc" onclick="document.getElementById(\'mFxSaida\').remove()">×</button></div>'+
+      '<div class="mb">'+
+        '<div class="fg"><label>Valor (R$)</label><input id="fxV" type="text" inputmode="decimal" placeholder="0,00" class="fx-in" style="width:100%;font-size:22px;padding:12px"></div>'+
+        '<div class="fg"><label>O que foi?</label><input id="fxD" type="text" maxlength="120" placeholder="Ex.: balde de lixo, conta de luz, pagamento Alan" class="fx-in" style="width:100%"></div>'+
+        '<div class="fg"><label>Categoria</label><div class="fx-chips" id="fxCats">'+FX_CATS.map(function(c,i){return '<button type="button" class="fx-chip'+(i===FX_CATS.length-1?' on':'')+'" data-v="'+san(c)+'" onclick="_fxEscolher(\'fxCats\',this)">'+san(c)+'</button>';}).join('')+'</div></div>'+
+        '<div class="fg"><label>Pago com</label><div class="fx-chips" id="fxFormas">'+Object.keys(FX_FORMAS).map(function(k,i){return '<button type="button" class="fx-chip'+(i===0?' on':'')+'" data-v="'+k+'" onclick="_fxEscolher(\'fxFormas\',this)">'+FX_FORMAS[k]+'</button>';}).join('')+'</div></div>'+
+        '<div class="fg"><label>Data</label><input id="fxDt" type="date" class="fx-in" style="width:100%" value="'+(window._fxModo==='dia'?window._fxDia:_hj())+'"></div>'+
+        selU+
+        '<div id="fxErr" style="display:none;color:var(--danger);font-size:12px;margin-top:6px"></div>'+
+      '</div>'+
+      '<div class="mf"><button class="btn bg" onclick="document.getElementById(\'mFxSaida\').remove()">Cancelar</button>'+
+      '<button class="btn bp" id="fxBtn" onclick="_fxSalvarSaida()">Salvar saída</button></div></div>';
+    document.body.appendChild(m);
+    setTimeout(function(){ var v=document.getElementById('fxV'); if(v) v.focus(); }, 120);
+  };
+
+  window._fxEscolher = function(grupo, btn){
+    var g = document.getElementById(grupo); if (!g) return;
+    [].forEach.call(g.querySelectorAll('.fx-chip'), function(b){ b.classList.remove('on'); });
+    btn.classList.add('on');
+  };
+
+  function _lerValor(txt){
+    var t = String(txt||'').trim().replace(/[R$\s]/g,'');
+    if (!t) return NaN;
+    if (t.indexOf(',')>=0) t = t.replace(/\./g,'').replace(',','.');   // 1.234,56 → 1234.56
+    var n = Number(t);
+    return isFinite(n) ? Math.round(n*100)/100 : NaN;
+  }
+  window._fxLerValor = _lerValor;
+
+  window._fxSalvarSaida = async function(){
+    var err = document.getElementById('fxErr');
+    function erro(t){ if(err){ err.textContent = t; err.style.display = 'block'; } }
+    var valor = _lerValor((document.getElementById('fxV')||{}).value);
+    var desc = ((document.getElementById('fxD')||{}).value||'').trim();
+    var data = (document.getElementById('fxDt')||{}).value || '';
+    var catEl = document.querySelector('#fxCats .fx-chip.on'), fEl = document.querySelector('#fxFormas .fx-chip.on');
+    var uEl = document.getElementById('fxU');
+    var unid = uEl ? uEl.value : (window._fxUnid || ((typeof UA!=='undefined'&&UA&&UA.unidadeId)?String(UA.unidadeId):''));
+    if (!(valor > 0)) return erro('⛔ Digite o valor da saída (ex.: 34,90).');
+    if (!desc) return erro('⛔ Escreva o que foi a saída.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return erro('⛔ Escolha a data.');
+    if (!unid) return erro('⛔ Escolha a unidade.');
+    var btn = document.getElementById('fxBtn'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando…'; }
+    var agora = new Date().toISOString();
+    var item = { id: 'fx_' + (typeof uid==='function' ? uid() : Date.now().toString(36)), data: data, unidadeId: String(unid), valor: valor,
+      descricao: desc.slice(0,120), categoria: catEl ? catEl.getAttribute('data-v') : 'Outros', forma: fEl ? fEl.getAttribute('data-v') : 'pix',
+      criadoEm: agora, atualizadoEm: agora, criadoPor: (typeof UA!=='undefined'&&UA)?String(UA.id):'', criadoPorNome: (typeof UA!=='undefined'&&UA)?UA.nome:'' };
+    var ok = false;
+    try { ok = await _fxGravarItem(item); } catch(e){ ok = false; }
+    if (!ok) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar saída'; }
+      return erro('⛔ Não salvou na nuvem. Confira a internet e se você entrou com a conta ADM (exit.escapegame@gmail.com). Nada foi gravado.');
+    }
+    var m = document.getElementById('mFxSaida'); if (m) m.remove();
+    if (typeof registrarAuditoria==='function') { try { registrarAuditoria('FLUXO_SAIDA_LANCADA', fM(valor)+' — "'+desc+'" ('+data+')', (UA&&UA.id)||''); } catch(e){} }
+    window._fxDia = data; if (window._fxModo==='mes') window._fxMes = data.slice(0,7);
+    toast('✅ Saída de '+fM(valor)+' salva.', 'success');
+    renderPage();
+  };
+
+  window._fxExcluir = async function(id){
+    var it = (window._FX||[]).find(function(x){ return String(x.id)===String(id); });
+    if (!it) return;
+    if (!window.confirm('Excluir a saída "'+(it.descricao||'')+'" de '+fM(it.valor)+'?')) return;
+    var novo = Object.assign({}, it, { excluido: true, atualizadoEm: new Date().toISOString(), excluidoPor: (UA&&UA.nome)||'' });
+    var ok = false;
+    try { ok = await _fxGravarItem(novo); } catch(e){ ok = false; }
+    if (!ok) { toast('⛔ Não excluiu: sem confirmação da nuvem. Tente de novo.', 'error'); return; }
+    if (typeof registrarAuditoria==='function') { try { registrarAuditoria('FLUXO_SAIDA_EXCLUIDA', fM(it.valor)+' — "'+(it.descricao||'')+'" ('+it.data+')', (UA&&UA.id)||''); } catch(e){} }
+    toast('Saída excluída.', 'warn');
+    renderPage();
+  };
+
+  // ── JOGADORES POR SALA (DASHBOARD) ───────────────────────────
+  window._jsMes = null;
+  function _jogadoresPorSala(mes){
+    var vend = _vendasVisiveis().filter(function(v){ return !_cancelada(v) && v.tipo!=='reserva_pagamento' && (v.data||'').slice(0,7)===mes && v.salaId!=null && v.salaId!==''; });
+    var r = {};
+    vend.forEach(function(v){
+      var k = String(v.salaId);
+      if (!r[k]) r[k] = { jogos:0, jogadores:0, total:0, unidadeId:v.unidadeId };
+      r[k].jogos++; r[k].jogadores += _num(v.qtdJogadores); r[k].total += _valVenda(v);
+    });
+    return r;
+  }
+  function _nomeSala(id){
+    var s = (DB.salas||[]).find(function(x){ return String(x.id)===String(id); });
+    if (s) return (s.emoji?s.emoji+' ':'')+s.nome;
+    return SALAS_ANTIGAS[String(id)] ? SALAS_ANTIGAS[String(id)]+' <span style="font-size:10px;color:var(--text3)">(sala desativada)</span>' : 'Sala removida ('+san(id)+')';
+  }
+  function _cardJogadores(){
+    var mes = window._jsMes || _hj().slice(0,7);
+    var atual = _jogadoresPorSala(mes), ant = _jogadoresPorSala(_mesAnterior(mes));
+    var ids = Object.keys(atual).sort(function(a,b){ return atual[b].jogadores - atual[a].jogadores; });
+    var tJ=0, tG=0, tF=0, tA=0;
+    Object.keys(ant).forEach(function(k){ tA += ant[k].jogadores; });
+    var linhas = ids.map(function(k){
+      var a = atual[k], p = ant[k] ? ant[k].jogadores : 0, dif = a.jogadores - p;
+      tJ += a.jogadores; tG += a.jogos; tF += a.total;
+      var difHtml = p ? '<span class="'+(dif>=0?'fx-pos':'fx-neg')+'">'+(dif>=0?'▲ ':'▼ ')+Math.abs(dif)+'</span>' : '<span style="color:var(--text3)">—</span>';
+      return '<tr><td>'+_nomeSala(k)+'</td><td style="font-weight:800;font-size:15px">'+a.jogadores+'</td><td>'+a.jogos+'</td><td>'+fM(a.total)+'</td><td>'+difHtml+'</td></tr>';
+    }).join('');
+    var difT = tJ - tA;
+    return '<div class="card" id="cardJogadoresSala"><div class="ct" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><span>👥 Jogadores por sala</span>'+
+      '<input type="month" class="fx-in" value="'+mes+'" onchange="if(this.value){window._jsMes=this.value;renderPage()}"></div>'+
+      '<div style="overflow-x:auto"><table class="fx-tb"><thead><tr><th>Sala</th><th>Jogadores</th><th>Jogos</th><th>Faturamento</th><th>vs mês anterior</th></tr></thead><tbody>'+
+      (linhas || '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Nenhum jogo em '+_mesNome(mes)+'.</td></tr>')+
+      (linhas ? '<tr class="tot"><td>Total</td><td>'+tJ+'</td><td>'+tG+'</td><td>'+fM(tF)+'</td><td>'+(tA?'<span class="'+(difT>=0?'fx-pos':'fx-neg')+'">'+(difT>=0?'▲ ':'▼ ')+Math.abs(difT)+'</span>':'—')+'</td></tr>' : '')+
+      '</tbody></table></div></div>';
+  }
+  window._cardJogadoresSala = _cardJogadores;
+
+  // ── MENU ─────────────────────────────────────────────────────
+  try {
+    if (Array.isArray(window.MENUS) && !window.MENUS.some(function(m){ return m.id==='fluxo'; })) {
+      var iFin = window.MENUS.findIndex(function(m){ return m.id==='financeiro'; });
+      var itemMenu = { id:'fluxo', lbl:'Fluxo de Caixa', ic:'📒', perm:'tudo' };
+      if (iFin >= 0) window.MENUS.splice(iFin+1, 0, itemMenu); else window.MENUS.push(itemMenu);
+    }
+  } catch(e){ console.warn('[v103] menu Fluxo de Caixa não adicionado:', e); }
+
+  // ── HOOK NO renderPage (mesmo padrão dos módulos v742/v748) ──
+  var _rp_v103 = (typeof renderPage==='function') ? renderPage : null;
+  if (_rp_v103) {
+    renderPage = function(){
+      if (typeof PA!=='undefined' && PA==='fluxo') {
+        if (!window._v103SyncPedido && typeof window._forcarResync==='function') { window._v103SyncPedido = true; setTimeout(function(){ try { window._forcarResync(); } catch(e){} }, 300); }
+        var e = (typeof el==='function') ? el('pc') : document.getElementById('pc');
+        if (!e) return;
+        try { e.innerHTML = rFluxo(); } catch(err){ console.error('[v103] erro no Fluxo de Caixa:', err); e.innerHTML = '<div class="pb"><div class="card"><div class="empty">Erro ao abrir o Fluxo de Caixa.</div></div></div>'; }
+        return;
+      }
+      _rp_v103.apply(this, arguments);
+      if (typeof PA!=='undefined' && PA==='dashboard') {
+        // Logo após entrar, o ERP só tem as primeiras 1000 vendas; a sincronização completa
+        // chega em seguida. Pede essa sincronização uma vez (função já existente do sistema).
+        if (!window._v103SyncPedido && typeof window._forcarResync==='function') { window._v103SyncPedido = true; setTimeout(function(){ try { window._forcarResync(); } catch(e){} }, 300); }
+        try {
+          var pb = document.querySelector('#pc .pb');
+          if (pb && !document.getElementById('cardJogadoresSala')) {
+            var w = document.createElement('div');
+            w.innerHTML = _estilos() + _cardJogadores();
+            var ref = pb.children[1] || null;            // logo depois dos 4 números do topo
+            while (w.firstChild) pb.insertBefore(w.firstChild, ref);
+          }
+        } catch(err){ console.error('[v103] erro no quadro Jogadores por sala:', err); }
+      }
+    };
+  }
+  window.rFluxo = rFluxo;
+  console.log('🔒 [INTEGRIDADE v103] Fluxo de Caixa diário + Jogadores por sala no Dashboard ativos');
+})();
+
+  </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->
   <script src="keyo-00-core.js"></script>
   <script src="keyo-01-ui.js"></script>

@@ -27346,9 +27346,11 @@ function runFinancialTests() {
   };
 
   // ── JOGADORES POR SALA (DASHBOARD) ───────────────────────────
+  // [v104] Separado por unidade: seletor de unidade (ou todas, cada uma no seu bloco)
   window._jsMes = null;
-  function _jogadoresPorSala(mes){
-    var vend = _vendasVisiveis().filter(function(v){ return !_cancelada(v) && v.tipo!=='reserva_pagamento' && (v.data||'').slice(0,7)===mes && v.salaId!=null && v.salaId!==''; });
+  window._jsUnid = null;       // null = unidade do usuário; '' = todas separadas
+  function _jogadoresPorSala(mes, unid){
+    var vend = _vendasVisiveis().filter(function(v){ return !_cancelada(v) && v.tipo!=='reserva_pagamento' && (v.data||'').slice(0,7)===mes && v.salaId!=null && v.salaId!=='' && (!unid || String(v.unidadeId)===String(unid)); });
     var r = {};
     vend.forEach(function(v){
       var k = String(v.salaId);
@@ -27362,24 +27364,48 @@ function runFinancialTests() {
     if (s) return (s.emoji?s.emoji+' ':'')+s.nome;
     return SALAS_ANTIGAS[String(id)] ? SALAS_ANTIGAS[String(id)]+' <span style="font-size:10px;color:var(--text3)">(sala desativada)</span>' : 'Sala removida ('+san(id)+')';
   }
-  function _cardJogadores(){
-    var mes = window._jsMes || _hj().slice(0,7);
-    var atual = _jogadoresPorSala(mes), ant = _jogadoresPorSala(_mesAnterior(mes));
+  function _seta(d){ return '<span class="'+(d>=0?'fx-pos':'fx-neg')+'">'+(d>=0?'▲ ':'▼ ')+Math.abs(d)+'</span>'; }
+  // Linhas de uma unidade (ou null se não teve jogo)
+  function _blocoUnidade(mes, unid, comTitulo){
+    var atual = _jogadoresPorSala(mes, unid), ant = _jogadoresPorSala(_mesAnterior(mes), unid);
     var ids = Object.keys(atual).sort(function(a,b){ return atual[b].jogadores - atual[a].jogadores; });
+    if (!ids.length) return null;
     var tJ=0, tG=0, tF=0, tA=0;
     Object.keys(ant).forEach(function(k){ tA += ant[k].jogadores; });
     var linhas = ids.map(function(k){
-      var a = atual[k], p = ant[k] ? ant[k].jogadores : 0, dif = a.jogadores - p;
+      var a = atual[k], p = ant[k] ? ant[k].jogadores : 0;
       tJ += a.jogadores; tG += a.jogos; tF += a.total;
-      var difHtml = p ? '<span class="'+(dif>=0?'fx-pos':'fx-neg')+'">'+(dif>=0?'▲ ':'▼ ')+Math.abs(dif)+'</span>' : '<span style="color:var(--text3)">—</span>';
-      return '<tr><td>'+_nomeSala(k)+'</td><td style="font-weight:800;font-size:15px">'+a.jogadores+'</td><td>'+a.jogos+'</td><td>'+fM(a.total)+'</td><td>'+difHtml+'</td></tr>';
+      return '<tr><td>'+_nomeSala(k)+'</td><td style="font-weight:800;font-size:15px">'+a.jogadores+'</td><td>'+a.jogos+'</td><td>'+fM(a.total)+'</td><td>'+(p?_seta(a.jogadores-p):'<span style="color:var(--text3)">—</span>')+'</td></tr>';
     }).join('');
-    var difT = tJ - tA;
-    return '<div class="card" id="cardJogadoresSala"><div class="ct" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><span>👥 Jogadores por sala</span>'+
-      '<input type="month" class="fx-in" value="'+mes+'" onchange="if(this.value){window._jsMes=this.value;renderPage()}"></div>'+
+    var tit = comTitulo ? '<tr><td colspan="5" style="text-align:left;padding-top:16px;font-weight:800;color:var(--accent2);border-bottom:2px solid var(--accent)">📍 '+san(_nomeUnid(unid))+'</td></tr>' : '';
+    return { html: tit+linhas+'<tr class="tot"><td>Total'+(comTitulo?' '+san(_nomeUnid(unid)):'')+'</td><td>'+tJ+'</td><td>'+tG+'</td><td>'+fM(tF)+'</td><td>'+(tA?_seta(tJ-tA):'—')+'</td></tr>', tJ:tJ, tG:tG, tF:tF };
+  }
+  function _cardJogadores(){
+    var mes = window._jsMes || _hj().slice(0,7);
+    var adm = (typeof isAdm==='function' && isAdm());
+    var minha = (typeof UA!=='undefined' && UA && UA.unidadeId) ? String(UA.unidadeId) : '';
+    var unid = adm ? (window._jsUnid===null ? minha : window._jsUnid) : minha;
+    var corpo = '';
+    if (unid) {
+      var b = _blocoUnidade(mes, unid, false);
+      corpo = b ? b.html : '';
+    } else {
+      var gJ=0, gG=0, gF=0, n=0;
+      (DB.unidades||[]).forEach(function(u){
+        var b = _blocoUnidade(mes, String(u.id), true);
+        if (b) { corpo += b.html; gJ+=b.tJ; gG+=b.tG; gF+=b.tF; n++; }
+      });
+      if (n > 1) corpo += '<tr class="tot" style="background:rgba(201,168,76,.12)"><td>TOTAL GERAL</td><td>'+gJ+'</td><td>'+gG+'</td><td>'+fM(gF)+'</td><td></td></tr>';
+    }
+    var sel = (adm && (DB.unidades||[]).length > 1)
+      ? '<select class="fx-in" onchange="window._jsUnid=this.value;renderPage()">'+
+          DB.unidades.map(function(u){ return '<option value="'+san(u.id)+'"'+(String(u.id)===String(unid)?' selected':'')+'>'+san(u.nome)+'</option>'; }).join('')+
+          '<option value=""'+(unid===''?' selected':'')+'>Todas (separadas por unidade)</option></select>' : '';
+    var nomeU = unid ? ' — '+san(_nomeUnid(unid)) : '';
+    return '<div class="card" id="cardJogadoresSala"><div class="ct" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><span>👥 Jogadores por sala'+nomeU+'</span>'+
+      '<span style="display:flex;gap:8px;flex-wrap:wrap">'+sel+'<input type="month" class="fx-in" value="'+mes+'" onchange="if(this.value){window._jsMes=this.value;renderPage()}"></span></div>'+
       '<div style="overflow-x:auto"><table class="fx-tb"><thead><tr><th>Sala</th><th>Jogadores</th><th>Jogos</th><th>Faturamento</th><th>vs mês anterior</th></tr></thead><tbody>'+
-      (linhas || '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Nenhum jogo em '+_mesNome(mes)+'.</td></tr>')+
-      (linhas ? '<tr class="tot"><td>Total</td><td>'+tJ+'</td><td>'+tG+'</td><td>'+fM(tF)+'</td><td>'+(tA?'<span class="'+(difT>=0?'fx-pos':'fx-neg')+'">'+(difT>=0?'▲ ':'▼ ')+Math.abs(difT)+'</span>':'—')+'</td></tr>' : '')+
+      (corpo || '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Nenhum jogo em '+_mesNome(mes)+nomeU+'.</td></tr>')+
       '</tbody></table></div></div>';
   }
   window._cardJogadoresSala = _cardJogadores;
@@ -27422,7 +27448,7 @@ function runFinancialTests() {
     };
   }
   window.rFluxo = rFluxo;
-  console.log('🔒 [INTEGRIDADE v103] Fluxo de Caixa diário + Jogadores por sala no Dashboard ativos');
+  console.log('🔒 [INTEGRIDADE v104] Fluxo de Caixa diário + Jogadores por sala (por unidade) no Dashboard ativos');
 })();
 
   </script>

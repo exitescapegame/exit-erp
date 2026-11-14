@@ -112,6 +112,7 @@ img.slogo{max-height:64px;align-self:flex-start}
 .av .st{display:flex;gap:clamp(8px,2vw,22px)}.av .st button{background:none;border:0;padding:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .av .st svg{width:clamp(64px,11vw,120px);height:clamp(64px,11vw,120px);fill:transparent;stroke:var(--gold);stroke-width:1.6;stroke-linejoin:round;transition:fill .15s,transform .15s}
 .av .st button.on svg{fill:var(--gold2);stroke:var(--gold2);transform:scale(1.06)}
+.av .rec{display:flex;flex-direction:column;align-items:center;gap:6px;border:2px solid var(--gold2);border-radius:20px;padding:16px 30px;background:rgba(195,167,93,.12)}.av .rec .tr{font-size:clamp(48px,8vw,80px);line-height:1}.av .rec b{font-size:clamp(26px,4.4vw,46px);color:var(--gold2);letter-spacing:.04em}.av .rec span{font-size:clamp(20px,3vw,28px);font-weight:600}
 .av .ok{font-size:28px;font-weight:600;color:var(--gold2)}
 .lerantes{font-size:clamp(22px,3vw,30px);font-weight:700;text-align:center;color:var(--text);margin:2px 0 0}
 .regras2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
@@ -170,7 +171,7 @@ var $=function(i){return document.getElementById(i)};
 if(typeof CONFIG==="undefined"||!CONFIG.SUPABASE_URL||CONFIG.SUPABASE_URL.indexOf("COLE_AQUI")===0){document.body.innerHTML='<div class="center"><b>Configuração ausente</b><p class="mute">Algo apagou a configuração desta página. Peça para publicar de novo.</p></div>';throw new Error("config ausente")}
 if(!window.supabase){document.body.innerHTML='<div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#08090b;color:#eef0f2;font-family:system-ui,sans-serif;text-align:center;padding:24px"><b style="font-size:24px">Sem conexão com a internet</b><p style="color:#8b939e">Tentando de novo em 10 segundos...</p></div>';(function tenta(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';s.onload=function(){location.reload()};s.onerror=function(){s.remove();setTimeout(tenta,10000)};document.head.appendChild(s)})();throw new Error('biblioteca do servidor não carregou')}
 function fetchComTempo(u,o){o=o||{};var url=String((u&&u.url)||u);if(o.signal||typeof AbortController==='undefined'||url.indexOf('/storage/v1/')>-1)return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},12000);return fetch(u,Object.assign({},o,{signal:c.signal})).finally(function(){clearTimeout(t)})}
-var VERSAO_ARQ='t25';
+var VERSAO_ARQ='t26';
 // atualização automática: quando uma versão nova é publicada, a tela se atualiza sozinha (sem ninguém precisar recarregar)
 var _esperandoAtualizar=false;
 function checarVersao(atual,podeAgora){if(_esperandoAtualizar)return;try{fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(h){var m=h&&h.match(/VERSAO_ARQ='([a-z]\d+)'/);if(m&&m[1]!==atual&&!_esperandoAtualizar){_esperandoAtualizar=true;var tenta=function(){if(podeAgora())location.replace(location.pathname+'?v='+m[1]);else setTimeout(tenta,30000)};tenta()}},function(){})}catch(e){}}
@@ -191,6 +192,7 @@ var ESTRELA='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.
 function fecharAvaliacao(){AVAL=null;clearTimeout(avalTimer);var o=$('aval');if(o)o.remove()}
 function abrirAvaliacao(sx){if(!sx||(AVAL&&AVAL.id===sx.id))return;fecharAvaliacao();AVAL=sx;
   var o=el('div','av');o.id='aval';o.setAttribute('role','dialog');
+  if(sx.resultado==='escapou'&&sx.recorde){var rc=el('div','rec');rc.appendChild(el('div','tr','🏆'));rc.appendChild(el('b',null,sx.recorde==='sala'?'NOVO RECORDE DA SALA!':'NOVO RECORDE DO MÊS!'));var tu=Math.max(0,(sx.duracao_segundos||0)-(+sx.restante_base||0));rc.appendChild(el('span',null,'Tempo: '+(tu>=3600?Math.floor(tu/3600)+':':'')+fmt(tu%3600)));o.appendChild(rc)}
   o.appendChild(el('h2',null,sx.resultado==='escapou'?'Parabéns! Como foi a experiência?':'Obrigado por jogar! Como foi a experiência?'));
   o.appendChild(el('div','sl','Toque nas estrelas para avaliar a sala '+(sala&&sala.nome||'')));
   var st=el('div','st'),bs=[];
@@ -208,7 +210,7 @@ async function verAvaliacao(antes,depois){try{
   if(antes&&antes.status!=='aguardando')id=antes.id;
   else if(!avalChecado&&!antes){avalChecado=true;var u=await sb.from('sessoes').select('id').eq('sala_id',sala.id).eq('status','encerrada').order('encerrada_em',{ascending:false}).limit(1);if(u.data&&u.data[0])id=u.data[0].id}
   avalChecado=true;if(!id)return;
-  var r=await sb.from('sessoes').select('id,status,resultado,avaliacao,encerrada_em').eq('id',id).maybeSingle();var x=r.data;
+  var r=await sb.from('sessoes').select('id,status,resultado,avaliacao,encerrada_em,recorde,duracao_segundos,restante_base').eq('id',id).maybeSingle();var x=r.data;
   if(x&&x.status==='encerrada'&&x.resultado!=='cancelada'&&x.avaliacao==null&&x.encerrada_em&&(Date.now()+off-Date.parse(x.encerrada_em))<300000&&!ses)abrirAvaliacao(x)
 }catch(e){}}
 // regras da sala também na tela de "Toque para iniciar"

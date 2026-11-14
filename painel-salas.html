@@ -130,7 +130,7 @@ html.embed .hdr{margin-bottom:14px}
 .evh{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:6px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line2)}
 .evh b{font-size:17px}
 .rc-cnt{font-size:12px;color:var(--mute);margin:-4px 0 4px;font-weight:500}
-.jog{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin:2px 0 6px}.jog button{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:18px;font-weight:700;line-height:1;cursor:pointer;color:inherit}.jog button:disabled{opacity:.35;cursor:default}.jog b{min-width:26px;text-align:center;font-size:17px;font-variant-numeric:tabular-nums}.jog .falta{color:#b45309;font-weight:500}.jog.alerta{background:#fff4e5;border:2px solid #f59e0b;border-radius:12px;padding:6px 10px;animation:pulsaJog 1.4s ease-in-out infinite}.jog.alerta .falta{color:#b45309;font-weight:800;text-transform:uppercase;letter-spacing:.03em}@keyframes pulsaJog{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}.rec-ov{position:fixed;inset:0;z-index:998;background:rgba(20,14,40,.55);display:flex;align-items:center;justify-content:center;padding:20px}.rec-cx{background:#fff;border:2px solid #c3a75d;border-radius:20px;padding:30px 34px;text-align:center;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.rec-cx .tr{font-size:56px;line-height:1}.rec-cx h2{margin:10px 0 6px;font-size:24px;color:#5b2a86;letter-spacing:.04em}.rec-cx p{margin:4px 0;font-size:16px;color:#333}.rec-cx .tm{font-size:30px;font-weight:800;color:#a8862f;margin:10px 0 16px}.tag-rec{background:#fff6dc;border:1px solid #c3a75d;color:#8a6d1f;border-radius:8px;padding:2px 8px;font-size:11.5px;letter-spacing:.04em}
+.jog{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin:2px 0 6px}.jog button{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:18px;font-weight:700;line-height:1;cursor:pointer;color:inherit}.jog button:disabled{opacity:.35;cursor:default}.jog b{min-width:26px;text-align:center;font-size:17px;font-variant-numeric:tabular-nums}.jog .falta{color:#b45309;font-weight:500}.jpick{display:flex;gap:8px;align-items:center;margin:0 0 8px}.jpick input{width:72px;height:40px;text-align:center;font-size:20px;font-weight:800;border:2px solid #f59e0b;border-radius:10px;background:#fff}.jpick button{height:40px;padding:0 16px;border-radius:10px;border:2px solid #f59e0b;background:#f59e0b;color:#fff;font-size:15px;font-weight:800;cursor:pointer}.jpick button:disabled{opacity:.5}.jog.alerta{background:#fff4e5;border:2px solid #f59e0b;border-radius:12px;padding:6px 10px;animation:pulsaJog 1.4s ease-in-out infinite}.jog.alerta .falta{color:#b45309;font-weight:800;text-transform:uppercase;letter-spacing:.03em}@keyframes pulsaJog{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}.rec-ov{position:fixed;inset:0;z-index:998;background:rgba(20,14,40,.55);display:flex;align-items:center;justify-content:center;padding:20px}.rec-cx{background:#fff;border:2px solid #c3a75d;border-radius:20px;padding:30px 34px;text-align:center;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.rec-cx .tr{font-size:56px;line-height:1}.rec-cx h2{margin:10px 0 6px;font-size:24px;color:#5b2a86;letter-spacing:.04em}.rec-cx p{margin:4px 0;font-size:16px;color:#333}.rec-cx .tm{font-size:30px;font-weight:800;color:#a8862f;margin:10px 0 16px}.tag-rec{background:#fff6dc;border:1px solid #c3a75d;color:#8a6d1f;border-radius:8px;padding:2px 8px;font-size:11.5px;letter-spacing:.04em}
 .rc-un{font-size:12px;color:var(--mute);margin:-4px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rc-un.ev{color:#7a3fb0;font-weight:600}
 .chk{font-size:12px;font-weight:600;margin:-2px 0 6px;cursor:pointer;display:inline-block}.chk.ok{color:#15803d}.chk.warn{color:#b45309}.chk.err{color:#b91c1c}
@@ -635,24 +635,10 @@ function alertaRecorde(){try{var ids=RECENTES.filter(function(x){return x.result
   o.querySelector('button').onclick=function(){o.remove()};o.addEventListener('click',function(e){if(e.target===o)o.remove()});
   document.body.appendChild(o);try{bip()}catch(e){}
   try{if(window.Notification&&Notification.permission==='granted')new Notification('🏆 '+(tot?'Novo recorde da sala':'Novo recorde do mês'),{body:(sa?sa.nome:'')+' — '+fh(tempoUsado(x)),tag:'exit-recorde'})}catch(e){}}catch(e){}}
-// alerta: jogo começou e o número de jogadores não foi informado -> janela no meio da tela com os números para tocar; some sozinha quando informar
+// alerta: jogo começou sem o número de jogadores -> bip uma vez; a escolha aparece dentro do card da própria sala (sem janela por cima)
 function alertaJogadores(){try{if(!can('operar'))return;
-  var falt=SESSOES.filter(function(x){return x.status!=='aguardando'&&!x.jogadores&&jogAvisados[x.id]!=='depois'&&salaById(x.sala_id)});
-  var o=document.getElementById('jogOv');
-  if(!falt.length){if(o)o.remove();return}
-  var x=falt[0],sa=salaById(x.sala_id),mx=sa.max_jogadores||12;
-  if(!jogAvisados[x.id]){jogAvisados[x.id]=1;try{bip()}catch(e){}
-    try{if(window.Notification&&Notification.permission==='granted')new Notification('👥 Informe o número de jogadores',{body:sa.nome,tag:'exit-jog-'+x.id})}catch(e){}}
-  if(o&&o.dataset.ses===x.id)return;if(o)o.remove();
-  o=document.createElement('div');o.className='rec-ov';o.id='jogOv';o.dataset.ses=x.id;
-  var bts='';for(var n=1;n<=mx;n++)bts+='<button class="btn soft" data-jn="'+n+'" style="min-width:52px;font-size:18px;padding:10px 0">'+n+'</button>';
-  o.innerHTML='<div class="rec-cx" style="max-width:520px"><div class="tr">👥</div><h2>QUANTOS JOGADORES?</h2><p>O jogo da <b>'+esc(sa.nome)+'</b> começou sem o número de jogadores.</p><div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px 0">'+bts+'</div><button class="btn ghost" data-jdep="1">Depois</button></div>';
-  o.querySelectorAll('[data-jn]').forEach(function(b){b.onclick=async function(){o.querySelectorAll('button').forEach(function(z){z.disabled=true});
-    var r=await sb.from('sessoes').update({jogadores:+b.dataset.jn}).eq('id',x.id);
-    if(r.error){toast('Erro: '+r.error.message);o.querySelectorAll('button').forEach(function(z){z.disabled=false});return}
-    x.jogadores=+b.dataset.jn;o.remove();renderAll();alertaJogadores()}});
-  o.querySelector('[data-jdep]').onclick=function(){jogAvisados[x.id]='depois';o.remove();alertaJogadores()};
-  document.body.appendChild(o)}catch(e){}}
+  SESSOES.forEach(function(x){if(x.status==='aguardando'||x.jogadores||jogAvisados[x.id])return;var sa=salaById(x.sala_id);if(!sa)return;jogAvisados[x.id]=1;try{bip()}catch(e){}
+    try{if(window.Notification&&Notification.permission==='granted')new Notification('👥 Informe o número de jogadores',{body:sa.nome,tag:'exit-jog-'+x.id})}catch(e){}})}catch(e){}}
 function alertaInicioTablet(){try{var ids=SESSOES.filter(function(x){return x.origem==='tablet'}).map(function(x){return x.id});
   var novos=tabVistas?ids.filter(function(i){return tabVistas.indexOf(i)<0}):[];tabVistas=ids;if(!novos.length||!can('operar'))return;
   var nomes=novos.map(function(id){var x=SESSOES.filter(function(y){return y.id===id})[0],sa=x&&salaById(x.sala_id);return sa?sa.nome:'Sala'}).join(', ');
@@ -1030,8 +1016,9 @@ function cardHtml(s){
   var un=unById(s.unidade_id);
   var nh=jogosHoje(s.id);
   h+='<div class="rc-cnt">🎮 '+(ses?'Jogo nº '+numJogo(ses)+' de hoje':(nh?nh+(nh===1?' jogo':' jogos')+' hoje':'Nenhum jogo hoje'))+'</div>';
-  if(ses){var nj=ses.jogadores||0,mx=s.max_jogadores||12;
-    h+='<div class="jog'+(!nj&&ses.status!=='aguardando'?' alerta':'')+'">👥 Jogadores:'+(op?'<button data-jog="'+s.id+'|-1"'+(nj<=0?' disabled':'')+' aria-label="Menos um jogador">−</button>':'')+'<b>'+(nj||'—')+'</b>'+(op?'<button data-jog="'+s.id+'|1"'+(nj>=mx?' disabled':'')+' aria-label="Mais um jogador">+</button>':'')+(nj?'':'<span class="falta">'+(ses.status!=='aguardando'?'⚠ informe o nº de jogadores':'informe')+'</span>')+'</div>'}
+  if(ses){var nj=ses.jogadores||0,mx=30;
+    h+='<div class="jog'+(!nj&&ses.status!=='aguardando'?' alerta':'')+'">👥 Jogadores:'+(op?'<button data-jog="'+s.id+'|-1"'+(nj<=2?' disabled':'')+' aria-label="Menos um jogador">−</button>':'')+'<b>'+(nj||'—')+'</b>'+(op?'<button data-jog="'+s.id+'|1"'+(nj>=mx?' disabled':'')+' aria-label="Mais um jogador">+</button>':'')+(nj?'':'<span class="falta">'+(ses.status!=='aguardando'?'⚠ informe o nº de jogadores':'informe')+'</span>')+'</div>';
+    if(op&&!nj&&ses.status!=='aguardando')h+='<div class="jpick"><input type="text" inputmode="numeric" maxlength="2" placeholder="nº" data-jin="'+s.id+'"><button data-jset="'+s.id+'">OK</button></div>';}
   var trv=travadoInfo(s,ses);if(trv)h+='<div class="banner trav">⏳ '+trv.min+' min sem resolver enigma'+(trv.en?' · provável: <b>'+esc(trv.en.nome)+'</b>':'')+'</div>';
   var ck=checarSala(s),nk=nivelCheck(ck);
   h+='<div><span class="chk '+nk+'"'+(can2editar()?' data-editar="'+s.id+'" data-etab="'+(ck[0]?ck[0].a:'enigmas')+'" title="Ver checagem da sala"':'')+'>'+(nk==='ok'?'✔ Sala pronta':(nk==='err'?'⛔ ':'⚠ ')+ck.length+(ck.length===1?' pendência':' pendências'))+'</span></div>';
@@ -1127,7 +1114,13 @@ function segPane(s,ses,tb){
 function bindCard(s){
   var c=$('card_'+s.id);if(!c)return;
   var q=function(sel,fn){c.querySelectorAll(sel).forEach(fn)};
-  q('[data-jog]',function(b){b.onclick=async function(){var ses=sesDe(s.id);if(!ses)return;var mx=s.max_jogadores||12;var n=Math.max(0,Math.min(mx,(ses.jogadores||0)+(+b.dataset.jog.split('|')[1])));if(n===(ses.jogadores||0))return;
+  q('[data-jset]',function(b){var inp=b.parentNode.querySelector('[data-jin]');
+    var salvar=async function(){var ses=sesDe(s.id);if(!ses)return;var n=parseInt(String(inp.value).replace(/\D/g,''),10);
+      if(!(n>=2&&n<=30)){toast('Digite um número de 2 a 30.');inp.focus();return}
+      b.disabled=true;inp.disabled=true;var x=await sb.from('sessoes').update({jogadores:n}).eq('id',ses.id);
+      if(falhouComando(x)){b.disabled=false;inp.disabled=false;return}ses.jogadores=n;inp.value='';inp.blur();renderAll()};
+    b.onclick=salvar;if(inp)inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();salvar()}}});
+  q('[data-jog]',function(b){b.onclick=async function(){var ses=sesDe(s.id);if(!ses)return;var mx=30;var dl=+b.dataset.jog.split('|')[1],n=ses.jogadores?Math.max(2,Math.min(mx,ses.jogadores+dl)):(dl>0?2:0);if(!n)return;if(n===(ses.jogadores||0))return;
     b.disabled=true;var x=await sb.from('sessoes').update({jogadores:n}).eq('id',ses.id);b.disabled=false;if(falhouComando(x))return;ses.jogadores=n;renderAll();alertaJogadores()}});
   q('[data-vol]',function(r){var lb=c.querySelector('[data-volv="'+s.id+'"]');r.oninput=function(){if(lb)lb.textContent=r.value+'%'};
     r.onchange=async function(){var v=+r.value;var x=await sb.rpc('definir_volume',{p_sala:s.id,p_volume:v});if(falhouComando(x)){r.value=s.volume_som==null?100:s.volume_som;return}s.volume_som=v;toast('Volume do tablet: '+v+'%')}});

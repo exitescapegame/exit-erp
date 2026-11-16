@@ -3018,35 +3018,15 @@ function mostrarTelaDesbloqueio() {
   // Injeta campo de senha master antes do login normal
   const body = overlay.querySelector('.mb');
   if (!body) return;
+  // [v105] Chamada 2x na abertura (DOMContentLoaded + init): a tela ficava duplicada e era
+  // preciso desbloquear duas vezes. Agora só monta uma vez.
+  if (window._telaDesbloqueioMontada) return;
+  window._telaDesbloqueioMontada = true;
 
   const meta = localStorage.getItem(SEC.SK_META);
   const jaConfigurado = meta && JSON.parse(meta).configurado;
 
   const senhaHtml = `
-    <div id="secSetup" style="margin-bottom:16px;padding:14px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px">
-      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">
-        🔐 ${jaConfigurado ? 'Senha de Criptografia' : 'Primeira Configuração'}
-      </div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">
-        ${jaConfigurado
-          ? 'Digite a senha master para descriptografar os dados.'
-          : 'Crie uma senha forte para proteger todos os dados. <strong>Guarde-a com segurança — sem ela os dados não podem ser recuperados.</strong>'}
-      </div>
-      <input type="password" id="senhaMaster" placeholder="${jaConfigurado ? 'Senha master' : 'Mín. 12 chars, maiúscula, número e símbolo'}"
-        style="margin-bottom:6px" oninput="${!jaConfigurado ? '_senhaMasterForca(this.value)' : ''}" onkeydown="if(event.key==='Enter')tentarDesbloquear()">
-      ${!jaConfigurado ? `
-        <div id="senhaMasterForcaBar" style="height:4px;border-radius:2px;background:#222;margin-bottom:4px;overflow:hidden">
-          <div id="senhaMasterForcaFill" style="height:100%;width:0%;transition:width .3s,background .3s"></div>
-        </div>
-        <div id="senhaMasterForcaTxt" style="font-size:10px;color:var(--text3);margin-bottom:6px"></div>
-        <input type="password" id="senhaMasterConf" placeholder="Confirme a senha master"
-          style="margin-bottom:8px">
-      ` : ''}
-      <button class="btn bp" style="width:100%" onclick="tentarDesbloquear()">
-        ${jaConfigurado ? '🔓 Desbloquear' : '🔐 Proteger e Iniciar'}
-      </button>
-      <div id="senhaErr" style="display:none;color:var(--danger);font-size:11px;margin-top:8px"></div>
-    </div>
     <div id="secLoginUnidade" style="margin-bottom:16px;padding:14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:8px">
       <div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:8px">
         🏢 Login na Nuvem (Unidade ou ADM)
@@ -3061,6 +3041,10 @@ function mostrarTelaDesbloqueio() {
         style="margin-bottom:6px" onkeydown="if(event.key==='Enter')document.getElementById('unidadeSenha')?.focus()">
       <input type="password" id="unidadeSenha" placeholder="Senha (unidade ou ADM)" autocomplete="current-password"
         style="margin-bottom:8px" onkeydown="if(event.key==='Enter')tentarDesbloquear()">
+    </div>
+    <div id="secSetup" style="margin-bottom:16px">
+      <button class="btn bp" style="width:100%" onclick="tentarDesbloquear()">🔓 Entrar</button>
+      <div id="senhaErr" style="display:none;color:var(--danger);font-size:11px;margin-top:8px"></div>
     </div>
     <div id="loginNormal" style="display:none">`;
 
@@ -3133,27 +3117,32 @@ function _validarForcaSenhaMaster(senha, errEl) {
   return true;
 }
 
+// [v105] A senha master saiu da tela de entrada. Ela não era conferida (qualquer texto passava):
+// só gerava a chave da criptografia LOCAL do aparelho. Essa chave agora é gerada uma vez e
+// guardada no próprio aparelho. Os dados continuam vindo da nuvem (login + RLS), como antes.
+// A senha master usada em autorizações (config.senhaMasterHashSec) NÃO muda.
+function _chaveDoAparelho() {
+  const K = 'exit_chave_aparelho_v105';
+  try {
+    let v = localStorage.getItem(K);
+    if (!v || v.length < 20) {
+      v = bufToB64(crypto.getRandomValues(new Uint8Array(32)));
+      localStorage.setItem(K, v);
+    }
+    return v;
+  } catch (e) {
+    return 'exit-aparelho-sem-armazenamento-local-v105';
+  }
+}
+
 async function tentarDesbloquear() {
-  const senha = document.getElementById('senhaMaster')?.value || '';
-  const senhaConf = document.getElementById('senhaMasterConf')?.value;
+  if (window._desbloqueando) return; // evita duplo clique / Enter repetido
+  const senha = _chaveDoAparelho();
   const errEl = document.getElementById('senhaErr');
+  if (errEl) errEl.style.display = 'none';
   const meta = localStorage.getItem(SEC.SK_META);
   const jaConfigurado = meta && JSON.parse(meta).configurado;
-
-  // [B5] Primeiro cadastro: validação completa de força
-  if (!jaConfigurado) {
-    if (!_validarForcaSenhaMaster(senha, errEl)) return;
-    if (senha !== senhaConf) {
-      if (errEl) { errEl.textContent = '⛔ As senhas não coincidem.'; errEl.style.display = 'block'; }
-      return;
-    }
-  } else {
-    // Senha já configurada: apenas verifica se foi digitada
-    if (senha.length < 1) {
-      if (errEl) { errEl.textContent = 'Digite a senha master.'; errEl.style.display = 'block'; }
-      return;
-    }
-  }
+  window._desbloqueando = true;
 
   // [v85] Lê o login de unidade (email/senha do Supabase), se os campos existirem
   const emailUnidade = document.getElementById('unidadeEmail')?.value?.trim() || '';
@@ -3163,10 +3152,12 @@ async function tentarDesbloquear() {
   if (btn) { btn.textContent = '⏳ Conectando ao banco...'; btn.disabled = true; }
 
   window._ultimoErroLoginUnidade = null;
-  const ok = await carregarDBSeguro(senha, emailUnidade, senhaUnidade);
+  let ok = false;
+  try { ok = await carregarDBSeguro(senha, emailUnidade, senhaUnidade); }
+  finally { window._desbloqueando = false; }
 
   if (!ok) {
-    if (btn) { btn.textContent = jaConfigurado ? '🔓 Desbloquear' : '🔐 Proteger e Iniciar'; btn.disabled = false; }
+    if (btn) { btn.textContent = '🔓 Entrar'; btn.disabled = false; }
     // [v85] Se o erro foi no login de unidade, mostra mensagem específica
     const msgErro = window._ultimoErroLoginUnidade
       ? ('Login da unidade: ' + window._ultimoErroLoginUnidade)
@@ -3188,19 +3179,9 @@ async function tentarDesbloquear() {
   // apagando dados reais de produção. Removido em definitivo para preservar os dados.
   // (A limpeza manual e proposital pelo ADM, com auditoria, continua disponível em outro ponto.)
 
-  // [B2-FIX] Migração senhaMaster FNV-1a → PBKDF2 (idêntico ao caminho dos colaboradores)
-  // Roda apenas se ainda estiver no formato legado (prefixo 'fb:')
-  try {
-    if (DB.config?.senhaMaster && String(DB.config.senhaMaster).startsWith('fb:')) {
-      hashPinSeguro(senha).then(({ hash, salt }) => {
-        DB.config.senhaMasterHashSec = hash;
-        DB.config.senhaMasterSalt    = salt;
-        delete DB.config.senhaMaster;
-        sDB();
-        console.info('[EXIT ERP] senhaMaster migrada de FNV-1a para PBKDF2.');
-      }).catch(() => {});
-    }
-  } catch(_) {}
+  // [v105] Removida a migração legada da senha master FNV-1a → PBKDF2 que rodava aqui: ela usava
+  // o texto digitado na tela (que não existe mais). A migração na conferência da senha master
+  // (_verificarSenhaMaster) continua existindo.
 
   // Limpa campo de senha da memória
   const senhaEl = document.getElementById('senhaMaster');
@@ -27448,7 +27429,7 @@ function runFinancialTests() {
     };
   }
   window.rFluxo = rFluxo;
-  console.log('🔒 [INTEGRIDADE v104] Fluxo de Caixa diário + Jogadores por sala (por unidade) no Dashboard ativos');
+  console.log('🔒 [INTEGRIDADE v105] Fluxo de Caixa diário + Jogadores por sala (por unidade) no Dashboard ativos + Entrada sem senha master (tela única)');
 })();
 
   </script>

@@ -27433,6 +27433,171 @@ function runFinancialTests() {
 })();
 
   </script>
+  <script>
+// ═══════════════════════════════════════════════════════════════════
+// [v106] AJUSTE MANUAL DE HORÁRIO (Ponto & RH) — 16/11/2026
+// Só ADM lança ou corrige um horário (dia, entrada, saída, motivo obrigatório).
+// A gravação é feita no SERVIDOR (função ponto_ajustar): confere se é ADM, recalcula horas e valor,
+// impede sobreposição e grava o ajuste num registro que não pode ser apagado (ajustes_ponto).
+// O colaborador confirma ou contesta o ajuste com a senha dele no próximo acesso pelo celular.
+// Bloco 100% aditivo: substitui só a janela "Ver" (verPt) e acrescenta um botão no Ponto & RH.
+// Reverter: remover este bloco <script> inteiro (volta à v105).
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+  var MSG = {
+    SOMENTE_ADM: 'Só a conta ADM pode ajustar horários. Entre no ERP com o login ADM.',
+    HORA_INVALIDA: 'Horário inválido. Use o formato 14:30.',
+    DATA_INVALIDA: 'Data inválida (não pode ser no futuro).',
+    MOTIVO_OBRIGATORIO: 'Escreva o motivo do ajuste (mínimo 5 letras).',
+    COLABORADOR_INVALIDO: 'Colaborador não encontrado.',
+    SAIDA_ANTES_DA_ENTRADA: 'A saída precisa ser depois da entrada.',
+    HORARIO_NO_FUTURO: 'A saída não pode ser num horário que ainda não chegou.',
+    REGISTRO_NAO_ENCONTRADO: 'Registro não encontrado. Recarregue a página.',
+    REGISTRO_DE_OUTRO_COLABORADOR: 'Esse registro é de outro colaborador.',
+    SOBREPOSICAO: 'Esse horário se sobrepõe a outro registro do mesmo dia.',
+    PONTOS_FORMATO_INVALIDO: 'Erro nos dados de ponto. Fale com o suporte.'
+  };
+  function _e(s){ return (typeof san==='function') ? san(s) : String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function _hoje(){ return (typeof hoje==='function') ? hoje() : new Date().toISOString().slice(0,10); }
+  function _adm(){ try { return typeof isAdm==='function' && isAdm(); } catch(e){ return false; } }
+  function _colab(id){ return (DB.colaboradores||[]).find(function(c){ return String(c.id)===String(id); }); }
+  function _hm(iso){ try { var d=new Date(iso); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); } catch(e){ return ''; } }
+
+  async function _rpc(nome, corpo){
+    try { if (typeof unidadeRenovarToken==='function' && window._unidadeSession) await unidadeRenovarToken().catch(function(){}); } catch(e){}
+    var tok = (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
+    var r, txt = '';
+    try {
+      r = await fetch(SUPA_URL + '/rest/v1/rpc/' + nome, {
+        method:'POST',
+        headers:{ 'apikey':SUPA_KEY, 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' },
+        body: JSON.stringify(corpo)
+      });
+      txt = await r.text();
+    } catch(e){ return { ok:false, erro:'Sem conexão com a nuvem. Tente de novo.' }; }
+    var j = null; try { j = JSON.parse(txt); } catch(e){}
+    if (r.ok) return { ok:true, data:j };
+    var cod = (j && (j.message||j.hint||j.details)) || txt || ('HTTP '+r.status);
+    var chave = Object.keys(MSG).find(function(k){ return String(cod).indexOf(k)>=0; });
+    return { ok:false, erro: chave ? MSG[chave] : ('Não foi possível salvar: '+String(cod).slice(0,140)) };
+  }
+
+  async function _recarregarPontos(){
+    try { if (typeof sincTabela==='function') await sincTabela('config'); } catch(e){}
+    try { if (typeof renderPage==='function') renderPage(); } catch(e){}
+  }
+
+  function _modal(){
+    var m = document.getElementById('mAjPt');
+    if (!m){
+      m = document.createElement('div'); m.className='mo'; m.id='mAjPt';
+      m.innerHTML = '<div class="md" style="max-width:560px"><div class="mh"><span class="mti" id="mAjPtT">Registros</span><button class="mc" onclick="CM(\'mAjPt\')">×</button></div><div class="mb" id="mAjPtB"></div></div>';
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+
+  function _badge(p){
+    if (!p.ajustadoManual) return '';
+    var st = p.ajusteStatus || 'pendente';
+    var cor = st==='confirmado' ? '#16a34a' : st==='contestado' ? '#dc2626' : '#b8962e';
+    var txt = st==='confirmado' ? 'Ajuste confirmado pelo colaborador' : st==='contestado' ? 'Colaborador NÃO concordou com o ajuste' : 'Ajuste aguardando confirmação do colaborador';
+    return '<div style="font-size:10px;font-weight:700;color:'+cor+';margin-top:2px">✎ '+txt+'</div>'+
+           (p.ajusteMotivo ? '<div style="font-size:10px;color:var(--text3)">Motivo: '+_e(p.ajusteMotivo)+'</div>' : '');
+  }
+
+  // ── Janela "Ver" do Ponto & RH (substitui a antiga, que só listava) ──
+  function verPtV106(cId){
+    var c = _colab(cId);
+    if (!rlsCanAccess((c && c.unidadeId) || UA.unidadeId)) { toast('Sem permissão para ver este colaborador.','error'); return; }
+    var adm = _adm();
+    var lista = rlsPontos().filter(function(p){ return String(p.colaboradorId)===String(cId); })
+      .slice().sort(function(a,b){ return String(b.entrada||'').localeCompare(String(a.entrada||'')); }).slice(0,40);
+    _modal();
+    el('mAjPtT').textContent = 'Registros — ' + ((c && c.nome) || '');
+    var h = '';
+    if (adm) h += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn bp bsm" onclick="_ajAbrirForm(\''+_e(cId)+'\')">+ Lançar horário</button></div>';
+    h += lista.length ? lista.map(function(p){
+      var aberto = !p.saida;
+      return '<div class="fi" style="align-items:flex-start">'+
+        '<div style="flex:1"><div style="font-size:12px;font-weight:600">'+_e(fD(p.data))+'</div>'+
+        '<div style="font-size:11px;color:var(--text2)">'+_e(p.entradaHora||_hm(p.entrada))+' → '+(aberto?'<span style="color:var(--success)">em serviço</span>':_e(p.saidaHora||_hm(p.saida)))+'</div>'+
+        _badge(p)+'</div>'+
+        '<div style="text-align:right;min-width:110px"><div style="font-size:12px;color:var(--accent)">'+(aberto?'—':fDur(p.duracaoMs||0))+'</div>'+
+        '<div style="font-size:12px;font-weight:700;color:var(--success)">'+(aberto?'':fM(p.valorDevido||0))+'</div>'+
+        (adm ? '<button class="btn bg bxs" style="margin-top:4px" onclick="_ajAbrirForm(\''+_e(cId)+'\',\''+_e(p.id)+'\')">Corrigir</button>' : '')+
+        '</div></div>';
+    }).join('') : '<div class="empty">Nenhum registro.</div>';
+    el('mAjPtB').innerHTML = h;
+    OM('mAjPt');
+  }
+
+  // ── Formulário de lançar / corrigir ──
+  function _ajAbrirForm(cId, registroId){
+    if (!_adm()) { toast('Só ADM pode ajustar horários.','error'); return; }
+    var p = registroId ? (DB.pontos||[]).find(function(x){ return String(x.id)===String(registroId); }) : null;
+    var colabs = (typeof rlsColaboradores==='function' ? rlsColaboradores() : (DB.colaboradores||[])).filter(function(c){ return c.ativo!==false; });
+    _modal();
+    el('mAjPtT').textContent = p ? 'Corrigir horário' : 'Lançar horário';
+    var ontem = (function(){ var d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+    el('mAjPtB').innerHTML =
+      (p ? '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Antes: '+_e(fD(p.data))+' · '+_e(p.entradaHora||_hm(p.entrada))+' → '+_e(p.saida?(p.saidaHora||_hm(p.saida)):'em serviço')+'</div>' : '')+
+      '<div class="fg"><label>Colaborador</label><select id="ajCol" '+(p?'disabled':'')+'>'+colabs.map(function(c){ return '<option value="'+_e(c.id)+'" '+(String(c.id)===String(cId)?'selected':'')+'>'+_e(c.nome)+'</option>'; }).join('')+'</select></div>'+
+      '<div class="ir"><div class="fg"><label>Dia</label><input type="date" id="ajData" max="'+_hoje()+'" value="'+_e(p?p.data:ontem)+'" '+(p?'disabled':'')+'></div>'+
+      '<div class="fg"><label>Entrada</label><input type="time" id="ajEnt" value="'+_e(p?(p.entradaHora||_hm(p.entrada)):'')+'"></div>'+
+      '<div class="fg"><label>Saída</label><input type="time" id="ajSai" value="'+_e(p&&p.saida?(p.saidaHora||_hm(p.saida)):'')+'"></div></div>'+
+      '<div class="fg"><label>Motivo do ajuste (obrigatório)</label><input type="text" id="ajMot" maxlength="200" placeholder="Ex.: esqueceu de registrar a entrada"></div>'+
+      '<div style="font-size:11px;color:var(--text3);margin:4px 0 12px">O ajuste fica gravado com seu login e não pode ser apagado. O colaborador vai confirmar ou contestar no próximo acesso pelo celular.</div>'+
+      '<div id="ajErr" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bg" onclick="verPt(\''+_e(cId)+'\')">Voltar</button><button class="btn bp" id="ajSalvar" onclick="_ajSalvar(\''+_e(registroId||'')+'\')">Salvar ajuste</button></div>';
+    OM('mAjPt');
+  }
+
+  var _salvando = false;
+  async function _ajSalvar(registroId){
+    if (_salvando) return;
+    var err = el('ajErr'); var mostra = function(t){ if(err){ err.textContent=t; err.style.display='block'; } };
+    if (err) err.style.display='none';
+    var colab = (el('ajCol')||{}).value, data = (el('ajData')||{}).value, ent = (el('ajEnt')||{}).value, sai = (el('ajSai')||{}).value, mot = ((el('ajMot')||{}).value||'').trim();
+    if (!colab) return mostra('Escolha o colaborador.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data||'')) return mostra('Escolha o dia.');
+    if (data > _hoje()) return mostra('O dia não pode ser no futuro.');
+    if (!/^\d{2}:\d{2}$/.test(ent||'') || !/^\d{2}:\d{2}$/.test(sai||'')) return mostra('Preencha a entrada e a saída.');
+    if (sai <= ent) return mostra('A saída precisa ser depois da entrada.');
+    if (mot.length < 5) return mostra('Escreva o motivo do ajuste (mínimo 5 letras).');
+    _salvando = true; var b = el('ajSalvar'); if (b){ b.disabled=true; b.textContent='Salvando…'; }
+    var corpo = { p_colab: String(colab), p_data: data, p_entrada: ent, p_saida: sai, p_motivo: mot };
+    if (registroId) corpo.p_registro_id = registroId;
+    var r = await _rpc('ponto_ajustar', corpo);
+    _salvando = false; if (b){ b.disabled=false; b.textContent='Salvar ajuste'; }
+    if (!r.ok) return mostra(r.erro);
+    try { if (typeof registrarAuditoria==='function') registrarAuditoria('PONTO_AJUSTE_MANUAL', 'Ajuste de horário '+data+' '+ent+'-'+sai+' (colaborador '+colab+'): '+mot, UA && UA.id); } catch(e){}
+    toast('✅ Ajuste salvo. Aguardando confirmação do colaborador.','success');
+    await _recarregarPontos();
+    verPtV106(colab);
+  }
+
+  window.verPt = verPtV106;
+  window._ajAbrirForm = _ajAbrirForm;
+  window._ajSalvar = _ajSalvar;
+
+  // Botão "+ Lançar horário" no topo do Ponto & RH (só ADM)
+  var _rPontoOrig = window.rPonto;
+  if (typeof _rPontoOrig === 'function') {
+    window.rPonto = function(){
+      var html = _rPontoOrig.apply(this, arguments);
+      try {
+        if (_adm() && typeof html === 'string' && html.indexOf('⏱️ Ponto & RH') >= 0) {
+          html = html.replace('<div class="br">', '<div class="br"><button class="btn bp bsm" onclick="_ajAbrirForm(\'\')">+ Lançar horário</button>');
+        }
+      } catch(e){}
+      return html;
+    };
+  }
+  console.log('🔒 [INTEGRIDADE v106] Ajuste manual de horário (ADM) com registro permanente + confirmação do colaborador ativo');
+})();
+  </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->
   <script src="keyo-00-core.js"></script>
   <script src="keyo-01-ui.js"></script>

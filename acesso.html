@@ -32,6 +32,16 @@ h2{font-size:15px;font-weight:700;color:#5b21b6;margin-bottom:12px}
 .lb{display:block;font-size:13px;font-weight:600;color:#5b4d85;margin:10px 0 6px}
 .in{width:100%;font:inherit;font-size:17px;padding:13px 14px;border:1.5px solid #e6dcfa;border-radius:12px;background:#faf8ff;color:#2a1a52;outline:none}
 .in:focus{border-color:#5b21b6;background:#fff}
+.assn{font-size:12px;color:#7a6aa3;text-align:center;margin-top:10px;line-height:1.4}
+.sig{margin-top:16px;border:1px solid #e6dcfa;background:#faf8ff;border-radius:12px;padding:12px;text-align:left}
+.sigt{font-size:11px;letter-spacing:1px;font-weight:800;color:#5b21b6;text-transform:uppercase}
+.sigc{font-size:18px;font-weight:800;letter-spacing:1px;margin-top:2px;font-variant-numeric:tabular-nums;color:#2a1a52}
+.sigd{font-size:12px;color:#5b4d85;margin-top:6px;line-height:1.45}
+.aj{border:1px solid #e6dcfa;background:#faf8ff;border-radius:12px;padding:12px;margin-bottom:10px}
+.ajd{font-weight:800;font-size:15px}
+.ajh{font-size:16px;font-weight:700;color:#5b21b6;margin-top:2px}
+.aja{font-size:12px;color:#7a6aa3;margin-top:4px}
+.ajm{font-size:13px;color:#2a1a52;margin-top:6px}
 .dica{font-size:13px;color:#7a6aa3;margin:-6px 0 10px}
 .dots{display:flex;justify-content:center;gap:12px;margin:8px 0 16px;min-height:18px}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid #5b21b6;background:#fff}
@@ -81,6 +91,7 @@ var modo='normal'; // 'normal' | 'criar1' (1º acesso: criar senha) | 'criar2' (
 var pin1='';
 var senhaPronta='';   // senha já digitada, guardada só até enviar (para a tela de contato)
 var criandoPend=false;
+var ctEmail=null, ctWhats=null; // contato digitado, guardado até concluir o envio
 var ocupado=false;
 var deslocMs=0;    // diferença entre relógio do servidor e do celular (só para exibir)
 var app=document.getElementById('app');
@@ -162,7 +173,8 @@ function telaPin(erro){
     '<h2>'+titulo+'</h2>'+dica+'<div class="dots" id="dots"></div><div class="kp">';
   ['1','2','3','4','5','6','7','8','9'].forEach(function(n){h+='<button class="k" data-k="'+n+'">'+n+'</button>';});
   h+='<button class="k x" data-k="voltar">Não sou eu</button><button class="k" data-k="0">0</button><button class="k x" data-k="apagar">Apagar</button></div>'+
-     '<button class="btn" id="bOk" disabled>'+acao+'</button>';
+     '<button class="btn" id="bOk" disabled>'+acao+'</button>'+
+     (modo==='criar1'?'':'<div class="assn">Ao registrar, você assina eletronicamente com sua senha pessoal o horário oficial do sistema.</div>');
   app.innerHTML=h;
   desenhaPin();
   Array.prototype.forEach.call(app.querySelectorAll('.k'),function(b){
@@ -205,6 +217,7 @@ function telaContato(erro){
     '<label class="lb" for="cWh">WhatsApp com DDD</label><input class="in" id="cWh" type="tel" inputmode="tel" autocomplete="tel" placeholder="(71) 99999-9999" maxlength="20">'+
     '<label class="lb" for="cEm">E-mail</label><input class="in" id="cEm" type="email" inputmode="email" autocomplete="email" placeholder="seunome@email.com" maxlength="120">'+
     '<button class="btn" id="bCt">'+(criandoPend?'Criar senha e registrar':'Registrar')+'</button>'+
+    '<div class="assn">Ao registrar, você assina eletronicamente com sua senha pessoal o horário oficial do sistema.</div>'+
     '<button class="btn sec" id="bCv">Voltar</button>';
   document.getElementById('cWh').oninput=function(){var d=this.value.replace(/\D/g,'').slice(0,11);var f=d;if(d.length>2)f='('+d.slice(0,2)+') '+d.slice(2);if(d.length>7)f='('+d.slice(0,2)+') '+d.slice(2,d.length-4)+'-'+d.slice(-4);this.value=f;};
   document.getElementById('bCv').onclick=function(){senhaPronta='';criandoPend=false;escolher(sel);};
@@ -218,19 +231,38 @@ function telaContato(erro){
     enviar(senhaPronta,criandoPend,e||null,w||null);
   };
 }
+function fData(d){var p=String(d||'').split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:String(d||'');}
+function telaAjustes(lista){
+  var h='<div class="sel"><div class="av">'+esc(ini(sel.nome))+'</div><div class="nm">'+esc(sel.nome)+'</div></div>'+
+    '<h2>A gerência ajustou seu horário</h2><div class="dica">Confira antes de registrar. Sua resposta fica assinada com sua senha.</div>';
+  lista.forEach(function(a){
+    h+='<div class="aj"><div class="ajd">'+esc(fData(a.data))+'</div>'+
+       '<div class="ajh">Entrada '+esc(a.entrada||'')+' · Saída '+esc(a.saida||'')+'</div>'+
+       (a.acao==='correcao'&&(a.antesEntrada||a.antesSaida)?'<div class="aja">Antes: '+esc(a.antesEntrada||'—')+' → '+esc(a.antesSaida||'—')+'</div>':'<div class="aja">Horário lançado pela gerência</div>')+
+       '<div class="ajm">Motivo: '+esc(a.motivo||'')+'</div></div>';
+  });
+  h+='<button class="btn" id="bAjOk">Confirmo os horários</button><button class="btn sec" id="bAjNo">Não concordo</button>';
+  app.innerHTML=h;
+  document.getElementById('bAjOk').onclick=function(){if(ocupado)return;enviar(senhaPronta,criandoPend,null,null,'confirmo');};
+  document.getElementById('bAjNo').onclick=function(){if(ocupado)return;enviar(senhaPronta,criandoPend,null,null,'contesto');};
+}
 function telaContatoErro(t){var m=document.getElementById('msg');if(m){m.textContent=t;m.className='msg err';}}
 
-function enviar(pinEnviar,criando,email,whats){
+function enviar(pinEnviar,criando,email,whats,resposta){
   ocupado=true;
-  var b=document.getElementById('bOk')||document.getElementById('bCt');if(b){b.disabled=true;b.textContent='Registrando…';}
+  var b=document.getElementById('bOk')||document.getElementById('bCt')||document.getElementById(resposta==='contesto'?'bAjNo':'bAjOk');if(b){b.disabled=true;b.textContent='Registrando…';}
   var enviado=pinEnviar;pin='';pin1='';
+  if(email)ctEmail=email; if(whats)ctWhats=whats;
   var corpo={acao:'bater',colaboradorId:sel.id,pin:enviado,criar:criando};
-  if(email)corpo.email=email; if(whats)corpo.whatsapp=whats;
+  if(ctEmail)corpo.email=ctEmail; if(ctWhats)corpo.whatsapp=ctWhats;
+  if(resposta)corpo.respostaAjustes=resposta;
   chamar(corpo).then(function(j){
-    if(!(j&&(j.erro==='EMAIL_INVALIDO'||j.erro==='WHATS_INVALIDO'||j.erro==='PRECISA_CONTATO'))){senhaPronta='';}
+    if(!(j&&(j.erro==='EMAIL_INVALIDO'||j.erro==='WHATS_INVALIDO'||j.erro==='PRECISA_CONTATO'||j.erro==='CONFIRMAR_AJUSTES'))){senhaPronta='';}
+    if(j&&(j.ok||(j.erro!=='EMAIL_INVALIDO'&&j.erro!=='WHATS_INVALIDO'&&j.erro!=='CONFIRMAR_AJUSTES'))){ctEmail=null;ctWhats=null;}
     ocupado=false;
     if(j&&j.ok){sel.temSenha=true;sel.precisaContato=false;modo='normal';try{localStorage.setItem('exit_ponto_quem',sel.id);}catch(e){}telaOk(j);return;}
     var e=j&&j.erro;
+    if(e==='CONFIRMAR_AJUSTES'){senhaPronta=enviado;criandoPend=criando;telaAjustes(j.ajustes||[]);return;}
     if(e==='PRECISA_CONTATO'){sel.precisaContato=true;senhaPronta=enviado;criandoPend=criando;telaContato('Informe o WhatsApp ou o e-mail.');return;}
     if(e==='EMAIL_INVALIDO'){senhaPronta=enviado;criandoPend=criando;telaContato('E-mail inválido.');return;}
     if(e==='WHATS_INVALIDO'){senhaPronta=enviado;criandoPend=criando;telaContato('WhatsApp inválido. Use DDD + número.');return;}
@@ -253,8 +285,10 @@ function telaOk(j){
   var saida=j.tipo==='saida';
   app.innerHTML='<div class="ok"><div class="ic">✓</div><div class="tp">'+(saida?'SAÍDA REGISTRADA':'ENTRADA REGISTRADA')+'</div>'+
     (j.senhaCriada?'<div class="ex" style="margin:0 0 6px">Senha criada. Use a mesma nas próximas vezes.</div>':'')+
+    (j.ajustesRespondidos?'<div class="ex" style="margin:0 0 6px">Sua resposta ao ajuste de horário foi registrada.</div>':'')+
     '<div class="hr">'+esc(j.hora||'')+'</div><div class="who">'+esc(j.nome||'')+'</div>'+
     (saida?'<div class="ex">Entrada às '+esc(j.entradaHora||'')+' · Tempo em serviço: '+esc(j.duracao||'')+'</div>':'<div class="ex">Bom trabalho!</div>')+
+    (j.assinatura?'<div class="sig"><div class="sigt">Assinatura eletrônica</div><div class="sigc">'+esc(j.assinatura)+'</div>'+(j.declaracao?'<div class="sigd">'+esc(j.declaracao)+'</div>':'')+'</div>':'')+
     '</div><button class="btn sec" id="bFim">Concluir</button>';
   document.getElementById('bFim').onclick=function(){
     app.innerHTML='<div class="aviso"><div class="big">Pronto!</div><p>Seu acesso está registrado. Pode fechar esta página.</p></div>';

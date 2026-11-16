@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta name="robots" content="noindex, nofollow"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>O tesouro é Sauípe</title>
+
+<style>@font-face{font-family:'Fraunces';font-style:normal;font-weight:400;font-display:swap;src:url(i/f/fraunces-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'Fraunces';font-style:normal;font-weight:600;font-display:swap;src:url(i/f/fraunces-latin-600-normal.woff2) format('woff2')}@font-face{font-family:'Fraunces';font-style:italic;font-weight:400;font-display:swap;src:url(i/f/fraunces-latin-400-italic.woff2) format('woff2')}@font-face{font-family:'Fraunces';font-style:italic;font-weight:600;font-display:swap;src:url(i/f/fraunces-latin-600-italic.woff2) format('woff2')}@font-face{font-family:'Manrope';font-style:normal;font-weight:400;font-display:swap;src:url(i/f/manrope-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'Manrope';font-style:normal;font-weight:500;font-display:swap;src:url(i/f/manrope-latin-500-normal.woff2) format('woff2')}@font-face{font-family:'Manrope';font-style:normal;font-weight:600;font-display:swap;src:url(i/f/manrope-latin-600-normal.woff2) format('woff2')}@font-face{font-family:'Manrope';font-style:normal;font-weight:700;font-display:swap;src:url(i/f/manrope-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'Manrope';font-style:normal;font-weight:800;font-display:swap;src:url(i/f/manrope-latin-800-normal.woff2) format('woff2')}</style>
+<style>/* MAPA ABERTURA */
+.mapa{height:100vh;min-height:640px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#3b1a70 0%,var(--noite) 70%);perspective:2200px}
+.sheet{position:absolute;left:50%;top:50%;width:max(100vw,136.36vh);height:max(73.33vw,100vh);transform:translate(-50%,-50%);transform-style:preserve-3d}
+.pnl{position:absolute;top:0;height:100%;width:25%;background-image:url(i/mapa.jpg);background-size:400% 100%;transform-origin:left center;transform-style:preserve-3d;backface-visibility:visible}
+.pnl:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(43,16,85,.0),rgba(43,16,85,.45));opacity:0;animation:crease 2.2s .3s both}
+.p1{left:0;background-position:0 0;box-shadow:0 40px 80px rgba(20,6,40,.6)}
+.p2{left:100%;background-position:33.333% 0}
+.p3{left:100%;background-position:66.666% 0}
+.p4{left:100%;background-position:100% 0}
+.p1{animation:sheetIn 2.4s .1s cubic-bezier(.2,.7,.2,1) both}
+.p2{animation:unf2 2.2s .3s cubic-bezier(.3,.6,.2,1) both}
+.p3{animation:unf3 2.2s .3s cubic-bezier(.3,.6,.2,1) both}
+.p4{animation:unf2 2.2s .3s cubic-bezier(.3,.6,.2,1) both}
+@keyframes sheetIn{0%{transform:translateX(150%) translateY(8%) scale(.42) rotateX(18deg) rotateZ(-6deg)}55%{transform:translateX(60%) translateY(3%) scale(.62) rotateX(8deg) rotateZ(-2deg)}100%{transform:none}}
+@keyframes unf2{0%{transform:rotateY(-176deg)}100%{transform:rotateY(0)}}
+@keyframes unf3{0%{transform:rotateY(176deg)}100%{transform:rotateY(0)}}
+@keyframes crease{0%{opacity:1}100%{opacity:.0}}
+.flat{position:absolute;inset:0;background:url(i/mapa.jpg) center/cover;opacity:0;animation:fadeIn .4s 2.55s forwards}
+@keyframes fadeIn{to{opacity:1}}
+.routes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.rt{fill:none;stroke:var(--roxo);stroke-width:7;stroke-linecap:round;stroke-dasharray:3000;stroke-dashoffset:3000}
+.r1{animation:draw 2.4s 2.9s ease-in-out forwards}.r2{animation:draw 1.4s 3.4s ease-in-out forwards}.r3{animation:draw 1s 3.8s ease-in-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.pin circle{fill:var(--creme);stroke:var(--roxo);stroke-width:6}.pin .core{fill:var(--roxo);stroke:none}
+.pin{opacity:0;animation:pop .5s forwards}.c1{animation-delay:2.75s}.c2{animation-delay:3.25s}.c3{animation-delay:3.65s}
+@keyframes pop{0%{opacity:0;transform:var(--t) scale(0)}100%{opacity:1}}
+.dest-pin{opacity:0;animation:fadeIn .5s 4.7s forwards}
+.dest-pin .dot{fill:var(--sol);stroke:var(--roxo);stroke-width:5}.dest-pin .dcore{fill:var(--roxo)}
+.ring{fill:none;stroke:var(--ouro);stroke-width:4;opacity:0;transform-origin:center;transform-box:fill-box;animation:ring 2.4s 4.8s infinite}
+.g2{animation-delay:5.6s}.g3{animation-delay:6.4s}
+@keyframes ring{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(5)}}
+.lbl{opacity:0;animation:fadeIn .6s forwards}.l1{animation-delay:3.1s}.l2{animation-delay:3.6s}.l3{animation-delay:4s}
+.lbl .city{font-family:var(--display);font-weight:600;font-size:52px;fill:var(--noite)}
+.lbl .unit{font-family:var(--body);font-weight:700;font-size:26px;letter-spacing:.06em;fill:var(--roxo)}
+.destcard{position:absolute;left:calc(50% + (1258/2400 - .5) * 100%);top:calc(50% + (1435/1760 - .5) * 100%);transform:translate(40px,-50%) scale(.8);opacity:0;background:var(--creme);border:2px solid var(--ouro);border-radius:6px;padding:12px 16px 10px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;box-shadow:0 18px 40px rgba(43,16,85,.35);animation:card .7s 5s cubic-bezier(.2,.9,.3,1.3) forwards}
+.destcard img{height:34px;width:auto}
+.destcard span{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#A87B12}
+@keyframes card{to{opacity:1;transform:translate(40px,-50%) scale(1)}}
+.mapa-txt{position:absolute;left:max(24px,5vw);bottom:9vh;max-width:min(600px,46vw);z-index:5;opacity:0;animation:fadeUp 1s 5.4s forwards}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.mapa-txt .eyebrow{color:#7A4FD0}
+.mapa-txt h1{font-size:clamp(40px,4.8vw,78px);color:var(--noite);margin:14px 0 18px}
+.mapa-txt h1 em.sol{color:var(--roxo);font-style:italic}
+.mapa-txt .lead{color:#3A2560;font-weight:500}
+.mapa-cta{display:flex;align-items:center;gap:22px;margin-top:22px;flex-wrap:wrap}
+.mapa-txt .scroll{color:var(--noite);margin-top:0}
+.mapa-txt .scroll i{background:linear-gradient(var(--roxo),transparent)}
+.replay{font:600 13px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--roxo);background:transparent;border:1.5px solid var(--roxo);border-radius:30px;padding:9px 16px;cursor:pointer}
+.replay:hover{background:var(--roxo);color:var(--creme)}
+.replay:focus-visible{outline:2px solid var(--sol);outline-offset:3px}
+@media (max-width:900px){.mapa-txt{max-width:88vw}.lbl .unit{display:none}}
+@media (prefers-reduced-motion:reduce){.pnl,.pnl:after,.flat,.rt,.pin,.dest-pin,.lbl,.destcard,.mapa-txt{animation:none!important}.flat,.pin,.dest-pin,.lbl,.destcard,.mapa-txt{opacity:1}.rt{stroke-dashoffset:0}.pnl{transform:none}}
+
+
+:root{--noite:#3A1A78;--roxo:#4B1F8C;--violeta:#7A4FD0;--sol:#F7B928;--ouro:#C8961A;--ouro2:#9A6F0C;--creme:#FFF8EA;--areia:#FFF3DC;--ceu:#E6F5FB;--tinta:#33176E;
+ --lar:#C08A12;--ver:#029639;--azu:#17A3DD;--vsa:#164734;
+ --display:"Fraunces",Georgia,serif;--body:"Manrope",system-ui,sans-serif;color-scheme:light}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#fff;color:var(--tinta);font-family:var(--body);font-size:18px;line-height:1.6;overflow-x:hidden}
+img,video{display:block;max-width:100%}
+[hidden]{display:none!important}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.05;text-wrap:balance;letter-spacing:-.01em;color:var(--tinta)}
+h2{font-size:clamp(34px,4.6vw,66px)}h2 em{font-style:italic;color:var(--lar)}
+h3{font-size:clamp(24px,2.4vw,34px)}
+.eyebrow{font-weight:800;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--ouro2)}
+.wrap{width:min(1180px,100% - 48px);margin:0 auto}
+.lead{font-size:clamp(18px,1.5vw,21px);color:#4A3585;max-width:62ch;margin-top:14px}
+.ad{display:inline-block;background:#FFE9A8;color:#6B4A00;font-weight:700;border-radius:4px;padding:1px 8px;font-size:.9em}
+.btn{display:inline-block;font:700 16px var(--body);letter-spacing:.04em;background:var(--sol);color:var(--tinta);border:0;border-radius:40px;padding:16px 30px;cursor:pointer;text-decoration:none;box-shadow:0 10px 26px rgba(200,150,26,.4);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(200,150,26,.5)}
+.btn:focus-visible,.op:focus-visible,.hb:focus-visible{outline:3px solid var(--roxo);outline-offset:3px}
+.btn[disabled]{background:#E9E2D2;color:#9A917C;box-shadow:none;cursor:not-allowed;transform:none}
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:flex-end;padding:12px 22px;gap:16px;pointer-events:none}
+.nav>*{pointer-events:auto}
+.brands{display:flex;align-items:stretch;border-radius:6px;overflow:hidden;box-shadow:0 6px 22px rgba(58,26,120,.22)}
+.brands .b{display:flex;align-items:center;padding:10px 20px}
+.brands .b.ex{background:#5B2BB0;border-right:2px solid var(--sol)}
+.brands .b.sa{background:#fff}
+.brands img{height:32px;width:auto}
+.hud{display:flex;gap:6px;background:#fff;border-radius:40px;padding:7px 10px;box-shadow:0 6px 22px rgba(58,26,120,.22)}
+.hud span{width:34px;height:34px;border-radius:50%;border:2px dashed #CFC3E8;display:grid;place-items:center;font:700 17px var(--display);color:transparent;transition:all .5s}
+.hud span.on{background:var(--sol);border:2px solid var(--ouro);color:var(--tinta);transform:scale(1.08)}
+/* ABERTURA */
+.abre{position:relative;height:100vh;min-height:360px;overflow:hidden;display:flex;align-items:flex-end}
+.abre .bg{position:absolute;inset:0;background-size:cover;background-position:center 60%;transition:opacity 1.4s ease,transform 6s ease}
+.abre video.b1{width:100%;height:100%;object-fit:cover;object-position:50% 60%}.abre .b2{background-image:url(i/g_dia2.jpg);opacity:0;transform:scale(1.06)}
+.abre.open .b1{opacity:0}.abre.open .b2{opacity:1;transform:none}
+.abre .tx{position:relative;z-index:2;margin:0 auto 9vh;width:min(1180px,100% - 48px)}
+
+.abre .tx{display:flex;justify-content:flex-end}
+.abre .card{background:rgba(255,255,255,.93);backdrop-filter:blur(6px);border-radius:14px;padding:30px 34px;max-width:620px;box-shadow:0 20px 50px rgba(30,60,90,.25)}
+.abre h1{font-size:clamp(44px,5.6vw,84px);margin:10px 0 14px}.abre h1 em{font-style:italic;color:var(--lar)}
+.abre .lead{margin:0 0 22px}
+.abre{align-items:flex-start}
+.abre .tx{margin:max(74px,9vh) auto 0;transition:opacity .6s}
+@media(orientation:landscape){.abre .card{max-width:min(520px,40vw);padding:22px 26px}.abre h1{font-size:clamp(34px,3.9vw,58px);margin:8px 0 10px}}
+@media(orientation:landscape) and (max-height:650px){.abre .tx{margin-top:64px}.abre .card{max-width:min(400px,36vw);padding:16px 20px}.abre .card .eyebrow{font-size:11px}.abre h1{font-size:clamp(28px,3.4vw,40px);margin:6px 0 8px}.abre .card .lead{font-size:14px;margin:0}.abre .ler{margin-top:10px!important;padding:7px 14px!important}}
+@media(max-width:860px) and (orientation:portrait){.abre .card{padding:16px 18px}.abre h1{font-size:34px;margin:6px 0 8px}.abre .card .lead{font-size:14px;margin:0}.abre .ler{margin-top:10px!important}}
+html{overflow-x:clip}.uniao{overflow:visible}
+.abre.open .tx{opacity:0;pointer-events:none}
+.abre.zoom .b2{transition:transform 1s ease-in,opacity 1s ease-in;transform:scale(3);opacity:0}
+.ler{background:none;border:0;font:600 14px var(--body);color:var(--roxo);text-decoration:underline;cursor:pointer;padding:0}
+.key{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;position:relative;transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rot,0deg)) scale(var(--sc,1));filter:drop-shadow(0 6px 6px rgba(60,40,10,.28))}
+.key img{height:130px;width:auto;pointer-events:none}
+.key span{font:700 16px var(--body);background:#fff;border:2px solid var(--roxo);border-radius:30px;padding:6px 16px;color:var(--tinta);white-space:nowrap}
+.key:hover{--sc:1.05}.key:focus-visible{outline:3px solid var(--roxo);outline-offset:6px;border-radius:10px}
+.key.drag{cursor:grabbing;z-index:80;--sc:1.12;filter:drop-shadow(0 18px 16px rgba(60,40,10,.35))}
+.key.anim{transition:transform .5s cubic-bezier(.3,.7,.2,1),opacity .4s}
+.key.foi{opacity:0;pointer-events:none}
+.key.errada{pointer-events:none;opacity:.35}.key.errada span{border-color:#C9BEDF;text-decoration:line-through}
+.solfix{width:clamp(46px,4.6vw,64px);height:auto;margin-right:auto;box-sizing:border-box;padding:7px;background:#fff;border-radius:50%;box-shadow:0 6px 22px rgba(58,26,120,.22);opacity:0;transform:scale(.4);transition:opacity .8s,transform .8s;animation:solgira 50s linear infinite}body.jogo .solfix{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.solfix{animation:none}}
+.abre.open .sol{left:46vw!important;top:3vh!important;width:clamp(70px,8vw,120px)!important}.sol{transition:left 1.2s ease,top 1.2s ease,width 1.2s ease}
+.sol{position:absolute;z-index:2;left:34vw;top:11vh;width:clamp(84px,9vw,150px);border-radius:50%;filter:drop-shadow(0 0 26px rgba(255,236,170,.95)) drop-shadow(0 0 70px rgba(255,210,90,.8));animation:solgira 50s linear infinite;pointer-events:none}@keyframes solgira{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.sol{animation:none}}
+.bur{position:absolute;z-index:6;--rot:-26deg;transform-origin:50% 28%;filter:drop-shadow(0 3px 3px rgba(60,40,10,.3))}
+.bur img{height:var(--kh,190px);-webkit-mask-image:linear-gradient(to bottom,#000 20%,transparent 31%);mask-image:linear-gradient(to bottom,#000 20%,transparent 31%)}
+.bur.drag img,.bur.anim img{-webkit-mask-image:none;mask-image:none}
+.bur:not(.drag):not(.anim){animation:acena 3.2s ease-in-out 1.5s infinite}
+@keyframes acena{0%,84%,100%{--rot:-26deg}88%{--rot:-20deg}92%{--rot:-31deg}96%{--rot:-23deg}}
+@property --rot{syntax:'<angle>';inherits:true;initial-value:0deg}
+.abre.open .bur{display:none}
+.mapahot{position:absolute;z-index:6;background:none;border:3px solid rgba(255,226,130,.95);box-shadow:0 0 34px 10px rgba(255,214,90,.65),inset 0 0 34px rgba(255,214,90,.35);border-radius:50%;cursor:pointer;animation:pulsa 1.8s ease-in-out infinite}
+@keyframes pulsa{0%,100%{transform:scale(.94);opacity:.55}50%{transform:scale(1.04);opacity:1}}
+.mapahot:focus-visible{outline:3px solid var(--roxo)}
+.mapa .mapa-txt{left:auto;right:4vw;bottom:auto;top:15vh;max-width:min(420px,40vw);animation:fadeUp .8s 2.7s forwards}
+.mapa-txt h1{font-size:clamp(28px,3vw,46px)!important;margin:10px 0 12px!important}
+.mfb{min-height:26px;margin-top:12px;font-weight:700;color:var(--lar)}
+.routes .uf{pointer-events:auto;cursor:pointer;opacity:0;animation:fadeIn .6s 2.9s forwards}
+.uf circle{fill:rgba(255,255,255,.55);stroke:#fff;stroke-width:5;transition:all .3s;filter:drop-shadow(0 3px 6px rgba(40,30,10,.35))}.uf circle.hit{fill:transparent;stroke:none;filter:none}.uf path.area{fill:rgba(255,255,255,0);stroke:none;transition:fill .25s}.uf:hover path.area{fill:rgba(255,255,255,.18)}.uf.no path.area,.uf.meio path.area{fill:rgba(255,255,255,0)}.uf.ok path.area{fill:rgba(245,185,30,.22)}.uf circle.cc{fill:var(--roxo);stroke:none}.uf:not(.ok):not(.no):not(.meio) circle:not(.hit):not(.cc){animation:ufp 2.4s ease-in-out infinite}@keyframes ufp{0%,100%{r:30px}50%{r:36px}}
+.uf text{font:700 27px var(--body);text-anchor:middle;fill:var(--tinta)}
+.uf:hover circle:not(.hit):not(.cc),.uf:focus-visible circle:not(.hit):not(.cc){fill:#fff}.uf:focus{outline:none}
+.uf.ok circle:not(.hit):not(.cc){fill:var(--sol);stroke:#fff}.uf.ok circle.cc{fill:#fff}
+.uf.meio circle:not(.hit):not(.cc){fill:#FFF3C9;stroke:var(--ouro)}.uf.meio circle.cc{fill:var(--ouro)}.uf.meio{pointer-events:none}
+.uf.no{pointer-events:none}.uf.no circle:not(.hit):not(.cc){fill:rgba(255,255,255,.3);stroke:rgba(255,255,255,.6)}.uf.no circle.cc{fill:#B9ADD6}.uf.no text{fill:#A79BC4}
+.mapa.tere .uf{transition:opacity .8s;opacity:0!important;pointer-events:none;animation:none}
+.mapa .pin,.mapa .lbl{animation:none;opacity:0}
+.mapa .pin.on,.mapa .lbl.on{animation:fadeIn .6s forwards}
+.tglow .ring{animation:none;opacity:0;stroke:var(--lar);stroke-width:6}
+.mapa.tere .tglow .ring{animation:ring 2s infinite}.mapa.tere .tglow .g2{animation-delay:.9s}
+.mapa.tere .c1 circle{fill:var(--sol);stroke:var(--lar)}.mapa.tere .l1 .city{fill:var(--lar)}
+.mapa:not(.fase2) .rt,.mapa:not(.fase2) .dest-pin,.mapa:not(.fase2) .dest-pin .ring,.mapa:not(.fase2) .destcard{animation:none!important;opacity:0}
+.mapa.fase2 .r1{animation:draw 2s .2s ease-in-out forwards}.mapa.fase2 .r2{animation:draw 1.2s .7s ease-in-out forwards}.mapa.fase2 .r3{animation:draw 1s 1s ease-in-out forwards}
+.mapa.fase2 .dest-pin{animation:fadeIn .5s 1.9s forwards}.mapa.fase2 .dest-pin .ring{animation:ring 2.4s 2s infinite}.mapa.fase2 .dest-pin .g2{animation-delay:2.8s}.mapa.fase2 .dest-pin .g3{animation-delay:3.6s}
+.mapa.fase2 .destcard{animation:card .6s 2.2s forwards}
+.gcena{position:absolute;inset:0;z-index:6;overflow:hidden;opacity:0;animation:gin 1.2s ease forwards}
+@keyframes gin{to{opacity:1}}
+.gfundo{position:absolute;inset:-30px;background:url(i/g_gar_ini.jpg) center/cover;filter:blur(18px) saturate(1.1)}
+.gbox{position:absolute}.gbox video,.gbox .gsem{position:absolute;inset:0;width:100%;height:100%;display:block}
+.gbox .gsem{opacity:0}.gcena.fim .gbox .gsem{opacity:1}.gcena.fim .gbox video{visibility:hidden}
+.gcena .tg{z-index:3}
+.rolha{position:absolute;left:69.55%;top:50.28%;width:6.54%;padding:18px;margin:-18px;box-sizing:content-box;height:auto;transform:translate(var(--dx,0px),var(--dy,0px)) rotate(var(--rr,0deg));transform-origin:30% 50%;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;opacity:0;pointer-events:none}
+.gcena.fim .rolha{opacity:1;pointer-events:auto;animation:puxe 2.4s ease-in-out .8s infinite}
+.rolha:before{content:''}
+.gdica{position:absolute;left:73%;top:calc(50.28% - 64px);transform:translateX(-50%);background:#fff;color:var(--tinta);font:700 15px var(--body);padding:8px 16px;border-radius:30px;box-shadow:0 8px 22px rgba(60,40,10,.25);white-space:nowrap;opacity:0;transition:opacity .6s .6s;pointer-events:none}
+.gdica:after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:#fff}
+.gcena.fim .gdica{opacity:1}@media(orientation:portrait){.gdica{transform:translateX(-78%)}.gdica:after{left:78%}}.gcena.aberta .gdica{opacity:0;transition-delay:0s}
+@keyframes puxe{0%,70%,100%{margin-left:0}80%{margin-left:7px}90%{margin-left:0}95%{margin-left:5px}}
+.gcena .rolha.drag{cursor:grabbing;animation:none}.rolha:focus-visible{outline:3px solid var(--roxo);outline-offset:4px}
+.gcena .rolha.fora{animation:none;transition:transform .7s cubic-bezier(.3,.6,.4,1),opacity .7s;opacity:0}
+.garbtn{display:flex;align-items:center;gap:16px;margin-top:18px;background:#fff;border:2px solid var(--sol);border-radius:60px;padding:8px 22px 8px 8px;cursor:pointer;font:700 17px var(--body);color:var(--tinta);text-align:left;animation:entra .8s both;box-shadow:0 10px 26px rgba(200,150,26,.35)}
+.garbtn i{width:74px;height:74px;border-radius:50%;background:url(i/g_garrafa.jpg) 47% 71%/420% auto;flex:none;animation:pulsa 1.8s ease-in-out infinite}
+.garbtn small{display:block;font-weight:600;font-size:13px;color:#6B5A9C}
+.gar{position:relative;width:min(1380px,100% - 24px);margin:0 auto 34px;border-radius:18px;overflow:hidden;aspect-ratio:16/9}
+.gar img{width:100%;height:100%;object-fit:cover}
+.garhot{position:absolute;left:1%;top:40%;width:60%;height:38%;background:none;border:3px solid rgba(255,226,130,.95);box-shadow:0 0 34px 10px rgba(255,214,90,.65),inset 0 0 34px rgba(255,214,90,.3);border-radius:50%;cursor:pointer;animation:pulsa 1.8s ease-in-out infinite}
+.conteudo .perg{animation:desenrola 1.1s .2s cubic-bezier(.2,.7,.2,1) both;transform-origin:top center}
+@keyframes desenrola{from{transform:scaleY(.04);opacity:.4}to{transform:none;opacity:1}}
+.perg{background:#FFF9EC;border:1px solid #EAD9AE;border-radius:18px;padding:40px 44px;box-shadow:0 18px 50px rgba(120,90,30,.16)}
+.gate.mini{grid-template-columns:minmax(120px,190px) 1fr;gap:30px;padding:22px;margin-bottom:22px}.gate.mini h3{font-size:clamp(21px,2.1vw,30px);margin:8px 0 18px}.gate.mini .key img{height:96px}
+.filo{margin-top:30px;padding:26px 30px;border-radius:14px;background:#fff;border-left:6px solid var(--sol)}.filo h3{font:600 clamp(24px,2.6vw,36px)/1.15 var(--display);margin:0;max-width:30ch}.filo p{font-weight:600;max-width:60ch;margin:0}
+.resp img{width:150px;height:120px;object-fit:cover;border-radius:10px;align-self:center}
+.resp{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;background:var(--sol);border-radius:14px;padding:20px 26px;margin-bottom:22px;animation:entra .7s both}.resp b{font:600 clamp(26px,2.8vw,40px) var(--display)}.resp span{font-weight:600;flex:1;min-width:240px}
+.perg{margin-top:34px}
+.rota{list-style:none;margin-top:30px;display:grid;grid-template-columns:repeat(3,1fr);gap:0 28px;counter-reset:r}
+.rota li{position:relative;padding:18px 0 18px 46px;border-top:1px dashed #D9C48E;counter-increment:r}
+.rota li:before{content:counter(r);position:absolute;left:0;top:16px;width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--ouro);display:grid;place-items:center;font:700 15px var(--body);color:var(--tinta)}
+.rota b{display:block;font:600 22px var(--display)}.rota span{display:block;font-size:16px;color:#4A3585;margin-top:2px}
+.rota li{padding-right:44px}.rota .mais{position:absolute;right:0;top:16px;width:32px;height:32px;border-radius:50%;border:0;background:var(--sol);color:var(--tinta);font:700 22px/1 var(--body);cursor:pointer;transition:transform .25s}.rota .mais:hover{transform:scale(1.1)}.rota .mais[aria-expanded=true]{transform:rotate(45deg)}.rota .mais:focus-visible{outline:3px solid var(--tinta);outline-offset:2px}.rota .det{margin-top:10px;padding:12px 14px;background:#fff;border-radius:10px;color:var(--tinta);font-weight:600;animation:entra .4s both}
+.tlh{margin:30px 0 0;font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:#8A6A12;display:flex;align-items:center;gap:14px}.tlh:after{content:"";flex:1;height:1px;background:#E4D3A4}.tlh.fut{color:var(--lar);margin-top:34px}
+.rota.tl{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:0 20px;position:relative;margin-top:22px}
+.rota.tl:before{content:"";position:absolute;left:16px;right:16px;top:15px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--ouro),var(--sol))}
+.rota.tl.tlf:before{background:repeating-linear-gradient(90deg,var(--lar) 0 12px,transparent 12px 20px)}
+.rota.tl li{border-top:0;padding:48px 0 8px 0}.rota.tl li:before{top:0}.rota.tl .mais{position:static;display:block;margin-top:10px;width:30px;height:30px;font-size:20px}.rota.tl b{font-size:19px;line-height:1.2}.rota.tl span{font-size:15px}
+@media(max-width:1000px){.rota.tl{grid-template-columns:1fr}.rota.tl:before{left:15px;right:auto;top:6px;bottom:6px;width:3px;height:auto}.rota.tl.tlf:before{background:repeating-linear-gradient(180deg,var(--lar) 0 12px,transparent 12px 20px)}.rota.tl li{padding:2px 0 22px 50px}.rota.tl li:before{top:0}}
+.rota .hoje:before{background:var(--sol)}.rota .fut:before{background:var(--lar);border-color:var(--lar);color:#fff}.rota .fut b{color:var(--lar)}
+.destcard{cursor:pointer}.destcard:focus-visible{outline:3px solid var(--roxo);outline-offset:4px}
+.inst{font-size:16px;color:#5A4690;margin:-8px 0 22px}
+.keys{display:flex;flex-wrap:wrap;gap:34px}
+.gimg.alvo-on{outline:4px dashed var(--sol);outline-offset:6px;border-radius:14px}
+.fbau{margin-top:10px}.fbau img{height:min(70vh,640px);object-position:center 80%}
+.mestra{position:absolute;right:12%;bottom:16%;z-index:5;--rot:18deg}.bleed .mestra img{height:170px;width:auto;object-fit:contain}.mestra span{border-color:var(--ouro);background:var(--sol)}
+.fbau.alvo-on{outline:4px dashed var(--sol);outline-offset:6px}
+.mapa{background:radial-gradient(ellipse at 50% 40%,#FFF3DC 0%,#EBD9B4 80%)!important}.mapa{min-height:400px!important}
+.pnl:after{background:linear-gradient(90deg,rgba(120,90,40,0),rgba(120,90,40,.35))!important}
+.p1{box-shadow:0 40px 80px rgba(90,70,30,.35)!important}
+.mapa-txt{background:rgba(255,255,255,.9);padding:24px 28px;border-radius:14px}
+/* CAPITULOS */
+.cap{padding:110px 0 100px;position:relative}
+.cap.areia{background:var(--areia)}.cap.ceu{background:var(--ceu)}.cap.branco{background:#fff}
+.gsol{position:absolute;top:18px;right:20px;width:clamp(52px,6vw,88px);height:auto;filter:drop-shadow(0 0 16px rgba(255,214,90,.85));animation:solgira 50s linear infinite;pointer-events:none;z-index:1}.gate.mini .gsol{width:clamp(40px,4.2vw,60px);top:14px;right:16px}.fbau .gsol{top:8%;right:6%;width:clamp(64px,8vw,120px)!important;height:auto!important;filter:drop-shadow(0 0 26px rgba(255,236,170,.95)) drop-shadow(0 0 60px rgba(255,210,90,.8))}@media(prefers-reduced-motion:reduce){.gsol{animation:none}}
+.gate{position:relative;display:grid;grid-template-columns:minmax(200px,340px) 1fr;gap:44px;align-items:center;background:#fff;border-radius:18px;padding:30px;box-shadow:0 18px 50px rgba(58,26,120,.12);border:1px solid #EEE6FA}
+.gimg img{border-radius:12px;aspect-ratio:1;object-fit:cover;width:100%}
+.gate h3{font-size:clamp(26px,3vw,42px);margin:10px 0 22px}
+.ops{display:flex;flex-wrap:wrap;gap:12px}
+.op{font:700 18px var(--body);color:var(--tinta);background:#fff;border:2px solid var(--roxo);border-radius:40px;padding:13px 26px;cursor:pointer;transition:background .2s,transform .2s}
+.op:hover{background:#F3ECFF;transform:translateY(-2px)}
+.op.no{animation:shake .4s;border-color:#C9BEDF;color:#A79BC4;background:#F7F4FB}
+.op.yes{background:var(--sol);border-color:var(--ouro)}
+@keyframes shake{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.hint{margin-top:18px;font-size:16px;color:#5A4690}
+.hb{background:none;border:0;font:600 15px var(--body);color:var(--roxo);text-decoration:underline;cursor:pointer}
+.gate.sai{animation:sai .6s forwards}@keyframes sai{to{opacity:0;transform:scale(.96)}}
+.aberto{display:flex;align-items:center;gap:16px;background:#fff;border-radius:60px;padding:10px 26px 10px 10px;width:max-content;max-width:100%;box-shadow:0 10px 30px rgba(58,26,120,.12);font-weight:600;animation:entra .7s both}
+.aberto .lt{width:48px;height:48px;border-radius:50%;background:var(--sol);border:2px solid var(--ouro);display:grid;place-items:center;font:700 24px var(--display)}
+.conteudo{animation:entra 1s .2s both;margin-top:54px}
+.conteudo>.wrap:first-child,.conteudo>.bleed:first-child{margin-top:0}
+@keyframes entra{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+.bleed{position:relative;width:min(1380px,100% - 24px);margin:0 auto 54px;border-radius:18px;overflow:hidden}
+.bleed img{width:100%;height:min(74vh,720px);object-fit:cover}
+.bleed.alto img,.bleed.alto video{height:min(86vh,820px)}.bleed video{display:block;width:100%;height:min(74vh,720px);object-fit:cover}
+.bleed.curto{margin-bottom:34px}.bleed.curto img{height:min(46vh,430px)}
+.bleed .bx{position:absolute;left:28px;bottom:28px;background:rgba(255,255,255,.94);border-radius:14px;padding:24px 28px;max-width:min(680px,calc(100% - 56px));box-shadow:0 14px 40px rgba(30,40,80,.25)}
+.bleed .bx h2{margin-top:8px}
+.tg{position:absolute;left:12px;top:12px;z-index:2;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;background:rgba(255,255,255,.92);color:var(--tinta);padding:5px 10px;border-radius:4px}
+.tg.r{left:auto;right:12px}
+.tgi{font:800 11px var(--body);letter-spacing:.12em;text-transform:uppercase;background:#F3ECFF;color:var(--roxo);padding:5px 10px;border-radius:4px;vertical-align:middle;margin-left:10px;white-space:nowrap}
+.ph{position:relative;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 10px 30px rgba(58,26,120,.12)}
+.ph img,.ph video{width:100%;aspect-ratio:16/10;object-fit:cover}
+.ph.alto img{aspect-ratio:4/5}
+.ph figcaption{padding:12px 16px;font-size:15px;font-weight:600;color:#3F2A7A}
+.parc{margin-top:64px;background:#fff;border-radius:18px;padding:34px 34px 26px;box-shadow:0 10px 34px rgba(60,40,120,.10)}.parc-h{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;border-bottom:1px solid #E4DAF5;padding-bottom:18px}.parc-h h3{margin:6px 0 0}.parc-n{text-align:right}.parc-n b{display:block;font:700 40px/1 Fraunces,serif;color:#3B1C7A}.parc-n span{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#6B5A9C}.parc-g{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;margin-top:20px}.parc-g img{width:calc((100% - 80px)/9);height:auto;display:block}@media(max-width:1000px){.parc-g img{width:calc((100% - 50px)/6)}}@media(max-width:560px){.parc{padding:22px 16px}.parc-g img{width:calc((100% - 20px)/3)}.parc-n b{font-size:30px}}
+.bsom{pointer-events:auto;width:44px;height:44px;border-radius:50%;border:0;background:#fff;box-shadow:0 6px 22px rgba(58,26,120,.22);display:grid;place-items:center;cursor:pointer}.bsom svg{width:22px;height:22px;fill:none;stroke:var(--roxo);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.bsom svg path:first-child{fill:var(--roxo)}.bsom .w{display:none}.bsom.on .w{display:block}.bsom.on .x{display:none}
+.hud span.on{cursor:pointer}.hud{pointer-events:auto}
+.dica{position:absolute;z-index:7;pointer-events:none;opacity:0;transition:opacity .6s;display:flex;flex-direction:column;align-items:flex-start;gap:8px}.dica.on{opacity:1}
+.dica b{background:rgba(255,255,255,.95);color:var(--tinta);font:700 15px var(--body);padding:9px 16px;border-radius:30px;box-shadow:0 8px 24px rgba(40,30,80,.25);white-space:nowrap;transform:translate(-30%,-100%)}
+.dica .fant{position:absolute;left:60px;top:0;width:0;height:0}.dica .fant img{position:absolute;height:90px;transform:translate(-50%,-30%) rotate(-26deg);opacity:0;filter:drop-shadow(0 0 12px rgba(255,214,90,.9))}
+.dica.on .fant img{animation:fant 2.6s ease-in-out .3s infinite}
+@keyframes fant{0%{opacity:0;transform:translate(-50%,-30%) rotate(-26deg)}15%{opacity:.9}70%{opacity:.9;transform:translate(calc(-50% + var(--gx,-300px)),calc(-30% + var(--gy,-150px))) rotate(-10deg)}85%,100%{opacity:0;transform:translate(calc(-50% + var(--gx,-300px)),calc(-30% + var(--gy,-150px))) rotate(-10deg)}}
+.ler{background:#fff!important;border:2px solid var(--roxo)!important;text-decoration:none!important;padding:9px 18px!important;border-radius:30px;margin-top:14px;font-weight:700!important}.ler:hover{background:var(--roxo)!important;color:#fff!important}
+.segw{display:flex;justify-content:center;margin-top:40px;margin-bottom:10px}.seg{border:0;background:var(--roxo);color:#fff;font:700 16px var(--body);padding:14px 28px;border-radius:40px;cursor:pointer;box-shadow:0 10px 26px rgba(58,26,120,.28)}.seg span{display:inline-block;animation:desce 1.6s ease-in-out infinite}.seg:hover{background:#4a1f9a}
+@keyframes desce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+#c6 .segw{display:none}
+.tour{margin-top:-20px}@media(max-width:860px) and (orientation:portrait){.dica b{transform:translate(-62%,-100%);font-size:13px}}.g2.pf{grid-template-columns:1fr;max-width:760px;margin:20px auto 0}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:22px}
+.galw{margin-top:26px}.galh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}.galh b{font:600 22px var(--display);color:var(--tinta)}.galn{margin-left:auto;font-size:13px;font-weight:700;color:#6A55A8}
+.gal{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 4px 16px;scrollbar-color:var(--sol) transparent}.gal .ph{flex:0 0 auto;width:min(340px,72vw);scroll-snap-align:start;margin:0}.gal .ph img{aspect-ratio:4/3}
+.ph img,.evt img{cursor:zoom-in}.galb{border:0;border-radius:50%;width:38px;height:38px;background:var(--sol);color:var(--tinta);font:700 22px/1 var(--body);cursor:pointer}.galb:focus-visible{outline:3px solid var(--tinta);outline-offset:2px}
+.lb{position:fixed;inset:0;z-index:90;background:rgba(255,247,232,.97);display:grid;grid-template-rows:1fr auto;place-items:center;padding:3vh 6vw 2vh}.lb[hidden]{display:none}
+.lb img{max-width:100%;max-height:82vh;border-radius:12px;box-shadow:0 24px 70px rgba(58,26,120,.28);object-fit:contain}
+.lb p{margin:14px 0 0;font:600 18px var(--body);color:var(--tinta);text-align:center}
+.lb button{position:absolute;border:0;border-radius:50%;width:52px;height:52px;background:var(--sol);color:var(--tinta);font:700 26px/1 var(--body);cursor:pointer}.lb button:focus-visible{outline:3px solid var(--tinta);outline-offset:2px}
+.lb .lx{top:18px;right:18px}.lb .lp{left:18px;top:50%;transform:translateY(-50%)}.lb .ln{right:18px;top:50%;transform:translateY(-50%)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px}
+.g2.mini .ph.alto img{aspect-ratio:3/4}
+.evt{margin:0;background:#fff;border-radius:14px;padding:10px;box-shadow:0 14px 40px rgba(60,30,120,.14)}.evt img{display:block;width:100%;height:auto;border-radius:8px}.evt figcaption{font-size:13px;font-weight:600;padding:10px 6px 2px;color:#4A3585}.g2.peq{gap:14px;margin-top:14px}.g2.peq .ph img{aspect-ratio:4/3;object-fit:cover}.g2.peq .ph figcaption{font-size:13px;padding:8px 12px}
+.sub{margin:64px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.chips span{background:#fff;border-radius:12px;padding:14px 20px;font-size:15px;font-weight:600;color:#4A3585;box-shadow:0 6px 18px rgba(58,26,120,.1);display:flex;flex-direction:column;min-width:130px}
+.chips b{font:600 30px var(--display);color:var(--tinta);line-height:1.1}
+.chips.big b{font-size:clamp(44px,5vw,72px);color:var(--lar)}
+.chips.big span{flex:1;min-width:220px;padding:22px 26px}
+.chips.sau span:nth-child(1) b{color:var(--lar)}.chips.sau span:nth-child(2) b{color:var(--azu)}.chips.sau span:nth-child(3) b{color:var(--ver)}
+.fonte{font-size:14px;color:#6B5A9C;margin-top:16px}
+.linha{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:3px solid var(--sol);margin-top:10px}
+.linha div{padding:22px 22px 0 0;position:relative}
+.linha div:before{content:"";position:absolute;top:-10px;left:0;width:17px;height:17px;border-radius:50%;background:#fff;border:3px solid var(--ouro)}
+.linha .on:before{background:var(--lar);border-color:var(--lar)}
+.linha b{display:block;font:600 clamp(34px,3.6vw,54px) var(--display);line-height:1}
+.linha .on b{color:var(--lar)}
+.linha span{display:block;margin-top:8px;font-size:17px;color:#4A3585}
+.frase{font:italic 400 clamp(22px,2.3vw,32px)/1.35 var(--display);margin-top:54px;max-width:30ch;color:var(--tinta)}
+.duas{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
+.lg{height:64px;margin:20px 0 26px}
+.tec{display:grid;grid-template-columns:.9fr 1.1fr;gap:44px;align-items:center;margin-top:64px;background:#fff;border-radius:18px;padding:26px;box-shadow:0 14px 40px rgba(58,26,120,.12)}
+.tec .ph{box-shadow:none}
+.crono{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.crono.c5{grid-template-columns:repeat(5,1fr);gap:12px}.crono.c5 div{padding:18px}.crono.c5 b{font-size:clamp(22px,2vw,30px)}.crono em{display:block;font:800 15px var(--body);font-style:normal;color:#5B2BB0;margin-top:6px}@media(max-width:860px){.crono.c5{grid-template-columns:1fr 1fr}.crono.c5 div:first-child{grid-column:1/-1}}
+.crono div{background:var(--areia);border-radius:14px;padding:24px;border-top:5px solid var(--sol)}
+.crono .on{border-top-color:var(--lar)}
+.crono b{display:block;font:600 clamp(24px,2.5vw,36px) var(--display)}.crono span{display:block;margin-top:8px;color:#4A3585}
+.quem{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px}
+.q{border-radius:16px;padding:30px;background:#fff;box-shadow:0 12px 34px rgba(58,26,120,.12)}
+.q.sau{border-top:6px solid var(--sol)}.q.sau .eyebrow{color:#8A6510}.q.ex{border-top:6px solid #5B2BB0}
+.q h3{margin:8px 0 14px;font-size:clamp(30px,3.2vw,46px)}
+.q ul,.vant{list-style:none}.q li{padding:11px 0;border-bottom:1px solid #EEE6FA;font-weight:600}
+.prod{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:start;margin-top:34px}
+.pt{background:#fff;border-radius:18px;padding:32px;box-shadow:0 14px 40px rgba(58,26,120,.12);border-top:6px solid var(--lar)}
+.pt h3{font-size:clamp(32px,3.6vw,52px);margin:8px 0 12px}
+.fmt{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+.fmt div{background:var(--ceu);border-radius:12px;padding:18px}.fmt b{display:block;font:600 22px var(--display)}.fmt span{font-size:15px;color:#4A3585}
+.enredo{font:italic 400 clamp(21px,2.1vw,30px)/1.45 var(--display);max-width:34ch;margin:0 0 34px;padding-left:24px;border-left:5px solid var(--sol)}
+.enredo em{color:var(--lar);font-weight:600}
+.premio{display:flex;gap:18px;align-items:center;background:var(--sol);border-radius:14px;padding:20px 26px;font-size:20px;font-weight:700;max-width:820px}
+@media(max-width:600px){.premio{flex-direction:column;align-items:flex-start;gap:10px;font-size:18px}}.premio b{font:800 12px var(--body);letter-spacing:.18em;text-transform:uppercase;background:#fff;border-radius:30px;padding:7px 14px;white-space:nowrap}
+.vant{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.vant li{background:#fff;border-radius:14px;padding:22px;box-shadow:0 8px 24px rgba(58,26,120,.1);font-size:16px}
+.vant b{display:block;font:600 22px var(--display);margin-bottom:6px}
+/* FINAL */
+.final{background:var(--areia);padding:110px 0 0}
+#cofre{padding-bottom:90px}
+.codigo{display:flex;justify-content:center;gap:clamp(8px,1.4vw,18px);margin:34px 0 18px}
+.codigo span{width:clamp(48px,8vw,104px);height:clamp(60px,10vw,128px);border-radius:14px;background:#fff;border:3px dashed #CFC3E8;display:grid;place-items:center;font:600 clamp(34px,6vw,84px) var(--display);color:var(--tinta);transition:all .5s}
+.codigo span.on{border:3px solid var(--ouro);background:var(--sol)}
+#cofre .lead{margin:0 auto 30px}
+#tesouro{animation:entra 1.2s both;background:#fff;padding:24px 0 80px}
+.conta{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}
+.conta div{background:var(--areia);border-radius:14px;padding:26px}
+.conta .on{background:var(--sol)}
+.fundo{margin-top:34px;padding:30px;border-radius:14px;background:#fff;border:1px solid rgba(91,43,176,.14)}.fundo h3{font:600 clamp(24px,2.6vw,36px)/1.15 var(--display);margin:8px 0 22px;max-width:26ch}.f3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.f3 div{background:var(--areia);border-radius:12px;padding:18px 20px}.f3 i{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--sol);font:700 15px var(--display);font-style:normal;margin-bottom:10px}.f3 b{display:block;font-size:18px}.f3 span{display:block;margin-top:4px;font-size:15px}.vive{margin:24px 0 0;font:600 clamp(26px,3vw,42px)/1.1 var(--display);color:var(--roxo,#5B2BB0)}.conta small{display:block;margin-top:10px;font-size:13px;line-height:1.4;opacity:.8}.conta b{line-height:1.1}
+.conta span{display:block;font-weight:700;font-size:17px}.conta b{display:block;margin-top:14px;font:600 34px var(--display)}
+.fecho{display:grid;grid-template-columns:1.2fr .8fr;gap:44px;align-items:center;margin-top:90px;padding-top:54px;border-top:3px solid var(--sol)}
+.fecho h2 em{color:var(--lar)}
+.uni2{position:absolute;inset:0;pointer-events:none;z-index:2}
+#uni2 .s{position:absolute;max-width:none;left:var(--sx,66%);top:var(--sy,32%);width:clamp(70px,9vw,130px)!important;height:auto!important;transform:translate(-50%,-50%) scale(.2);opacity:0;filter:drop-shadow(0 0 30px rgba(255,214,90,.95))}
+#uni2 .k{position:absolute;max-width:none;left:var(--kx,42%);top:var(--ky,60%);height:clamp(90px,11vw,150px)!important;width:auto!important;transform:translate(-50%,-50%) rotate(-58deg) scale(.3);opacity:0;filter:drop-shadow(0 0 14px rgba(255,214,90,.8))}
+.uni2 .fl{position:absolute;left:var(--sx,66%);top:var(--sy,32%);width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#fff 0,rgba(255,232,150,.95) 35%,rgba(255,226,130,0) 70%);transform:translate(-50%,-50%) scale(0);opacity:0}
+.uni2 .lk{position:absolute;left:50%;top:var(--sy,32%);display:inline-flex;transform:translate(-50%,-50%) scale(.4);opacity:0;box-shadow:0 14px 40px rgba(58,26,120,.35)}
+#uni2 .lk .b{padding:clamp(10px,1.4vw,18px) clamp(14px,2.2vw,30px)}#uni2 .lk img{height:clamp(26px,4vw,58px)!important;width:auto!important;max-width:none}
+.uni2.on .s{animation:u2s 1.1s ease-out forwards,u2so .6s ease-in 3.1s forwards}
+.uni2.on .k{animation:u2k 2.1s cubic-bezier(.55,0,.35,1) .8s forwards}
+.uni2.on .fl{animation:u2f 1.1s ease-out 2.8s forwards}
+.uni2.on .lk{animation:u2l .9s cubic-bezier(.2,.8,.3,1.2) 3.2s forwards}
+@keyframes u2s{to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes u2so{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(-50%,-50%) scale(1.3);opacity:0}}
+@keyframes u2k{0%{opacity:0;transform:translate(-50%,-50%) rotate(-58deg) scale(.3)}22%{opacity:1;left:var(--kx,42%);top:calc(var(--ky,60%) - 40px);transform:translate(-50%,-50%) rotate(-30deg) scale(1)}92%{opacity:1;left:var(--sx,66%);top:var(--sy,32%);transform:translate(-50%,-50%) rotate(0deg) scale(.6)}100%{opacity:0;left:var(--sx,66%);top:var(--sy,32%);transform:translate(-50%,-50%) rotate(0deg) scale(.3)}}
+@keyframes u2f{0%{transform:translate(-50%,-50%) scale(0);opacity:1}100%{transform:translate(-50%,-50%) scale(16);opacity:0}}
+@keyframes u2l{to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.uni2.est .lk{opacity:1;transform:translate(-50%,-50%)}#tesouro .bleed.alto .bx{opacity:0;transition:opacity .9s}#tesouro.uniu .bleed.alto .bx{opacity:1}
+@media(prefers-reduced-motion:reduce){.uni2 .s,.uni2 .k,.uni2 .fl{display:none}.uni2 .lk{opacity:1;transform:translate(-50%,-50%)}#tesouro .bleed.alto .bx{opacity:1}}
+.nw{white-space:nowrap}.conta small .nw{display:inline;font:inherit;color:inherit;margin:0}.cartaz{margin:10px 0 0;font:700 17px var(--body);color:#5B2BB0}.casafim{margin-top:10px}.casafim img{height:min(70vh,640px)}.casafim .lead{margin:8px 0 0}.alem{margin:26px 0 40px;font-size:18px;color:var(--tinta)}.alem b{color:#5B2BB0}
+.modelo{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px}.mcol{background:#fff;border-radius:16px;padding:24px 26px;box-shadow:0 10px 30px rgba(58,26,120,.08)}.mlist{margin:12px 0 0;padding-left:22px}.mlist li{margin:8px 0}.mlist span{display:block;font-size:15px;color:#6B5A9C;margin-top:4px}.mgan{margin:12px 0 0;padding-left:20px}.mgan li{margin:8px 0}.split{display:grid;grid-template-columns:4fr 1fr;gap:6px;margin-top:14px;border-radius:12px;overflow:hidden}.split div{padding:14px 16px}.split .se{background:#5B2BB0;color:#fff}.split .ss{background:var(--sol);color:var(--tinta)}.split b{display:block;font:600 30px var(--display)}.split span{font-size:13px;font-weight:700}.mkt{display:grid;grid-template-columns:1fr 1.3fr;gap:0;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 12px 34px rgba(58,26,120,.12);margin:26px 0 44px;border:2px solid var(--sol)}.mkt img{width:100%;height:100%;object-fit:cover;min-height:280px}.mkt .mt{padding:26px 28px}.mkt h3{margin:6px 0 10px}.mkt p{margin:0 0 14px}.mchips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.mchips span{background:#FFF8E6;border-radius:12px;padding:12px;font-size:13px;line-height:1.35}.mchips b{display:block;font:600 26px var(--display);color:#5B2BB0}.mval{font-size:14px;color:#6B5A9C;margin-top:14px!important}@media(max-width:860px){.mkt{grid-template-columns:1fr}.mkt img{min-height:200px;max-height:240px}.mchips{grid-template-columns:1fr}}
+.protege{background:#FFF8E6;border-left:5px solid var(--sol);border-radius:10px;padding:14px 18px;margin:16px 0 0;font-size:15.5px}.shop15{font-size:14px;color:#4A3585;margin:10px 0 0}.simc{background:#fff;border:2px solid var(--sol);border-radius:18px;padding:24px 26px;margin:26px 0 10px;box-shadow:0 12px 30px rgba(58,26,120,.10)}.simc h3{margin:6px 0 14px}.sfase{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.sfase button{border:2px solid #E4D9F5;background:#fff;border-radius:30px;padding:8px 14px;font:700 14px var(--body);color:var(--tinta);cursor:pointer}.sfase button.on{background:#5B2BB0;border-color:#5B2BB0;color:#fff}.sl{display:block;font-size:16px;margin:4px 0 14px}.sl b{font-size:22px;color:#5B2BB0}.sl input{display:block;width:100%;margin-top:8px;accent-color:#5B2BB0}.sres{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.sres div{background:#FFF8E6;border-radius:14px;padding:14px 16px}.sres span{display:block;font-size:13px;color:#6B5A9C}.sres b{font:600 clamp(22px,2.4vw,32px) var(--display)}.sres .on{background:var(--sol)}@media(max-width:700px){.sres{grid-template-columns:1fr}}
+.resumo{font-size:18px;margin:26px 0 10px;max-width:900px}.passo{background:#fff;border:2px solid var(--sol);border-radius:16px;padding:22px 26px;margin:20px 0 40px}.passo ol{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:12px 0 0;padding:0;list-style:none;counter-reset:p}.passo li{counter-increment:p;background:#FFF8E6;border-radius:12px;padding:14px}.passo li:before{content:counter(p);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--sol);font-weight:800;margin-bottom:8px}.passo li b{display:block}.passo li span{font-size:14px;color:#6B5A9C}.passo li.on{background:var(--sol)}.passo li.on:before{background:#fff}.resp-ct{margin-bottom:10px}@media(max-width:860px){.modelo{grid-template-columns:1fr}.passo ol{grid-template-columns:1fr 1fr}}
+.uniao{position:relative;height:130px;margin-bottom:26px;max-width:520px}
+.uniao .uk{position:absolute;left:34px;top:50%;height:120px;width:auto;transform:translateY(-50%) rotate(-58deg);filter:drop-shadow(0 6px 8px rgba(60,40,10,.3))}
+.uniao .us{position:absolute;right:0;top:50%;height:96px;width:auto;transform:translateY(-50%);filter:drop-shadow(0 0 22px rgba(255,214,90,.9))}
+.uniao .ub{position:absolute;left:50%;top:50%;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,#fff 0,rgba(255,226,130,.9) 40%,rgba(255,226,130,0) 70%);transform:translate(-50%,-50%) scale(0);opacity:0}
+.uniao .ul{position:absolute;left:0;top:50%;transform:translateY(-50%) scale(.7);opacity:0;display:inline-flex}.uniao .ul img{height:48px}
+.uniao.on .uk{animation:ukv 1.5s cubic-bezier(.5,0,.3,1) .3s forwards}.uniao.on .us{animation:usv 1.5s cubic-bezier(.5,0,.3,1) .3s forwards}
+.uniao.on .ub{animation:ubv 1s ease-out 1.6s forwards}.uniao.on .ul{animation:ulv .9s cubic-bezier(.2,.8,.3,1.2) 1.9s forwards}
+@keyframes ukv{70%{opacity:1}100%{left:50%;transform:translate(-70%,-50%) rotate(-90deg) scale(.5);opacity:0}}
+@keyframes usv{0%{transform:translateY(-50%) rotate(0)}70%{opacity:1}100%{right:50%;transform:translate(70%,-50%) rotate(-360deg) scale(.5);opacity:0}}
+@keyframes ubv{0%{transform:translate(-50%,-50%) scale(0);opacity:1}60%{opacity:1}100%{transform:translate(-50%,-50%) scale(22);opacity:0}}
+@keyframes ulv{to{transform:translateY(-50%) scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.uniao .uk,.uniao .us,.uniao .ub{display:none}.uniao .ul{opacity:1;transform:translateY(-50%)}}
+.ct .brands{display:inline-flex;margin-bottom:22px}.ct .brands img{height:40px}.ct p{font-weight:600;line-height:1.9}
+.foot{text-align:center;font-size:13px;color:#6B5A9C;padding:26px 24px;background:#fff}
+@media(max-width:860px) and (orientation:portrait){.abre.open .sol{left:5vw!important;top:62px!important}.abre .bg{background-position:45% 60%!important}.abre video.b1{object-position:45% 60%!important}.sheet{width:215vw;height:157.7vw;top:64px;transform:translateX(-38.6%);transition:width 1.2s ease,height 1.2s ease,transform 1.2s ease}.mapa.tere .sheet{width:177vw;height:129.8vw;transform:translateX(-42.4%)}.destcard{margin-left:-235px;margin-top:-78px}.uf text{font-size:22px}.gf{width:62vw;right:14vw;bottom:30vh}.onda{width:90vw}}
+@media(max-width:860px) and (orientation:landscape){.mapa .mapa-txt{left:auto!important;right:12px!important;top:62px!important;bottom:auto!important;max-width:300px!important;padding:14px 16px}.mapa .mapa-txt h2,.mapa .mapa-txt #mh{font-size:20px}.mapa .mapa-txt p{font-size:14px;margin:6px 0 0}}
+@media(max-width:860px){.gate.mini{grid-template-columns:1fr}.gate.mini .gimg{max-width:120px}.rota{grid-template-columns:1fr}.mapa .mapa-txt{right:12px;left:12px;top:auto;bottom:12px;max-width:none}.perg{padding:26px 20px}.gate,.duas,.tec,.prod,.quem,.fecho,.g2{grid-template-columns:1fr}.g3,.vant,.conta,.crono,.f3{grid-template-columns:1fr}.linha{grid-template-columns:1fr 1fr;row-gap:26px}.brands img{height:22px}.brands .b{padding:8px 12px}.hud span{width:26px;height:26px;font-size:13px}.gimg{max-width:220px}.fmt{grid-template-columns:1fr}.bleed .bx{left:12px;right:12px;bottom:12px;max-width:none;padding:18px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style></head><body>
+<nav class="nav"><img class="solfix" src="i/sol_sauipe.svg" alt="Costa do Sauípe">
+<button type="button" class="bsom" id="bsom" aria-pressed="false" aria-label="Ligar o som"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="w" d="M16 9c1.5 1.5 1.5 4.5 0 6M18.5 6.5c3 3 3 8 0 11"/><path class="x" d="M16 9l5 6M21 9l-5 6"/></svg></button><div class="hud" aria-label="Letras do código"><span data-l="S"></span><span data-l="A"></span><span data-l="U"></span><span data-l="Í"></span><span data-l="P"></span><span data-l="E"></span></div></nav>
+<section class="abre" id="abre">
+ <video class="bg b1" id="vabre" src="i/v_abre.mp4" poster="i/g_dia1.jpg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video><div class="bg b2"></div>
+ <img class="sol" id="sol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+ <div class="key bur" id="chave" tabindex="0" role="button" aria-label="Chave enterrada na areia"><img src="i/g_chave.png" alt="" draggable="false"></div>
+ <button type="button" class="mapahot" id="mapahot" aria-label="Abrir o mapa" hidden></button>
+ <div class="tx"><div class="card">
+  <div class="eyebrow">Exit Games × Costa do Sauípe · Proposta de parceria 2027</div><h1>O tesouro é <em>Sauípe</em>.</h1><p class="lead">Esta proposta não se lê. Se joga.</p><button type="button" class="ler" id="ler">Ver tudo sem jogar</button>
+ </div></div>
+</section>
+<!-- 1 -->
+<section class="mapa" id="mapa" hidden>
+  <div class="sheet" id="sheet">
+    <div class="pnl p1"><div class="pnl p2"><div class="pnl p3"><div class="pnl p4"></div></div></div></div>
+    <div class="flat"></div>
+    <svg class="routes" viewBox="0 0 2400 1760" preserveAspectRatio="xMidYMid slice" aria-label="Rotas das unidades Exit até a Costa do Sauípe">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <path class="rt r1" d="M499,283 C1150,180 1560,820 1258,1435"/>
+      <path class="rt r2" d="M1393,1202 C1470,1300 1400,1400 1258,1435"/>
+      <path class="rt r3" d="M1170,1528 C1170,1480 1200,1450 1258,1435"/>
+      <g class="uf" transform="translate(470,610)" data-ok="0" data-on="" data-nome="Piauí" tabindex="0" role="button" aria-label="Piauí"><path class="area" d="M194,-688 L200,-684 L206,-680 L211,-675 L217,-672 L225,-672 L231,-672 L238,-673 L244,-671 L250,-671 L257,-669 L263,-662 L269,-656 L269,-650 L269,-643 L265,-639 L260,-634 L249,-612 L247,-605 L243,-599 L248,-594 L254,-592 L255,-586 L258,-580 L259,-574 L253,-569 L258,-558 L257,-551 L264,-548 L272,-545 L269,-539 L268,-532 L263,-527 L267,-523 L271,-518 L274,-512 L274,-504 L271,-498 L277,-495 L284,-494 L291,-493 L290,-487 L288,-480 L291,-473 L288,-462 L290,-452 L289,-445 L285,-439 L282,-430 L280,-423 L279,-417 L275,-410 L273,-403 L278,-398 L282,-394 L278,-388 L273,-383 L276,-377 L273,-371 L272,-364 L274,-358 L275,-351 L281,-350 L286,-342 L291,-337 L295,-332 L299,-326 L305,-325 L311,-319 L317,-316 L320,-310 L319,-304 L323,-299 L323,-293 L321,-287 L322,-279 L318,-275 L322,-269 L320,-262 L320,-255 L323,-248 L324,-240 L319,-235 L323,-226 L324,-220 L324,-211 L326,-202 L329,-187 L324,-180 L328,-175 L332,-167 L332,-157 L333,-151 L337,-143 L343,-135 L344,-129 L341,-123 L341,-116 L341,-109 L342,-102 L349,-94 L352,-87 L351,-80 L364,-76 L371,-71 L378,-70 L385,-68 L391,-67 L394,-62 L397,-56 L405,-57 L403,-51 L398,-44 L399,-36 L398,-27 L399,-21 L394,-13 L389,-7 L388,1 L386,10 L385,18 L385,24 L381,29 L380,37 L364,43 L355,47 L357,60 L364,68 L364,77 L362,83 L360,89 L363,98 L376,102 L381,107 L380,124 L376,137 L372,145 L373,152 L367,155 L361,158 L357,164 L352,168 L346,171 L344,177 L342,183 L338,190 L332,193 L326,189 L324,196 L321,203 L316,199 L309,196 L303,201 L302,208 L295,214 L290,218 L284,223 L279,226 L277,233 L272,236 L265,237 L257,244 L250,244 L247,250 L243,259 L237,264 L232,268 L229,274 L226,280 L221,286 L215,284 L209,289 L203,292 L197,293 L195,300 L191,309 L185,314 L182,320 L179,329 L172,331 L166,335 L160,332 L154,333 L146,331 L138,335 L126,336 L120,336 L112,339 L104,341 L98,346 L91,353 L87,358 L84,363 L78,363 L72,370 L65,370 L57,376 L48,377 L43,375 L39,380 L35,385 L29,389 L25,384 L23,377 L17,379 L12,374 L6,372 L4,365 L4,359 L-0,354 L-11,356 L-16,352 L-21,349 L-27,350 L-32,357 L-38,354 L-44,356 L-50,353 L-56,349 L-65,338 L-71,332 L-78,332 L-84,338 L-90,340 L-100,350 L-109,357 L-119,359 L-125,363 L-130,369 L-135,377 L-133,383 L-133,390 L-127,400 L-125,411 L-119,414 L-113,418 L-106,421 L-106,427 L-111,431 L-110,437 L-112,443 L-106,447 L-107,453 L-110,459 L-116,460 L-123,464 L-124,477 L-133,488 L-133,496 L-138,501 L-142,506 L-145,515 L-152,516 L-159,513 L-164,519 L-163,525 L-169,537 L-173,542 L-178,548 L-185,550 L-191,546 L-199,547 L-204,540 L-210,535 L-220,544 L-226,545 L-233,550 L-239,551 L-248,548 L-253,553 L-259,555 L-261,564 L-265,570 L-275,572 L-280,576 L-284,582 L-288,588 L-296,591 L-303,595 L-310,590 L-317,588 L-325,581 L-332,581 L-339,581 L-348,579 L-353,578 L-356,571 L-364,569 L-370,564 L-372,554 L-378,550 L-382,540 L-382,532 L-377,522 L-380,516 L-381,510 L-385,502 L-389,497 L-395,494 L-396,488 L-401,483 L-402,474 L-404,468 L-413,468 L-421,473 L-427,473 L-427,481 L-438,491 L-445,489 L-451,486 L-458,488 L-463,483 L-459,477 L-454,473 L-452,467 L-450,459 L-449,450 L-446,443 L-447,436 L-449,430 L-447,424 L-445,416 L-442,410 L-443,404 L-444,394 L-443,387 L-445,380 L-442,374 L-438,369 L-437,363 L-438,356 L-442,351 L-448,347 L-453,343 L-455,337 L-455,330 L-454,324 L-456,317 L-458,309 L-459,302 L-461,296 L-465,287 L-469,281 L-467,275 L-465,269 L-461,264 L-460,257 L-455,252 L-450,248 L-442,238 L-439,231 L-433,229 L-434,223 L-432,217 L-430,211 L-430,204 L-428,198 L-423,193 L-421,187 L-419,181 L-417,173 L-409,165 L-405,157 L-404,151 L-403,144 L-404,137 L-401,128 L-398,121 L-397,115 L-396,107 L-394,101 L-390,95 L-389,88 L-384,83 L-379,79 L-376,73 L-368,68 L-362,65 L-355,65 L-349,63 L-343,60 L-338,56 L-327,54 L-321,55 L-315,53 L-307,50 L-302,47 L-298,42 L-291,38 L-286,34 L-280,34 L-274,32 L-269,37 L-264,32 L-260,26 L-254,23 L-251,17 L-247,12 L-240,10 L-236,4 L-230,0 L-222,-4 L-216,-6 L-210,-8 L-201,-14 L-199,-23 L-190,-31 L-188,-37 L-183,-45 L-178,-50 L-176,-56 L-170,-54 L-168,-59 L-156,-64 L-150,-65 L-139,-64 L-130,-68 L-124,-71 L-116,-72 L-107,-72 L-100,-68 L-93,-64 L-88,-60 L-81,-57 L-77,-51 L-70,-51 L-63,-52 L-58,-56 L-50,-57 L-43,-59 L-34,-63 L-26,-60 L-19,-62 L-13,-65 L-6,-63 L-1,-66 L6,-72 L10,-77 L13,-89 L16,-95 L18,-102 L18,-110 L17,-116 L20,-122 L24,-129 L21,-135 L20,-141 L18,-147 L11,-150 L5,-154 L0,-163 L-8,-166 L-11,-171 L-14,-177 L-10,-181 L-13,-187 L-16,-194 L-15,-204 L-17,-210 L-18,-220 L-14,-226 L-16,-233 L-16,-241 L-12,-247 L-7,-250 L-3,-256 L2,-265 L4,-271 L10,-274 L13,-279 L19,-283 L25,-286 L27,-294 L25,-301 L27,-307 L28,-318 L26,-326 L23,-331 L20,-344 L20,-351 L15,-357 L14,-364 L10,-369 L6,-374 L9,-381 L8,-387 L6,-393 L11,-397 L17,-407 L17,-415 L20,-420 L17,-426 L16,-433 L9,-439 L4,-443 L1,-450 L-1,-462 L7,-473 L15,-475 L14,-481 L19,-485 L22,-493 L25,-500 L31,-506 L38,-511 L41,-518 L47,-530 L47,-537 L47,-546 L51,-554 L56,-558 L59,-565 L64,-567 L70,-575 L74,-581 L77,-586 L80,-581 L86,-585 L92,-584 L98,-586 L107,-586 L116,-589 L122,-589 L125,-595 L131,-600 L135,-606 L133,-612 L142,-616 L149,-618 L156,-622 L159,-629 L164,-634 L166,-640 L174,-648 L180,-652 L182,-659 L184,-666 L179,-670 L175,-676 L175,-682 L177,-688 L181,-696 L187,-694 L192,-689Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="uf" transform="translate(1013,330)" data-ok="3" data-on="" data-nome="Ceará" tabindex="0" role="button" aria-label="Ceará"><path class="area" d="M-81,-403 L-74,-400 L-68,-399 L-62,-395 L-56,-392 L-50,-389 L-44,-385 L-37,-379 L-32,-377 L-26,-375 L-18,-373 L-15,-367 L-9,-365 L-3,-361 L4,-357 L10,-354 L16,-349 L24,-349 L29,-344 L36,-343 L42,-339 L49,-331 L53,-326 L58,-323 L63,-318 L68,-313 L74,-313 L83,-311 L88,-306 L90,-300 L98,-295 L103,-291 L110,-288 L115,-282 L120,-279 L127,-274 L132,-270 L139,-268 L145,-267 L150,-264 L156,-263 L162,-262 L166,-256 L171,-249 L175,-242 L179,-236 L184,-231 L191,-228 L195,-224 L199,-218 L203,-213 L207,-208 L211,-203 L215,-197 L222,-191 L226,-186 L232,-180 L237,-176 L247,-167 L252,-163 L257,-160 L263,-157 L270,-156 L273,-149 L276,-141 L281,-136 L287,-130 L292,-125 L297,-121 L302,-118 L309,-118 L315,-117 L321,-115 L327,-113 L334,-111 L339,-108 L345,-102 L348,-95 L350,-89 L334,-83 L321,-80 L290,-73 L285,-54 L279,-51 L276,-45 L271,-39 L269,-32 L268,-25 L267,-18 L263,-11 L258,-8 L255,-2 L253,8 L251,15 L246,18 L242,23 L236,27 L233,32 L229,39 L222,44 L220,52 L227,54 L222,62 L218,67 L215,79 L209,85 L204,90 L196,97 L195,104 L189,108 L182,109 L175,108 L167,109 L163,114 L160,120 L156,125 L152,130 L148,138 L145,144 L144,152 L141,158 L147,160 L153,161 L148,165 L145,171 L141,176 L137,183 L134,188 L133,196 L132,203 L129,208 L132,215 L138,220 L133,224 L129,228 L126,234 L121,237 L115,240 L115,246 L117,253 L122,257 L127,261 L130,267 L130,274 L127,280 L133,284 L137,289 L141,294 L148,293 L151,301 L148,307 L145,313 L142,318 L141,324 L135,327 L133,334 L132,340 L128,345 L123,351 L118,357 L112,359 L106,360 L106,368 L99,367 L95,373 L88,375 L86,383 L82,388 L76,383 L70,384 L64,390 L64,382 L62,376 L57,369 L49,365 L42,365 L37,360 L30,360 L32,352 L30,346 L27,339 L22,335 L16,330 L8,326 L3,324 L-2,319 L-11,314 L-15,309 L-23,306 L-29,304 L-40,305 L-49,307 L-55,306 L-63,308 L-69,313 L-75,317 L-81,318 L-90,318 L-101,320 L-116,323 L-120,317 L-127,314 L-136,316 L-143,316 L-156,316 L-163,317 L-162,309 L-158,304 L-158,298 L-157,290 L-156,284 L-153,276 L-151,269 L-147,264 L-145,259 L-145,247 L-145,239 L-143,233 L-138,228 L-145,225 L-149,218 L-152,213 L-158,212 L-165,210 L-172,209 L-178,206 L-188,203 L-190,194 L-194,186 L-200,180 L-202,171 L-202,164 L-202,157 L-199,151 L-200,145 L-206,137 L-210,132 L-211,123 L-211,113 L-214,106 L-219,102 L-216,95 L-215,84 L-218,74 L-219,64 L-221,56 L-222,50 L-222,43 L-218,36 L-220,30 L-223,23 L-222,17 L-221,10 L-220,3 L-224,-3 L-220,-10 L-222,-16 L-223,-22 L-223,-29 L-224,-35 L-229,-38 L-235,-42 L-239,-47 L-246,-47 L-249,-53 L-253,-60 L-262,-70 L-268,-71 L-270,-77 L-272,-83 L-271,-89 L-268,-95 L-272,-99 L-269,-104 L-261,-114 L-265,-118 L-270,-123 L-271,-129 L-266,-133 L-263,-140 L-261,-146 L-258,-154 L-257,-161 L-252,-167 L-255,-182 L-249,-190 L-253,-195 L-253,-207 L-252,-213 L-258,-214 L-265,-216 L-273,-213 L-272,-221 L-268,-227 L-269,-233 L-274,-240 L-277,-247 L-273,-255 L-274,-262 L-278,-267 L-284,-269 L-285,-278 L-287,-284 L-284,-292 L-283,-299 L-286,-304 L-287,-311 L-294,-312 L-296,-320 L-296,-326 L-284,-349 L-278,-359 L-274,-363 L-274,-370 L-274,-376 L-278,-382 L-284,-385 L-278,-393 L-273,-395 L-263,-394 L-252,-394 L-246,-394 L-235,-394 L-228,-396 L-221,-397 L-215,-399 L-209,-396 L-202,-398 L-196,-401 L-185,-401 L-179,-401 L-170,-402 L-165,-405 L-159,-408 L-151,-409 L-141,-407 L-129,-408 L-123,-407 L-116,-407 L-110,-406 L-103,-403 L-96,-405 L-90,-402 L-81,-402Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="uf" transform="translate(1190,800)" data-ok="3" data-on="" data-nome="Pernambuco" tabindex="0" role="button" aria-label="Pernambuco"><path class="area" d="M185,-166 L190,-162 L199,-159 L204,-155 L210,-152 L211,-145 L215,-140 L209,-137 L202,-134 L196,-131 L189,-126 L185,-120 L183,-112 L186,-107 L190,-100 L188,-93 L183,-90 L177,-88 L174,-82 L168,-73 L164,-68 L158,-63 L166,-62 L172,-62 L179,-62 L184,-59 L189,-55 L188,-49 L191,-44 L190,-37 L187,-31 L194,-30 L196,-21 L206,-16 L214,-10 L220,-11 L225,-15 L229,-19 L235,-22 L242,-25 L248,-27 L254,-30 L262,-33 L269,-39 L267,-45 L271,-60 L274,-66 L280,-67 L283,-73 L291,-70 L298,-71 L302,-75 L302,-85 L309,-87 L321,-88 L327,-84 L329,-90 L335,-95 L340,-92 L346,-92 L353,-92 L359,-91 L365,-87 L372,-88 L378,-91 L384,-90 L387,-96 L394,-97 L402,-98 L408,-101 L414,-104 L422,-105 L428,-110 L436,-112 L442,-112 L443,-119 L443,-125 L445,-132 L446,-138 L448,-144 L456,-143 L465,-144 L470,-149 L475,-151 L481,-154 L487,-156 L494,-154 L501,-153 L509,-151 L517,-149 L524,-145 L526,-138 L529,-133 L536,-132 L542,-130 L550,-129 L551,-124 L554,-118 L551,-109 L551,-103 L550,-90 L549,-84 L551,-77 L553,-70 L551,-64 L550,-56 L546,-52 L543,-43 L538,-32 L538,-25 L535,-19 L533,-12 L533,-5 L532,1 L530,7 L527,14 L525,21 L525,28 L520,33 L518,39 L514,44 L512,50 L511,56 L510,63 L507,68 L504,75 L503,82 L497,83 L490,83 L481,81 L470,79 L462,77 L454,76 L448,73 L441,72 L436,75 L431,79 L425,82 L419,84 L412,86 L406,86 L404,80 L396,78 L390,78 L384,79 L379,82 L373,85 L367,87 L359,87 L349,94 L353,100 L347,106 L341,107 L336,112 L332,117 L329,122 L334,127 L327,128 L321,128 L317,133 L310,135 L304,137 L298,136 L292,140 L280,147 L280,153 L274,153 L268,150 L263,146 L251,143 L245,147 L238,146 L232,144 L226,148 L225,154 L223,160 L217,158 L209,150 L203,149 L200,140 L193,141 L187,144 L183,135 L176,138 L174,131 L171,125 L167,120 L162,115 L151,109 L145,105 L136,101 L132,95 L125,96 L118,98 L113,103 L108,99 L105,94 L101,88 L97,83 L92,79 L87,82 L84,88 L83,94 L80,100 L76,107 L67,114 L63,119 L60,124 L53,125 L47,128 L39,132 L33,139 L29,146 L22,151 L12,135 L12,128 L7,123 L10,116 L10,110 L8,101 L-3,104 L-9,106 L-18,101 L-23,94 L-21,88 L-17,83 L-18,77 L-29,73 L-37,82 L-38,93 L-41,98 L-47,97 L-51,91 L-52,82 L-58,76 L-67,68 L-76,67 L-87,68 L-93,68 L-101,61 L-109,58 L-122,55 L-130,55 L-137,50 L-136,44 L-140,39 L-143,32 L-152,31 L-157,27 L-164,28 L-169,32 L-180,38 L-185,41 L-193,46 L-199,47 L-207,47 L-205,55 L-204,61 L-207,69 L-215,68 L-222,72 L-235,73 L-239,77 L-236,85 L-238,95 L-242,100 L-248,108 L-255,110 L-265,111 L-275,118 L-281,116 L-287,111 L-294,110 L-299,119 L-299,129 L-303,143 L-307,152 L-310,160 L-319,156 L-324,162 L-328,167 L-334,165 L-340,172 L-347,174 L-361,174 L-367,171 L-373,172 L-372,165 L-370,158 L-372,150 L-366,148 L-362,144 L-362,138 L-360,131 L-360,124 L-369,120 L-376,116 L-382,113 L-383,107 L-386,101 L-387,93 L-391,88 L-394,82 L-398,76 L-404,76 L-410,74 L-416,67 L-423,67 L-429,63 L-430,57 L-436,55 L-442,55 L-450,56 L-457,59 L-463,58 L-459,52 L-450,47 L-444,45 L-444,38 L-438,35 L-434,29 L-428,27 L-424,21 L-418,13 L-412,9 L-405,8 L-399,13 L-395,8 L-394,1 L-385,3 L-383,-4 L-378,-8 L-377,-17 L-371,-19 L-365,-22 L-361,-28 L-357,-33 L-350,-34 L-349,-41 L-345,-50 L-339,-63 L-339,-78 L-340,-84 L-353,-90 L-360,-95 L-358,-107 L-356,-113 L-355,-119 L-363,-130 L-366,-138 L-361,-144 L-340,-153 L-333,-154 L-320,-154 L-313,-154 L-304,-156 L-298,-154 L-293,-147 L-278,-150 L-267,-152 L-258,-152 L-252,-153 L-246,-157 L-241,-162 L-233,-163 L-227,-163 L-217,-165 L-206,-166 L-200,-164 L-193,-162 L-188,-156 L-179,-151 L-175,-147 L-169,-144 L-162,-140 L-156,-137 L-150,-131 L-147,-125 L-143,-120 L-146,-114 L-141,-111 L-138,-105 L-131,-106 L-125,-102 L-118,-98 L-115,-92 L-113,-85 L-103,-85 L-96,-82 L-91,-87 L-90,-94 L-83,-98 L-78,-103 L-72,-102 L-71,-108 L-65,-110 L-59,-111 L-56,-116 L-49,-113 L-44,-109 L-40,-103 L-36,-98 L-29,-97 L-20,-97 L-15,-100 L-7,-100 L-1,-105 L6,-105 L9,-99 L11,-92 L12,-84 L20,-84 L25,-88 L30,-91 L37,-90 L45,-84 L45,-91 L51,-97 L56,-92 L64,-94 L67,-99 L74,-103 L79,-112 L87,-114 L93,-113 L97,-119 L103,-125 L107,-130 L115,-131 L121,-136 L127,-140 L131,-145 L135,-152 L140,-159 L146,-159 L153,-159 L158,-162 L161,-170 L168,-170 L177,-172 L182,-169ZM929,-715 L926,-708 L920,-708 L924,-713Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="uf" transform="translate(1445,985)" data-ok="2" data-on="" data-nome="Alagoas" tabindex="0" role="button" aria-label="Alagoas"><path class="area" d="M197,-112 L205,-110 L215,-106 L221,-105 L230,-102 L237,-102 L245,-100 L243,-92 L237,-84 L234,-79 L232,-72 L228,-67 L225,-61 L223,-55 L219,-51 L215,-44 L210,-40 L205,-35 L201,-31 L195,-26 L192,-21 L190,-15 L183,-10 L179,-5 L175,0 L170,4 L166,9 L161,16 L158,23 L151,24 L146,28 L142,33 L138,39 L134,44 L130,51 L124,58 L120,64 L116,70 L109,81 L105,87 L98,91 L94,97 L89,100 L85,105 L78,111 L72,116 L67,123 L68,130 L63,136 L59,142 L56,148 L48,144 L43,138 L36,141 L29,141 L25,131 L25,125 L22,119 L17,114 L10,116 L2,115 L-4,112 L-13,108 L-18,104 L-21,98 L-28,95 L-33,89 L-36,81 L-36,75 L-41,70 L-48,72 L-54,68 L-63,60 L-73,57 L-79,57 L-83,50 L-88,46 L-96,41 L-104,38 L-115,34 L-128,33 L-144,24 L-149,17 L-158,14 L-164,16 L-168,12 L-173,7 L-180,2 L-192,-0 L-198,-2 L-199,-9 L-207,-12 L-215,-16 L-221,-15 L-227,-18 L-228,-24 L-233,-30 L-230,-38 L-223,-43 L-220,-50 L-214,-56 L-206,-58 L-200,-60 L-194,-63 L-191,-68 L-184,-76 L-178,-81 L-175,-86 L-172,-93 L-170,-99 L-164,-106 L-158,-103 L-155,-98 L-151,-93 L-151,-86 L-145,-86 L-139,-83 L-136,-88 L-129,-89 L-122,-90 L-115,-80 L-108,-78 L-94,-72 L-89,-66 L-84,-60 L-80,-55 L-78,-49 L-72,-50 L-68,-45 L-62,-43 L-55,-45 L-51,-40 L-46,-35 L-43,-29 L-35,-24 L-31,-30 L-29,-37 L-23,-41 L-17,-39 L-10,-38 L-4,-42 L6,-41 L10,-36 L16,-32 L22,-31 L25,-38 L35,-42 L39,-47 L45,-50 L53,-49 L59,-51 L64,-55 L69,-58 L75,-56 L74,-63 L76,-69 L81,-73 L86,-78 L92,-78 L96,-83 L94,-89 L100,-93 L109,-99 L116,-100 L122,-102 L128,-106 L135,-107 L141,-107 L148,-106 L148,-100 L157,-99 L164,-101 L170,-103 L176,-106 L181,-109 L186,-113 L192,-112Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="uf" transform="translate(1325,1125)" data-ok="1" data-on="c2 l2" data-nome="Sergipe" tabindex="0" role="button" aria-label="Sergipe"><path class="area" d="M-72,-140 L-65,-138 L-53,-133 L-48,-128 L-44,-124 L-39,-125 L-31,-124 L-26,-120 L-13,-109 L5,-106 L13,-104 L21,-100 L28,-95 L37,-90 L40,-84 L47,-83 L54,-82 L66,-72 L71,-68 L78,-70 L83,-67 L84,-61 L85,-55 L90,-47 L96,-44 L102,-39 L107,-32 L117,-29 L122,-25 L128,-24 L134,-27 L142,-21 L145,-15 L145,-9 L146,-1 L154,0 L162,-2 L168,4 L171,10 L167,16 L160,17 L153,20 L144,24 L137,27 L131,31 L124,35 L118,38 L113,41 L108,45 L101,50 L92,60 L88,65 L84,70 L79,75 L74,83 L69,91 L66,96 L62,102 L58,108 L53,116 L46,126 L38,136 L34,142 L32,148 L30,154 L27,160 L20,163 L14,170 L9,173 L-1,175 L-8,178 L-14,175 L-20,175 L-27,180 L-33,178 L-39,176 L-45,174 L-49,169 L-54,166 L-58,161 L-63,159 L-70,157 L-75,152 L-76,145 L-78,138 L-77,132 L-74,125 L-80,121 L-85,119 L-89,113 L-93,108 L-91,101 L-95,95 L-101,91 L-106,88 L-109,82 L-114,77 L-116,70 L-116,63 L-112,56 L-112,47 L-106,44 L-100,47 L-92,44 L-86,46 L-82,54 L-74,53 L-54,44 L-51,26 L-51,19 L-49,13 L-56,1 L-53,-5 L-48,-9 L-42,-12 L-38,-16 L-41,-36 L-43,-43 L-46,-49 L-50,-57 L-52,-66 L-58,-70 L-65,-70 L-72,-71 L-75,-76 L-76,-83 L-74,-89 L-73,-96 L-81,-100 L-84,-106 L-84,-115 L-79,-122 L-82,-127 L-84,-133 L-81,-139 L-72,-140Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="uf" transform="translate(860,1340)" data-ok="1" data-on="c3 l3" data-nome="Bahia" tabindex="0" role="button" aria-label="Bahia"><path class="area" d="M186,-508 L190,-501 L194,-496 L193,-490 L197,-485 L204,-486 L221,-482 L227,-480 L232,-476 L238,-471 L249,-473 L261,-473 L272,-464 L278,-458 L279,-449 L283,-443 L289,-442 L292,-447 L292,-456 L298,-466 L308,-466 L313,-462 L312,-455 L307,-450 L309,-442 L316,-436 L322,-434 L332,-440 L341,-436 L339,-430 L337,-421 L342,-412 L343,-406 L348,-394 L350,-387 L354,-383 L357,-377 L360,-371 L366,-370 L375,-370 L380,-365 L387,-361 L385,-355 L383,-349 L382,-343 L389,-338 L384,-334 L380,-326 L383,-317 L387,-313 L391,-306 L389,-299 L390,-291 L393,-286 L399,-286 L406,-285 L413,-281 L415,-272 L419,-264 L422,-259 L421,-253 L427,-232 L424,-227 L417,-224 L412,-220 L409,-214 L414,-206 L416,-200 L412,-195 L416,-172 L391,-162 L384,-161 L380,-168 L374,-170 L368,-168 L362,-169 L355,-170 L353,-163 L351,-156 L351,-148 L351,-140 L354,-135 L358,-129 L364,-124 L370,-121 L372,-115 L373,-109 L376,-103 L380,-96 L385,-94 L391,-90 L388,-83 L387,-77 L389,-71 L391,-65 L394,-59 L401,-59 L408,-56 L409,-49 L414,-46 L418,-41 L425,-41 L430,-36 L436,-34 L439,-39 L446,-39 L453,-39 L462,-37 L471,-41 L479,-45 L485,-51 L483,-44 L479,-38 L476,-32 L473,-26 L470,-20 L467,-14 L463,-6 L456,8 L454,14 L449,24 L446,34 L441,41 L436,49 L433,55 L427,64 L421,74 L413,85 L405,97 L400,104 L396,109 L391,116 L389,122 L384,126 L380,131 L377,136 L373,141 L368,146 L364,151 L360,156 L355,162 L348,169 L343,174 L338,180 L333,185 L327,185 L321,189 L316,193 L310,194 L304,194 L297,192 L300,185 L292,181 L291,188 L288,193 L283,198 L277,201 L272,206 L268,211 L263,214 L257,217 L252,221 L246,225 L241,228 L238,235 L236,246 L239,253 L245,252 L246,260 L248,265 L245,271 L242,277 L242,283 L246,288 L249,294 L245,299 L238,298 L233,305 L231,313 L232,319 L236,326 L239,331 L242,338 L242,344 L240,351 L239,357 L238,364 L235,372 L233,379 L232,386 L232,392 L233,399 L230,404 L230,412 L228,418 L227,425 L226,432 L224,440 L222,448 L221,458 L221,467 L223,473 L226,478 L227,489 L228,496 L231,503 L232,523 L232,540 L232,548 L233,554 L234,563 L235,570 L238,579 L240,592 L240,602 L241,612 L243,619 L246,625 L248,631 L252,638 L254,644 L249,652 L245,666 L242,672 L240,678 L238,686 L238,692 L235,700 L230,704 L228,710 L228,717 L230,726 L225,730 L222,737 L221,743 L219,749 L218,755 L217,762 L216,768 L215,775 L212,781 L209,786 L209,792 L209,799 L211,805 L210,812 L207,818 L204,826 L204,832 L203,841 L199,846 L198,852 L198,860 L197,867 L197,874 L199,888 L201,895 L201,906 L202,913 L202,921 L206,927 L210,933 L204,939 L200,945 L195,951 L190,957 L186,963 L179,966 L172,968 L163,973 L158,978 L153,984 L150,989 L146,995 L143,1001 L136,1012 L132,1019 L130,1027 L129,1033 L102,1019 L89,1010 L41,979 L34,972 L39,967 L48,959 L44,953 L42,947 L40,940 L34,939 L29,934 L25,929 L21,921 L13,923 L11,917 L4,914 L0,908 L0,901 L-6,897 L-11,893 L-18,891 L-18,885 L-17,879 L-15,872 L-12,865 L-12,858 L-15,848 L-12,839 L-11,829 L-10,822 L-3,813 L-1,806 L5,807 L12,808 L17,805 L22,808 L29,808 L34,803 L36,796 L30,792 L23,791 L25,784 L28,778 L28,772 L30,764 L32,757 L38,755 L44,756 L50,758 L49,752 L53,744 L57,740 L60,733 L62,739 L66,734 L70,729 L71,723 L76,719 L83,714 L88,711 L85,705 L89,699 L94,692 L97,686 L95,679 L91,674 L86,671 L84,665 L77,665 L71,663 L65,660 L65,652 L59,652 L53,650 L49,646 L43,643 L40,638 L33,637 L27,637 L20,637 L13,637 L8,631 L2,628 L-4,630 L-9,634 L-15,630 L-19,625 L-25,623 L-31,619 L-35,614 L-41,616 L-46,619 L-52,611 L-56,616 L-62,618 L-67,613 L-75,611 L-77,618 L-82,621 L-89,623 L-95,625 L-102,629 L-111,627 L-118,625 L-124,625 L-131,625 L-134,609 L-136,588 L-153,572 L-179,548 L-203,526 L-212,527 L-221,532 L-226,536 L-233,535 L-241,535 L-248,536 L-254,532 L-260,527 L-263,522 L-270,525 L-278,528 L-286,524 L-292,524 L-297,520 L-304,518 L-304,512 L-311,511 L-317,506 L-323,502 L-328,498 L-334,499 L-339,495 L-344,493 L-350,489 L-354,484 L-367,478 L-372,473 L-378,469 L-382,465 L-389,461 L-396,460 L-403,458 L-409,457 L-416,456 L-422,454 L-428,455 L-436,455 L-442,457 L-449,461 L-455,463 L-461,465 L-464,471 L-469,475 L-474,479 L-480,472 L-486,470 L-492,469 L-497,466 L-504,466 L-509,461 L-515,459 L-524,456 L-530,453 L-529,447 L-530,441 L-528,433 L-524,423 L-520,412 L-514,404 L-520,401 L-526,400 L-533,397 L-539,398 L-543,394 L-550,393 L-556,395 L-562,394 L-569,395 L-575,392 L-581,389 L-587,390 L-594,390 L-601,390 L-606,394 L-615,396 L-620,400 L-626,402 L-632,403 L-638,406 L-643,408 L-648,412 L-652,417 L-657,421 L-664,424 L-670,427 L-675,430 L-678,436 L-682,441 L-687,445 L-695,449 L-701,452 L-706,457 L-712,461 L-717,469 L-725,468 L-731,466 L-738,470 L-742,475 L-747,478 L-752,482 L-757,486 L-762,489 L-766,495 L-773,498 L-780,502 L-787,499 L-796,504 L-800,510 L-806,512 L-809,521 L-815,524 L-821,528 L-828,527 L-834,528 L-840,533 L-847,529 L-854,531 L-857,539 L-864,540 L-867,546 L-872,550 L-875,544 L-878,539 L-872,537 L-867,531 L-864,524 L-856,514 L-857,508 L-855,500 L-861,496 L-863,490 L-867,483 L-863,478 L-862,472 L-861,466 L-863,460 L-858,454 L-858,448 L-858,441 L-857,434 L-859,427 L-860,421 L-861,415 L-856,419 L-850,416 L-846,410 L-851,404 L-853,398 L-859,394 L-864,390 L-869,387 L-870,381 L-877,380 L-881,375 L-889,374 L-893,369 L-900,367 L-895,361 L-893,354 L-894,347 L-899,343 L-901,335 L-896,326 L-902,323 L-903,317 L-896,315 L-901,309 L-897,305 L-898,296 L-893,292 L-885,286 L-893,283 L-897,275 L-894,269 L-895,263 L-894,257 L-888,254 L-882,252 L-876,247 L-869,242 L-866,235 L-877,237 L-887,242 L-893,243 L-901,247 L-905,242 L-907,236 L-911,232 L-909,226 L-907,219 L-906,212 L-907,205 L-904,199 L-899,193 L-893,193 L-887,190 L-882,187 L-878,182 L-889,180 L-894,183 L-901,182 L-907,184 L-906,178 L-906,170 L-901,166 L-903,160 L-903,153 L-901,148 L-904,142 L-901,137 L-902,128 L-900,121 L-893,119 L-885,118 L-884,111 L-895,113 L-899,107 L-901,100 L-907,98 L-909,91 L-915,88 L-911,83 L-918,80 L-919,74 L-917,67 L-920,62 L-918,56 L-919,49 L-919,43 L-918,37 L-915,31 L-905,26 L-899,26 L-893,23 L-887,20 L-893,18 L-901,18 L-908,18 L-915,16 L-918,9 L-913,5 L-910,-1 L-917,-3 L-911,-7 L-908,-12 L-908,-20 L-903,-25 L-894,-22 L-889,-20 L-882,-21 L-873,-22 L-880,-28 L-886,-29 L-893,-29 L-900,-36 L-909,-38 L-915,-38 L-921,-39 L-929,-42 L-935,-43 L-941,-47 L-942,-54 L-945,-59 L-951,-66 L-954,-73 L-953,-82 L-938,-91 L-931,-99 L-929,-109 L-926,-118 L-922,-124 L-916,-130 L-910,-134 L-904,-138 L-906,-146 L-903,-151 L-896,-154 L-895,-160 L-892,-167 L-889,-173 L-893,-179 L-886,-184 L-880,-183 L-872,-186 L-864,-192 L-859,-197 L-854,-201 L-845,-207 L-841,-211 L-834,-212 L-833,-218 L-828,-226 L-821,-226 L-817,-231 L-814,-238 L-813,-247 L-813,-255 L-805,-261 L-798,-264 L-792,-259 L-793,-252 L-787,-245 L-785,-238 L-781,-234 L-775,-228 L-771,-224 L-771,-216 L-766,-211 L-771,-204 L-773,-196 L-772,-184 L-766,-179 L-760,-166 L-754,-161 L-748,-160 L-745,-155 L-738,-152 L-729,-149 L-722,-149 L-715,-149 L-709,-145 L-703,-142 L-693,-135 L-688,-139 L-681,-142 L-675,-144 L-671,-154 L-665,-158 L-659,-161 L-652,-161 L-652,-172 L-646,-175 L-641,-180 L-634,-182 L-626,-179 L-620,-184 L-614,-185 L-603,-194 L-597,-193 L-592,-186 L-585,-183 L-578,-182 L-573,-180 L-567,-185 L-561,-188 L-556,-202 L-552,-206 L-553,-216 L-544,-215 L-535,-214 L-535,-221 L-530,-227 L-525,-231 L-522,-238 L-517,-249 L-512,-260 L-512,-269 L-500,-269 L-497,-277 L-496,-283 L-502,-287 L-500,-293 L-501,-299 L-496,-303 L-496,-309 L-502,-312 L-509,-316 L-515,-319 L-516,-326 L-521,-337 L-524,-343 L-525,-351 L-522,-357 L-517,-364 L-512,-370 L-499,-373 L-490,-380 L-482,-389 L-476,-391 L-470,-396 L-461,-398 L-455,-392 L-451,-384 L-444,-381 L-439,-377 L-431,-374 L-424,-376 L-418,-378 L-412,-379 L-406,-378 L-401,-373 L-395,-375 L-388,-375 L-386,-367 L-385,-361 L-379,-356 L-373,-351 L-367,-353 L-365,-346 L-361,-341 L-355,-343 L-351,-349 L-349,-356 L-342,-353 L-335,-354 L-329,-359 L-324,-361 L-313,-362 L-310,-367 L-303,-370 L-299,-377 L-293,-379 L-288,-386 L-282,-391 L-275,-393 L-269,-393 L-258,-394 L-247,-399 L-240,-400 L-232,-400 L-227,-397 L-220,-399 L-215,-402 L-208,-410 L-205,-416 L-200,-420 L-195,-424 L-195,-432 L-192,-437 L-185,-439 L-179,-442 L-174,-446 L-165,-446 L-163,-453 L-160,-459 L-157,-464 L-148,-472 L-143,-480 L-140,-485 L-133,-482 L-127,-481 L-120,-484 L-112,-485 L-106,-485 L-98,-486 L-101,-480 L-97,-475 L-91,-474 L-84,-470 L-79,-466 L-72,-464 L-65,-461 L-62,-454 L-59,-449 L-57,-442 L-55,-436 L-53,-430 L-50,-424 L-44,-423 L-35,-417 L-29,-414 L-31,-407 L-32,-401 L-35,-394 L-41,-391 L-40,-385 L-40,-376 L-44,-369 L-37,-369 L-31,-366 L-22,-363 L-14,-366 L-9,-372 L-3,-375 L4,-375 L7,-382 L14,-381 L23,-384 L26,-394 L31,-411 L31,-421 L33,-427 L39,-431 L48,-425 L55,-422 L63,-427 L70,-430 L77,-430 L88,-440 L92,-445 L95,-450 L91,-461 L95,-467 L103,-469 L115,-472 L121,-471 L126,-474 L126,-481 L123,-490 L128,-494 L135,-494 L142,-497 L149,-501 L157,-504 L163,-508 L168,-512 L175,-512 L184,-509Z"/><circle class="hit" r="62"/><circle r="30"/><circle class="cc" r="9"/></g><g class="tglow" transform="translate(499,283)"><circle class="ring" r="30"/><circle class="ring g2" r="30"/></g><g class="pin c1" transform="translate(499,283)"><circle r="16"/><circle r="6" class="core"/></g>
+      <g class="pin c2" transform="translate(1393,1202)"><circle r="16"/><circle r="6" class="core"/></g>
+      <g class="pin c3" transform="translate(1170,1528)"><circle r="16"/><circle r="6" class="core"/></g>
+      <g class="dest-pin" transform="translate(1258,1435)">
+        <circle class="ring g1" r="30"/><circle class="ring g2" r="30"/><circle class="ring g3" r="30"/>
+        <circle r="24" class="dot" filter="url(#glow)"/><circle r="9" class="dcore"/>
+      </g>
+      <g class="lbl l1" transform="translate(455,365)"><text class="city" x="0" y="0">Teresina</text><text class="unit" x="0" y="44">Projeto Shopping Rio Poty · 2027</text></g>
+      <g class="lbl l2" transform="translate(1440,1170)"><text class="city" x="0" y="0">Aracaju</text><text class="unit" x="0" y="44">Shopping RioMar</text></g>
+      <g class="lbl l3" transform="translate(1135,1530)"><text class="city" x="0" y="0" text-anchor="end">Salvador</text><text class="unit" x="0" y="44" text-anchor="end">Salvador Norte · Shopping Barra</text></g>
+    </svg>
+    <div class="destcard" id="destcard"><img src="i/logo_sauipe.svg" alt="Costa do Sauípe"><span>Destino final</span></div>
+  </div>
+  <div class="mapa-txt">
+    <div class="eyebrow">Cadeado 1 de 6</div>
+    <h1 id="mh">Onde a Exit atua hoje?</h1>
+    <p class="lead" id="ml"></p>
+    <p class="mfb" id="mfb" aria-live="polite"></p>
+  </div>
+  <div class="gcena" id="gf" hidden><div class="gfundo"></div><div class="gbox" id="gbox"><video id="vgar" src="i/v_gar.mp4" poster="i/g_gar_ini.jpg" muted playsinline preload="auto" aria-label="Uma garrafa com uma mensagem chega à praia"></video><img class="gsem" src="i/g_gar_sem.jpg" alt="" draggable="false"><img class="rolha" id="rolha" src="i/g_rolha2.png" alt="Rolha" tabindex="0" role="button" draggable="false"></div><span class="tg r">imagem ilustrativa</span></div>
+</section>
+
+
+<section class="cap ceu" id="c1" data-cap="1" data-l="S" hidden>
+<div class="gar" id="gar"><img src="i/g_garrafa.jpg" alt="Garrafa com uma mensagem na beira do mar" draggable="false"><span class="tg r">imagem ilustrativa</span></div>
+<div class="wrap"><div class="aberto" hidden><span class="lt">S</span><span>Cadeado 1 aberto. A letra <b>S</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="wrap">
+ <div class="gate mini"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq"><div class="eyebrow">Cadeado dentro da mensagem</div><h3>A Exit nasceu em 2018, numa loja do Shopping Jardins, em Aracaju. De que tamanho era essa loja?</h3><div class="keys"><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: 30 m²"><img src="i/g_chave.png" alt="" draggable="false"><span>30 m²</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 120 m²"><img src="i/g_chave.png" alt="" draggable="false"><span>120 m²</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 300 m²"><img src="i/g_chave.png" alt="" draggable="false"><span>300 m²</span></div></div><p class="hint" hidden>Essa chave não gira. Dica: Cabia uma ideia e pouco mais.</p></div>
+ </div>
+ <div class="resp" hidden><b>30 m².</b><span>Foi assim que tudo começou, em 2018, no Shopping Jardins. A loja que abre no Shopping Barra em dezembro de 2026 tem 200 m².</span></div>
+ <div class="gate mini"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq"><div class="eyebrow">Cadeado dentro da mensagem</div><h3>Desde 2018 a Exit cresce ao lado de um grupo parceiro. Qual?</h3><div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: Um banco"><img src="i/g_chave.png" alt="" draggable="false"><span>Um banco</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: Grupo JCPM"><img src="i/g_chave.png" alt="" draggable="false"><span>Grupo JCPM</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: Uma franqueadora"><img src="i/g_chave.png" alt="" draggable="false"><span>Uma franqueadora</span></div></div><p class="hint" hidden>Essa chave não gira. Dica: É um grupo de shoppings.</p></div>
+ </div>
+ <div class="resp" hidden><img src="i/jcpm.jpg" alt="Equipe do Grupo JCPM em uma unidade da Exit"><b>Grupo JCPM.</b><span>Parceiro da Exit desde 2018. Com o grupo, Pernambuco e Ceará estão em negociação para 2028.</span></div>
+ <div class="perg">
+  <div class="eyebrow">A mensagem na garrafa</div>
+  <h2>A linha do tempo da Exit.</h2>
+  <h3 class="tlh"><span>Por onde passou</span></h3>
+  <ol class="rota tl" style="--n:6">
+   <li><b>2018 · Aracaju</b><span>Uma loja de 30 m² no Shopping Jardins.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>O Shopping Jardins foi o primeiro parceiro a acreditar na Exit. E o Grupo JCPM se tornou nosso grande parceiro.</span></li>
+   <li><b>2019 · Aracaju</b><span>Makai Resort. Começou com uma sala e triplicou em poucos meses.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Em 2019 inauguramos com uma sala. Em poucos meses, triplicamos. A operação foi interrompida na pandemia e por uma alteração de gestão.</span></li>
+   <li><b>Feiras</b><span>Viva Sergipe (Sebrae), Jogos da Juventude (COB) e 81ª SOEA (Confea e Crea-SE).</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Sucesso absoluto, com milhares de jogadores atendidos. No Viva Sergipe, cenário realista com parede de barro e grandes filas. Nos Jogos da Juventude, um jogo sobre consciência ambiental e esporte. Na SOEA, sala com painel e televisores.</span></li>
+   <li><b>Empresas</b><span>O jogo vai até a empresa: Tecnogera (Simões Filho), Ultragaz (Aracaju) e tantas outras. Em Alagoas, a Exit atende eventos corporativos.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Com o Exit Vision, o jogo também serve ao desenvolvimento das equipes.</span></li>
+   <li class="hoje"><b>Hoje · Aracaju</b><span>Shopping RioMar</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Com 170 m², estamos reformulando a unidade para as férias.</span></li>
+   <li class="hoje"><b>Hoje · Salvador</b><span>Shopping Salvador Norte</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>A Exit é a única empresa de escape room em shoppings de Salvador.</span></li>
+  </ol>
+  <h3 class="tlh fut"><span>Onde chegará</span></h3>
+  <ol class="rota tl tlf" style="--n:4;counter-reset:r 6">
+   <li class="fut"><b>Dez/2026 · Salvador</b><span>Shopping Barra, em obra.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Loja de 200 m², com inauguração em dezembro de 2026.</span></li>
+   <li class="fut"><b>2027 · Teresina</b><span>Projeto Shopping Rio Poty</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Projeto 2027 com loja definida, projetos em construção e pré-contrato assinado.</span></li>
+   <li class="fut"><b>2027 · Costa do Sauípe</b><span>O Casarão Exit · apresentação de projeto.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Possibilidade de abertura a partir de 20 de janeiro, dependendo da negociação.</span></li>
+   <li class="fut"><b>2028 · Pernambuco e Ceará</b><span>Em negociação com o Grupo JCPM.</span><button class="mais" aria-expanded="false" aria-label="Mais informações">+</button><span class="det" hidden>Com o Grupo JCPM, parceiro da Exit desde 2018.</span></li>
+  </ol>
+  
+ </div>
+</div>
+<div class="wrap" style="margin-top:70px">
+ <div class="eyebrow">Capítulo 1 · A Exit</div>
+ <h2>A maior empresa de escape room do Nordeste.</h2>
+ <div class="chips"><span><b>+50 mil</b>jogadores</span><span><b>+50</b>empresas atendidas</span><span><b>+30</b>enredos, do infantil ao terror</span><span><b>+20</b>escolas</span><span><b>+15 mil</b>seguidores orgânicos</span></div>
+ <h3 class="sub">As unidades</h3>
+ <div class="g3">
+  <figure class="ph "><img src="i/u_ssa.jpg" alt="Shopping Salvador Norte, Salvador" loading="lazy"><figcaption>Shopping Salvador Norte, Salvador</figcaption></figure>
+  <figure class="ph "><span class="tg">em obra · projeção</span><img src="i/u_barra.jpg" alt="Shopping Barra, Salvador · inauguração em dezembro de 2026" loading="lazy"><figcaption>Shopping Barra, Salvador · inauguração em dezembro de 2026</figcaption></figure>
+  <figure class="ph "><img src="i/u_rio.jpg" alt="Shopping RioMar, Aracaju" loading="lazy"><figcaption>Shopping RioMar, Aracaju</figcaption></figure>
+ </div>
+ <div class="galw"><div class="galh"><b>Por dentro das salas da Exit</b><span class="galn">4 fotos</span><button type="button" class="galb gp" aria-label="Fotos anteriores">‹</button><button type="button" class="galb gn" aria-label="Próximas fotos">›</button></div><div class="gal" tabindex="0"><figure class="ph"><img src="i/x_salas2.jpg" alt="Quarto do Medo" loading="lazy"><figcaption>Quarto do Medo</figcaption></figure><figure class="ph"><img src="i/x_salas3.jpg" alt="Quarto do Medo · outro ângulo" loading="lazy"><figcaption>Quarto do Medo · outro ângulo</figcaption></figure><figure class="ph"><img src="i/x_salas4.jpg" alt="Zona Z" loading="lazy"><figcaption>Zona Z</figcaption></figure><figure class="ph"><img src="i/x_salas6.jpg" alt="Unidade Salvador · corredor das salas" loading="lazy"><figcaption>Unidade Salvador · corredor das salas</figcaption></figure></div></div>
+ <h3 class="sub">Nossos eventos viram grandes filas</h3>
+ <div class="g2">
+  <figure class="ph alto"><img src="i/vs_fila.jpg" alt="Viva Sergipe · fila para o Escape Room Sergipe" loading="lazy"><figcaption>Viva Sergipe · fila para o Escape Room Sergipe</figcaption></figure>
+  <div class="col">
+   <figure class="ph alto"><img src="i/vs_barro.jpg" alt="Viva Sergipe · nossos cenários são realistas" loading="lazy"><figcaption>Viva Sergipe · nossos cenários são realistas</figcaption></figure>
+  </div>
+ </div>
+ <div class="g3">
+  <figure class="ph alto"><img src="i/jj1.jpg" alt="Jogos da Juventude (COB) · um jogo sobre consciência ambiental e esporte" loading="lazy"><figcaption>Jogos da Juventude (COB) · um jogo sobre consciência ambiental e esporte</figcaption></figure>
+  <figure class="ph alto"><img src="i/jj2.jpg" alt="O cenário recria uma trilha onde o jogador encontra desmatamento, rio poluído e lixo" loading="lazy"><figcaption>O cenário recria uma trilha onde o jogador encontra desmatamento, rio poluído e lixo</figcaption></figure>
+  <figure class="ph alto"><img src="i/so4.jpg" alt="81ª SOEA · sala do painel e dos televisores" loading="lazy"><figcaption>81ª SOEA · sala do painel e dos televisores</figcaption></figure>
+</div>
+ <div class="galw"><div class="galh"><b>Mais das feiras e eventos</b><span class="galn">5 fotos</span><button type="button" class="galb gp" aria-label="Fotos anteriores">‹</button><button type="button" class="galb gn" aria-label="Próximas fotos">›</button></div><div class="gal" tabindex="0"><figure class="ph"><img src="i/x_feiras0.jpg" alt="Viva Sergipe · visitantes no cenário" loading="lazy"><figcaption>Viva Sergipe · visitantes no cenário</figcaption></figure><figure class="ph"><img src="i/x_feiras2.jpg" alt="Viva Sergipe · jogadores em ação" loading="lazy"><figcaption>Viva Sergipe · jogadores em ação</figcaption></figure><figure class="ph"><img src="i/x_feiras4.jpg" alt="Viva Sergipe · público aguardando" loading="lazy"><figcaption>Viva Sergipe · público aguardando</figcaption></figure><figure class="ph"><img src="i/x_feiras5.jpg" alt="81ª SOEA · o cubo do escape room" loading="lazy"><figcaption>81ª SOEA · o cubo do escape room</figcaption></figure><figure class="ph"><img src="i/x_feiras6.jpg" alt="81ª SOEA · entrada da sala" loading="lazy"><figcaption>81ª SOEA · entrada da sala</figcaption></figure></div></div>
+<div class="parc">
+  <div class="parc-h"><div><div class="eyebrow">Quem acreditou na Exit</div><h3>Alguns parceiros</h3></div><div class="parc-n"><b>+50</b><span>empresas atendidas</span></div></div>
+  <div class="parc-g" role="img" aria-label="Logos de parceiros da Exit Games, entre eles a Knauf (gesso acartonado)"><img src="i/p/00.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/01.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/02.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/03.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/04.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/05.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/06.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/07.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/08.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/09.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/10.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/11.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/12.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/13.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/14.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/15.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/16.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/17.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/18.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/19.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/20.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/21.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/22.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/23.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/24.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/25.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/26.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/27.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/28.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/29.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/30.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/31.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/32.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/33.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/34.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/35.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/36.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/37.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/38.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/39.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/40.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/41.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/42.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/43.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/44.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/45.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/46.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/47.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/48.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/49.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/50.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/51.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/52.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/53.webp" alt="" loading="lazy" width="340" height="220"><img src="i/p/54.webp" alt="" loading="lazy" width="340" height="220"></div>
+  <p class="fonte">Marcas registradas de seus respectivos titulares.</p>
+ </div>
+</div>
+</div>
+</section><section class="cap branco" id="c2" data-cap="2" hidden>
+<div class="wrap"><div class="gate" data-n="2" data-l="A"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq">
+    <div class="eyebrow">Cadeado 2 de 6</div>
+    <h3>Em que ano a Costa do Sauípe abriu as portas?</h3>
+    
+    <div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 1990"><img src="i/g_chave.png" alt="" draggable="false"><span>1990</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: 2000"><img src="i/g_chave.png" alt="" draggable="false"><span>2000</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 2010"><img src="i/g_chave.png" alt="" draggable="false"><span>2010</span></div></div>
+    <p class="hint" hidden>Essa chave não gira. Dica: Na virada do milênio.</p>
+  </div>
+</div>
+<div class="aberto" hidden><span class="lt">A</span><span>Cadeado 2 aberto. A letra <b>A</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="bleed curto"><img src="i/g_costa.jpg" alt="Litoral com coqueiros visto do alto" loading="lazy"><span class="tg r">imagem ilustrativa</span></div>
+<div class="wrap duas">
+ <div>
+  <div class="eyebrow">Capítulo 2 · O destino</div>
+  <img class="lg" src="i/logo_sauipe.svg" alt="Costa do Sauípe">
+  <h2>O destino já existe.<br><em>Falta o jogo.</em></h2>
+  <p class="lead">Um resort recebe famílias, grupos e empresas inteiras. A Exit entrega a todos uma história para viverem juntos, sem sair do resort.</p>
+  <div class="chips sau"><span><b>2000</b>inauguração</span><span><b>6 km</b>de praia</span><span><b>76 km</b>de Salvador</span></div>
+  <p class="fonte">Dados públicos do destino: A Tarde, CVC e Correio.</p>
+ </div>
+ <figure class="ph alto"><span class="tg">imagem ilustrativa</span><img src="i/c_gal.jpg" alt="Estudo de projeto do Casarão Exit dentro da Costa do Sauípe" loading="lazy"><figcaption>Estudo de projeto do Casarão Exit dentro da Costa do Sauípe</figcaption></figure>
+</div></div>
+</section><section class="cap branco" id="c3" data-cap="3" hidden>
+<div class="wrap"><div class="gate" data-n="3" data-l="U"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq">
+    <div class="eyebrow">Cadeado 3 de 6</div>
+    <h3>A quantas salas o Casarão Exit pode chegar ainda em 2027?</h3>
+    
+    <div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 6 salas"><img src="i/g_chave.png" alt="" draggable="false"><span>6 salas</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 12 salas"><img src="i/g_chave.png" alt="" draggable="false"><span>12 salas</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: 18 salas"><img src="i/g_chave.png" alt="" draggable="false"><span>18 salas</span></div></div>
+    <p class="hint" hidden>Essa chave não gira. Dica: A proposta começa com 3 e cresce junto com a programação de eventos do resort.</p>
+  </div>
+</div>
+<div class="aberto" hidden><span class="lt">U</span><span>Cadeado 3 aberto. A letra <b>U</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="bleed"><img src="i/c_fach2.jpg" alt="Fachada do Casarão Exit" loading="lazy"><div class="bx"><div class="eyebrow">Capítulo 3 · O Casarão Exit</div><h2>O maior escape room do Brasil dentro de um resort.</h2><p class="lead">Casarão de dois andares, com pátio interno e 18 suítes.</p></div><span class="tg r">imagem ilustrativa</span></div>
+<div class="bleed tour"><video class="vauto" src="i/v_casa.mp4" poster="i/v_casa.jpg" muted loop playsinline preload="none" aria-label="Passeio pelo Casarão: fachada, pátio, escada e galeria"></video><div class="bx"><div class="eyebrow">Um passeio pelo Casarão</div><h3>Da rua ao andar de cima.</h3></div><span class="tg r">perspectiva do projeto · imagem ilustrativa</span></div>
+<div class="wrap">
+ <div class="crono c5">
+  <div class="on"><b>Jan/2027</b><em>3 salas</em><span>Possibilidade de abertura a partir de 20/01, dependendo da negociação</span></div>
+  <div><b>Abr/2027</b><em>+4 salas</em><span>Previsão de 7 salas em operação</span></div>
+  <div><b>Jul/2027</b><em>+4 salas</em><span>Previsão de 11 salas em operação</span></div>
+  <div><b>Out/2027</b><em>+4 salas</em><span>Previsão de 15 salas em operação</span></div>
+  <div class="on"><b>Dez/2027</b><em>+3 salas</em><span>Expectativa de 18 salas em operação</span></div>
+ </div>
+ <div class="protege"><b>Um projeto construído com transparência e de forma sólida.</b> As 18 salas são uma expectativa: dependem do fluxo e da aceitação do público. O cronograma é uma proteção para as duas marcas. Cada nova fase entra quando as salas em operação atingirem a meta de público combinada entre as partes: <span class="ad">[a definir]</span>. As novas salas entram dentro da programação de eventos da Costa do Sauípe.</div>
+ <div class="quem">
+  <div class="q sau"><div class="eyebrow">Costa do Sauípe leva</div><h3>A casa.</h3><ul><li>A sede</li><li>Pintura</li><li>Internet</li><li>Energia</li><li>Aparelhos de ar-condicionado nas salas</li><li>Manutenção da sede</li></ul></div>
+  <div class="q ex"><div class="eyebrow">Exit Games leva</div><h3>Os jogos.</h3><ul><li>Jogos</li><li>Decoração</li><li>Comunicação visual</li><li>Atualização dos jogos</li><li>Sistemas</li><li>Mão de obra</li><li>Manutenção das salas e dos jogos</li></ul></div>
+ </div>
+ <div class="modelo">
+  <div class="mcol"><div class="eyebrow">Como funciona a parceria</div><h3>Uma parceria, não uma compra.</h3>
+   <ol class="mlist"><li><b>A Costa do Sauípe cede o espaço.</b></li><li><b>A Exit monta e opera todos os jogos.</b></li><li><b>As duas dividem o faturamento.</b></li></ol><div class="split"><div class="se"><b>80%</b><span>Exit Games</span></div><div class="ss"><b>20%</b><span>Costa do Sauípe</span></div></div><p class="shop15">Nos shoppings, a Exit trabalha com 15% do faturamento. Para a Costa do Sauípe, a proposta é 20%.</p><ol class="mlist" hidden></ol></div>
+  <div class="mcol"><div class="eyebrow">O que a Costa do Sauípe ganha</div>
+   <ul class="mgan"><li>Uma nova atração dentro do resort, para hóspedes, famílias, grupos e empresas.</li><li>Salas infantis com os mascotes da Costa do Sauípe.</li><li>Jogos criados para os eventos da Costa do Sauípe.</li><li>20% do faturamento, sem investir em jogos, decoração, sistemas ou equipe.</li></ul></div>
+ </div>
+ <div class="simc" id="simc">
+  <div class="eyebrow">Simule a parceria</div>
+  <h3>Quanto a Costa do Sauípe recebe.</h3>
+  <div class="sfase" role="group" aria-label="Fase do Casarão"><button type="button" data-s="3" class="on">Jan · 3 salas</button><button type="button" data-s="7">Abr · 7</button><button type="button" data-s="11">Jul · 11</button><button type="button" data-s="15">Out · 15</button><button type="button" data-s="18">Dez · 18</button></div>
+  <label class="sl">Pessoas por sala, por mês: <b id="simv">60</b><input type="range" id="simr" min="20" max="200" step="10" value="60" aria-label="Pessoas por sala, por mês"></label>
+  <div class="sres"><div><span>Pessoas por mês</span><b id="simp">-</b></div><div><span>Faturamento por mês</span><b id="simf">-</b></div><div class="on"><span>Costa do Sauípe (20%) por mês</span><b id="sims">-</b></div></div>
+  <p class="fonte">Preço por pessoa: R$ 50, o mesmo das unidades da Exit nos shoppings. Simulação ilustrativa: o público real depende do fluxo e da aceitação.</p>
+ </div>
+</div></div>
+</section><section class="cap areia" id="c4" data-cap="4" hidden>
+<div class="wrap"><div class="gate" data-n="4" data-l="Í"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq">
+    <div class="eyebrow">Cadeado 4 de 6</div>
+    <h3>Quantas suítes o Casarão tem para virar salas?</h3>
+    
+    <div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 9 suítes"><img src="i/g_chave.png" alt="" draggable="false"><span>9 suítes</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 12 suítes"><img src="i/g_chave.png" alt="" draggable="false"><span>12 suítes</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: 18 suítes"><img src="i/g_chave.png" alt="" draggable="false"><span>18 suítes</span></div></div>
+    <p class="hint" hidden>Essa chave não gira. Dica: São 9 por andar.</p>
+  </div>
+</div>
+<div class="aberto" hidden><span class="lt">Í</span><span>Cadeado 4 aberto. A letra <b>Í</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="bleed curto"><img src="i/c_pat.jpg" alt="Pátio interno do Casarão Exit" loading="lazy"><div class="bx"><div class="eyebrow">Capítulo 4 · As salas do Casarão</div><h2>Uma casa inteira de histórias.</h2></div><span class="tg r">perspectiva do projeto · imagem ilustrativa</span></div>
+<div class="wrap">
+ <h3 class="sub">Ideias de salas <span class="tgi">ideias para criação · imagens ilustrativas</span></h3>
+ <p class="lead">Salas criadas sob medida para o Casarão, incluindo salas infantis com a Turminha da Zooeira, os mascotes da Costa do Sauípe.</p>
+ <div class="g3"><figure class="ph "><img src="i/s_col.jpg" alt="Casa colonial" loading="lazy"><figcaption>Casa colonial</figcaption></figure><figure class="ph "><img src="i/s_cer.jpg" alt="Sala infantil · O Chamado do Juba" loading="lazy"><figcaption>Sala infantil · O Chamado do Juba</figcaption></figure><figure class="ph "><img src="i/s_sel.jpg" alt="Sala infantil · A Floresta do Blá" loading="lazy"><figcaption>Sala infantil · A Floresta do Blá</figcaption></figure><figure class="ph "><img src="i/s_cat.jpg" alt="Cativeiro" loading="lazy"><figcaption>Cativeiro</figcaption></figure><figure class="ph "><img src="i/s_209.jpg" alt="Quarto 209" loading="lazy"><figcaption>Quarto 209</figcaption></figure><figure class="ph "><img src="i/s_ant.jpg" alt="Quarto antigo" loading="lazy"><figcaption>Quarto antigo</figcaption></figure></div>
+ <div class="galw"><div class="galh"><b>Mais ideias de salas</b> <span class="tgi">ideias para criação · imagens ilustrativas</span><span class="galn">2 fotos</span><button type="button" class="galb gp" aria-label="Fotos anteriores">‹</button><button type="button" class="galb gn" aria-label="Próximas fotos">›</button></div><div class="gal" tabindex="0"><figure class="ph"><img src="i/s_vila.jpg" alt="Ideia de sala · vila baiana" loading="lazy"><figcaption>Ideia de sala · vila baiana</figcaption></figure><figure class="ph"><img src="i/s_cela.jpg" alt="Ideia de sala · cela" loading="lazy"><figcaption>Ideia de sala · cela</figcaption></figure></div></div>
+ <p class="fonte">Juba e Blá são personagens da Turminha da Zooeira. O uso depende de autorização da Costa do Sauípe.</p>
+ <h3 class="sub">Por dentro do Casarão</h3>
+ <div class="g3"><figure class="ph "><img src="i/c_rec5.jpg" alt="Recepção" loading="lazy"><figcaption>Recepção</figcaption></figure><figure class="ph "><img src="i/c_ent2.jpg" alt="Entrada" loading="lazy"><figcaption>Entrada</figcaption></figure><figure class="ph "><img src="i/c_balcao.jpg" alt="Balcão da recepção" loading="lazy"><figcaption>Balcão da recepção</figcaption></figure></div>
+ <div class="g3"><figure class="ph "><img src="i/c_tarde.jpg" alt="Fachada ao entardecer" loading="lazy"><figcaption>Fachada ao entardecer</figcaption></figure><figure class="ph "><img src="i/c_dentro.jpg" alt="Entrada vista de dentro" loading="lazy"><figcaption>Entrada vista de dentro</figcaption></figure><figure class="ph "><img src="i/c_pat.jpg" alt="Pátio interno" loading="lazy"><figcaption>Pátio interno</figcaption></figure></div>
+ <div class="g2 pf"><figure class="ph "><img src="i/c_ponto.jpg" alt="Ponto de foto em frente ao Casarão" loading="lazy"><figcaption>Ponto de foto em frente ao Casarão</figcaption></figure></div>
+ <div class="galw"><div class="galh"><b>Mais do Casarão</b> <span class="tgi">imagens ilustrativas</span><span class="galn">5 fotos</span><button type="button" class="galb gp" aria-label="Fotos anteriores">‹</button><button type="button" class="galb gn" aria-label="Próximas fotos">›</button></div><div class="gal" tabindex="0"><figure class="ph"><img src="i/c_esc.jpg" alt="Escada do pátio" loading="lazy"><figcaption>Escada do pátio</figcaption></figure><figure class="ph"><img src="i/c_esc2.jpg" alt="Escada iluminada" loading="lazy"><figcaption>Escada iluminada</figcaption></figure><figure class="ph"><img src="i/c_gal2.jpg" alt="Galeria do andar de cima" loading="lazy"><figcaption>Galeria do andar de cima</figcaption></figure><figure class="ph"><img src="i/c_cima.jpg" alt="Pátio visto de cima" loading="lazy"><figcaption>Pátio visto de cima</figcaption></figure><figure class="ph"><img src="i/x_casa1.jpg" alt="Varanda sobre o pátio" loading="lazy"><figcaption>Varanda sobre o pátio</figcaption></figure></div></div>
+</div></div>
+</section><section class="cap areia" id="c5" data-cap="5" hidden>
+<div class="wrap"><div class="gate" data-n="5" data-l="P"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq">
+    <div class="eyebrow">Cadeado 5 de 6</div>
+    <h3>Além das famílias hospedadas, quem mais ganha um destino com esta parceria?</h3>
+    
+    <div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: Só quem já está no resort"><img src="i/g_chave.png" alt="" draggable="false"><span>Só quem já está no resort</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: Empresas e escolas"><img src="i/g_chave.png" alt="" draggable="false"><span>Empresas e escolas</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: Ninguém mais"><img src="i/g_chave.png" alt="" draggable="false"><span>Ninguém mais</span></div></div>
+    <p class="hint" hidden>Essa chave não gira. Dica: Um chega de crachá. O outro, de uniforme.</p>
+  </div>
+</div>
+<div class="aberto" hidden><span class="lt">P</span><span>Cadeado 5 aberto. A letra <b>P</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="bleed curto"><img src="i/g_confra.jpg" alt="Equipe de empresa em confraternização no gramado à beira-mar" loading="lazy" style="object-position:50% 45%"><span class="tg r">imagem ilustrativa</span></div>
+<div class="wrap">
+ <div class="eyebrow">Capítulo 5 · Novos públicos</div>
+ <h2>Agora as empresas têm um destino.</h2>
+  <div class="prod">
+  <div class="pt"><div class="eyebrow">Novo produto</div><h3>Exit Vision Sauípe</h3><p>O jogo que mostra, ao vivo, como a equipe decide, lidera e coopera. Agora dentro de um resort.</p>
+   <div class="fmt"><div><b>Day use</b><span>A equipe passa o dia na Costa do Sauípe e vive o jogo.</span></div><div><b>Confraternização inteira</b><span>O evento da empresa acontece no resort, com a análise da Exit. Depois, a confraternização e a estadia são os pontos altos.</span></div></div>
+   <p class="fonte">Pacotes e valores: <span class="ad">[a definir]</span></p></div>
+  <div class="evcol"><figure class="evt"><img src="i/ev_tela.png" alt="Tela do relatório do Exit Vision" loading="lazy"><figcaption>Tela do Exit Vision · exemplo com dados de demonstração</figcaption></figure><div class="g2 peq"><figure class="ph "><img src="i/co2.jpg" alt="Ultragaz" loading="lazy"><figcaption>Ultragaz</figcaption></figure><figure class="ph "><img src="i/co1b.jpg" alt="Tecnogera" loading="lazy"><figcaption>Tecnogera</figcaption></figure></div></div>
+ </div>
+ <h3 class="sub">E as escolas recebem o agente de férias</h3>
+ <p class="lead">A Exit vai às escolas parceiras acompanhada do agente de férias da Costa do Sauípe. O jogo abre a conversa com as famílias.</p>
+ <div class="g3"><figure class="ph "><img src="i/es1.jpg" alt="Encontro escolar" loading="lazy"><figcaption>Encontro escolar</figcaption></figure><figure class="ph "><img src="i/es3.jpg" alt="Palestra com alunos" loading="lazy"><figcaption>Palestra com alunos</figcaption></figure><figure class="ph "><img src="i/es4.jpg" alt="Turma na Exit" loading="lazy"><figcaption>Turma na Exit</figcaption></figure></div>
+</div></div>
+</section><section class="cap ceu" id="c6" data-cap="6" hidden>
+<div class="wrap"><div class="gate" data-n="6" data-l="E"><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe">
+  <div class="gimg" data-alvo><img src="i/g_cad2.jpg" alt="Cadeado fechado" draggable="false"></div>
+  <div class="gq">
+    <div class="eyebrow">Cadeado 6 de 6</div>
+    <h3>Quantos jogadores passam, em média, por mês em cada unidade da Exit?</h3>
+    
+    <div class="keys"><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 300"><img src="i/g_chave.png" alt="" draggable="false"><span>300</span></div><div class="key" data-ok="1" tabindex="0" role="button" aria-label="Chave: 1.000"><img src="i/g_chave.png" alt="" draggable="false"><span>1.000</span></div><div class="key" data-ok="0" tabindex="0" role="button" aria-label="Chave: 5.000"><img src="i/g_chave.png" alt="" draggable="false"><span>5.000</span></div></div>
+    <p class="hint" hidden>Essa chave não gira. Dica: São quatro dígitos. E nas férias esse número se multiplica.</p>
+  </div>
+</div>
+<div class="aberto" hidden><span class="lt">E</span><span>Cadeado 6 aberto. A letra <b>E</b> entrou no código.</span></div></div>
+<div class="conteudo" hidden>
+<div class="bleed"><img src="i/g_sala2.jpg" alt="Sala temática de férias na praia, ensolarada, com casas coloridas e coqueiros" loading="lazy"><div class="bx"><div class="eyebrow">Capítulo 6 · Além do projeto: parceria nas lojas Exit</div><h2>Destino Sauípe: a sala que vende férias.</h2><p class="cartaz">Esta sala estará em cartaz em todas as unidades da Exit.</p></div><span class="tg r">imagem conceito</span></div>
+<div class="wrap">
+ <blockquote class="enredo">As malas estão na porta. O embarque para a Costa do Sauípe é hoje. E as passagens sumiram. No lugar delas, um baú trancado e um bilhete: <em>“Férias assim não se ganham, se conquistam.”</em> O relógio já está correndo.</blockquote>
+ <div class="premio"><b>Engajamento</b><span>O primeiro grupo a escapar ganha passaporte day use na Costa do Sauípe para os participantes.</span></div>
+ <div class="tec" style="margin-top:22px;margin-bottom:34px">
+  <figure class="ph "><img src="i/jog_vs.jpg" alt="Jogadores no Viva Sergipe" loading="lazy"><figcaption>Jogadores no Viva Sergipe</figcaption></figure>
+  <div><div class="eyebrow">Tecnologia própria</div><h3>Não há como burlar o jogo.</h3><p class="lead">Com prêmio em jogo, a disputa precisa ser limpa. O Exit System roda em todas as salas e a Exit muda as senhas instantaneamente. O que um grupo descobriu não serve para o próximo.</p></div>
+  </div>
+ <div class="chips big"><span><b>1.000</b>pessoas por mês, em média, por unidade (média real de 2026 pelo Exit System)</span><span><b>×4</b>nas férias</span></div>
+ <h3 class="sub">Segundos de atenção ou 30 minutos dentro da história</h3>
+ <p class="lead">Quem joga na Exit é o mesmo público que viaja de férias. A diferença está no tempo de atenção.</p>
+ <div class="conta">
+  <div><span>Painel de LED em shopping</span><b>Poucos segundos</b><small>de atenção de quem passa. Referência de mercado: <span class="nw">R$ 15 mil</span> a <span class="nw">R$ 30 mil</span> por mês, em tabelas de mídia de shoppings (2024 e 2026).</small></div>
+  <div><span>Sala Destino Sauípe na Exit</span><b>30 minutos</b><small>dentro da história da Costa do Sauípe, com 1.000 pessoas por mês, em média, por unidade.</small></div>
+  <div class="on"><span>Custo com a Exit</span><b><span class="ad">[a definir]</span></b></div>
+ </div>
+ <div class="fundo">
+  <div class="eyebrow">Além dos jogadores</div>
+  <h3>O público do shopping passa pela loja. Quem entra conhece a Costa do Sauípe.</h3>
+  <div class="f3">
+   <div><i>1</i><b>Na recepção</b><span>Quadro ou elementos da Costa do Sauípe.</span></div>
+   <div><i>2</i><b>Na TV</b><span>O enredo do jogo em exibição.</span></div>
+   <div><i>3</i><b>No jogo</b><span>A sala Destino Sauípe.</span></div>
+  </div>
+  <p class="vive">Quem joga viverá a Costa do Sauípe.</p>
+ </div>
+</div></div>
+</section>
+<section class="final" id="final" hidden>
+ <div id="cofre">
+  <div class="wrap" style="text-align:center">
+   <div class="eyebrow">O código final</div>
+   <h2>Seis letras formam a última chave.</h2>
+   <div class="codigo" id="codigo"><span data-l="S"></span><span data-l="A"></span><span data-l="U"></span><span data-l="Í"></span><span data-l="P"></span><span data-l="E"></span></div>
+   <p class="lead" id="falta"></p>
+  </div>
+  <div class="bleed fbau" id="fbau" data-alvo><img class="gsol" src="i/sol_sauipe.svg" alt="O sol da Costa do Sauípe"><img src="i/g_fim0.jpg" alt="Baú trancado na areia ao pôr do sol" draggable="false">
+   <div class="key mestra" id="mestra" tabindex="0" role="button" aria-label="Chave final" hidden><img src="i/g_chave.png" alt="" draggable="false"><span>SAUÍPE</span></div>
+  </div>
+ </div>
+ <div id="tesouro" hidden>
+  <div class="bleed alto"><video id="vfim" src="i/v_fim.mp4" poster="i/g_fim0.jpg" muted playsinline preload="auto" aria-label="O baú se abre na praia ao pôr do sol"></video><div class="uni2" id="uni2" aria-label="Exit Games e Costa do Sauípe"><img class="k" src="i/g_chave.png" alt=""><img class="s" src="i/sol_sauipe.svg" alt=""><span class="fl"></span><div class="brands lk"><div class="b ex"><img src="i/logo.png" alt="Exit Games"></div><div class="b sa"><img src="i/logo_sauipe.svg" alt="Costa do Sauípe"></div></div></div><div class="bx"><div class="eyebrow">O tesouro</div><h2>Nós escapamos para Sauípe.</h2></div></div>
+  <div class="wrap">
+   <div class="bleed casafim"><img src="i/c_noite.jpg" alt="Casarão Exit à noite" loading="lazy"><div class="bx"><div class="eyebrow">O projeto</div><h2>O Casarão Exit.</h2><p class="lead">O maior escape room do Brasil dentro de um resort.</p></div><span class="tg r">perspectiva do projeto · imagem ilustrativa</span></div>
+   <p class="resumo"><b>Jan/2027:</b> 3 salas (possibilidade a partir de 20/01, dependendo da negociação). <b>Abr:</b> 7. <b>Jul:</b> 11. <b>Out:</b> 15. <b>Dez/2027:</b> expectativa de 18 salas, conforme o fluxo e a aceitação do público. A Costa do Sauípe leva a casa. A Exit leva os jogos. Faturamento: 80% Exit Games, 20% Costa do Sauípe.</p>
+   <div class="passo">
+    <div class="eyebrow">Próximo passo</div>
+    <ol><li><b>Visita técnica ao Casarão</b><span><span class="ad">[a definir]</span></span></li><li><b>Alinhamento do modelo de parceria</b><span><span class="ad">[a definir]</span></span></li><li><b>Assinatura</b><span><span class="ad">[a definir]</span></span></li><li class="on"><b>Abertura</b><span>Possibilidade a partir de 20/01/2027</span></li></ol>
+   </div>
+   <div class="mkt">
+    <img src="i/g_sala2.jpg" alt="Sala Destino Sauípe" loading="lazy">
+    <div class="mt"><div class="eyebrow">E, além do projeto · possibilidade</div>
+     <h3>Marketing diário da Costa do Sauípe em cada unidade Exit.</h3>
+     <p>A sala <b>Destino Sauípe</b> em cartaz em todas as unidades da Exit. Todos os dias, cada grupo que joga a Destino Sauípe vive férias na Costa do Sauípe.</p>
+     <div class="mchips"><span><b>4</b>unidades até 2027: Aracaju, Salvador Norte, Barra e Teresina</span><span><b>Todos</b>os dias, em cada sessão</span><span><b>1.000</b>pessoas por mês, em média, por unidade</span></div>
+     <p class="mval">Valor mensal por shopping: <span class="ad">[a definir]</span></p>
+    </div>
+   </div>
+   <div class="fecho">
+    <div><h2>Vamos escrever esta <em>história</em> juntos.</h2><p class="lead">Não criamos apenas jogos. Conectamos pessoas.</p></div>
+    <div class="ct">
+     <p class="resp-ct"><b>Tiago Zago Thomasi</b><br>Diretor Comercial · <span class="nw">(79) 98135-4174</span></p><p>exitgamesbrasil.com.br<br>contato@exitgamesbrasil.com.br<br>WhatsApp <span class="nw">(79) 98852-1010</span> · <span class="nw">(79) 98131-4478</span><br>Instagram @exit.games · @exitgames.ssa</p></div>
+   </div>
+  </div>
+ </div>
+ <div class="foot">Exit Games × Costa do Sauípe · Projeto Casarão Exit · Proposta de parceria 2027 · Imagens do Casarão e da sala Destino Sauípe são ilustrativas do estudo de projeto.</div>
+</section>
+<div class="lb" id="lb" hidden role="dialog" aria-label="Foto ampliada"><img alt=""><p></p><button type="button" class="lx" aria-label="Fechar">×</button><button type="button" class="lp" aria-label="Foto anterior">‹</button><button type="button" class="ln" aria-label="Próxima foto">›</button></div>
+<script>
+(()=>{const r=document.getElementById('simr');if(!r)return;let sal=3;const fm=n=>'R$ '+Math.round(n).toLocaleString('pt-BR');
+function up(){const p=+r.value,pes=sal*p,fat=pes*50;document.getElementById('simv').textContent=p;document.getElementById('simp').textContent=pes.toLocaleString('pt-BR');document.getElementById('simf').textContent=fm(fat);document.getElementById('sims').textContent=fm(fat*.2)}
+r.addEventListener('input',up);document.querySelectorAll('.sfase button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.sfase button').forEach(x=>x.classList.remove('on'));b.classList.add('on');sal=+b.dataset.s;up()}));up()})();
+
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const abre=$('#abre'),mapa=$('#mapa'),chave=$('#chave'),hot=$('#mapahot');
+// --- posicao de pontos da foto (1600x900, cover, centro 60%)
+function pt(x,y){const w=abre.clientWidth,h=abre.clientHeight,s=Math.max(w/1600,h/900),fx=w<860&&h>w?.45:.5;return{x:(w-1600*s)*fx+x*s,y:(h-900*s)*.6+y*s,s}}
+function coloca(){const port=abre.clientWidth<860&&abre.clientHeight>abre.clientWidth,k=port?pt(880,850):pt(1330,815),kh=270*k.s;chave.style.setProperty('--kh',kh+'px');const kw=kh*184/588;
+ chave.style.left=Math.min(k.x-kw/2,abre.clientWidth-kw*2.6)+'px';chave.style.top=(k.y-kh*.3)+'px';
+  const sol=$('#sol'),cd=$('.abre .card').getBoundingClientRect(),ar=abre.getBoundingClientRect(),W=abre.clientWidth;let sw=Math.max(56,Math.min(150,W*.09)),sx,sy;
+ if(cd.left-ar.left-sw-36>W*.22){sx=cd.left-ar.left-sw-36;sy=Math.max(74,cd.top-ar.top+6)}
+ else if(cd.top-ar.top>sw+84){sx=W*.5-sw/2;sy=70}
+ else if(cd.left-ar.left>=Math.max(sw,96)+34){sw=Math.max(sw,96);sx=(cd.left-ar.left-sw)/2;sy=Math.max(12,cd.top-ar.top-10)}
+ else{sw=Math.max(56,Math.min(110,cd.top-ar.top-24));sx=16;sy=Math.max(8,(cd.top-ar.top-sw)/2)}
+ sol.style.width=sw+'px';sol.style.left=sx+'px';sol.style.top=sy+'px';
+ const a=pt(490,395),c=pt(975,580);hot.style.left=a.x+'px';hot.style.top=a.y+'px';hot.style.width=(c.x-a.x)+'px';hot.style.height=(c.y-a.y)+'px';
+ const bc=pt(740,600)}
+coloca();addEventListener('resize',coloca);addEventListener('load',coloca);addEventListener('pageshow',coloca);document.addEventListener('visibilitychange',coloca);
+if(window.ResizeObserver)new ResizeObserver(()=>coloca()).observe(abre);[150,600,1500,3000].forEach(t=>setTimeout(coloca,t));if(document.fonts&&document.fonts.ready)document.fonts.ready.then(coloca);
+function alvoBau(){const r=abre.getBoundingClientRect(),a=pt(400,420),c=pt(1060,800),l=pt(740,600);return{l:r.left+a.x,t:r.top+a.y,r:r.left+c.x,b:r.top+c.y,cx:r.left+l.x,cy:r.top+l.y}}
+// --- arrastar
+function arrasta(el,alvo,tenta,marca,soArrasto){let sx,sy,moveu,ativo=false;
+ const centro=()=>{const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}};
+ const vai=(x,y,fim)=>{const c=centro(),dx=parseFloat(el.style.getPropertyValue('--dx'))||0,dy=parseFloat(el.style.getPropertyValue('--dy'))||0;
+  el.classList.add('anim');el.style.setProperty('--dx',(dx+x-c.x)+'px');el.style.setProperty('--dy',(dy+y-c.y)+'px');setTimeout(fim,520)};
+ const volta=()=>{el.classList.add('anim');el.style.setProperty('--dx','0px');el.style.setProperty('--dy','0px');setTimeout(()=>el.classList.remove('anim'),520)};
+ const solta=(x,y,forca)=>{const a=alvo();if(marca)marca(false);const dentro=x>=a.l-30&&x<=a.r+30&&y>=a.t-30&&y<=a.b+30;
+  if(dentro||forca){vai(a.cx,a.cy,()=>{if(tenta()){el.classList.add('foi')}else{volta()}})}else volta()};
+ el.addEventListener('pointerdown',e=>{if(el.classList.contains('foi'))return;ativo=true;moveu=false;sx=e.clientX-(parseFloat(el.style.getPropertyValue('--dx'))||0);sy=e.clientY-(parseFloat(el.style.getPropertyValue('--dy'))||0);
+  el.setPointerCapture(e.pointerId);el.classList.remove('anim');el.classList.add('drag');if(marca)marca(true);e.preventDefault()});
+ el.addEventListener('pointermove',e=>{if(!ativo)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>6)moveu=true;el.style.setProperty('--dx',dx+'px');el.style.setProperty('--dy',dy+'px')});
+ const fim=e=>{if(!ativo)return;ativo=false;el.classList.remove('drag');if(soArrasto&&!moveu){if(marca)marca(false);volta();return}solta(e.clientX,e.clientY,!moveu)};
+ el.addEventListener('pointerup',fim);el.addEventListener('pointercancel',e=>{ativo=false;el.classList.remove('drag');volta()});
+ el.addEventListener('keydown',e=>{if(soArrasto)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();solta(0,0,true)}})}
+// --- abertura
+function abrirBau(){abre.classList.add('open');som('bau');setTimeout(()=>{hot.hidden=false},1500)}
+arrasta(chave,alvoBau,()=>{abrirBau();return true},null,true);
+function abrirMapa(suave){document.body.classList.add('jogo');mapa.hidden=false;abre.hidden=true;scrollTo(0,0)}
+hot.addEventListener('click',()=>{const r=hot.getBoundingClientRect(),a=abre.getBoundingClientRect();$('.abre .b2').style.transformOrigin=((r.left+r.width/2-a.left)/a.width*100)+'% '+((r.top+r.height/2-a.top)/a.height*100)+'%';abre.classList.add('zoom');hot.hidden=true;setTimeout(abrirMapa,950)});
+// --- enigma do mapa
+const mfb=$('#mfb'),gf=$('#gf'),rolha=$('#rolha');let achou=0;
+function acende(u){u.classList.add('ok');u.dataset.on.split(' ').forEach(c=>$('.mapa .'+c).classList.add('on'))}
+function resolveMapa(rapido){$$('.uf[data-ok="1"]').forEach(acende);
+ const t=rapido?0:1;setTimeout(()=>{mapa.classList.add('tere');$('.mapa .c1').classList.add('on');$('.mapa .l1').classList.add('on');
+  $('#mh').textContent='Todos os caminhos levam à Costa do Sauípe.';$('#ml').textContent='Aracaju e Salvador hoje. Teresina em 2027.';mfb.textContent=''},900*t);
+ setTimeout(()=>mapa.classList.add('fase2'),2800*t);
+ if(!rapido)setTimeout(()=>{gf.hidden=false;posGar();const vg=$('#vgar');let fez=false;const fim=()=>{if(fez)return;fez=true;gf.classList.add('fim')};vg.addEventListener('ended',fim,{once:true});try{vg.currentTime=0;vg.play().catch(fim)}catch(e){fim()}setTimeout(fim,9000);const c=$('#mh').closest('.mapa-txt');c.style.animation='none';c.style.opacity=1;void c.offsetWidth;c.style.transition='opacity .8s';c.style.opacity=0;setTimeout(()=>c.style.visibility='hidden',800)},6400)}
+$$('.uf').forEach(u=>{const f=()=>{if(u.classList.contains('ok')||u.classList.contains('no')||u.classList.contains('meio')||mapa.classList.contains('tere'))return;const k=u.dataset.ok;
+  if(k==='1'){acende(u);achou++;mfb.textContent=achou<2?'Isso. '+u.dataset.nome+' tem Exit.':'';if(achou===2)resolveMapa(false)}
+  else if(k==='2'){u.classList.add('meio');mfb.textContent='Quase. Em Alagoas a Exit atende eventos corporativos, ainda sem unidade aberta.'}
+  else if(k==='3'){u.classList.add('meio');mfb.textContent='Ainda não. '+u.dataset.nome+' está em negociação para 2028 com o Grupo JCPM.'}
+  else{u.classList.add('no');mfb.textContent=u.dataset.nome==='Piauí'?'Hoje ainda não. Mas guarde esse lugar.':'A Exit ainda não chegou lá.'}};
+ u.addEventListener('click',f);u.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}})});
+// --- garrafa: puxar a rolha
+function posGar(){const b=$('#gbox'),w=gf.clientWidth,h=gf.clientHeight;if(!w||!h)return;let k,l,t;if(w>=h){k=Math.max(w/1280,h/714);l=(w-1280*k)/2;t=(h-714*k)/2}else{k=Math.min(w/(.46*1280),h/714);l=w/2-.585*1280*k;t=h/2-.55*714*k}Object.assign(b.style,{width:1280*k+'px',height:714*k+'px',left:l+'px',top:t+'px'})}
+addEventListener('resize',()=>{if(!gf.hidden)posGar()});
+function abrirGarrafa(){if(gf.classList.contains('aberta'))return;gf.classList.add('aberta');som('rolha');rolha.classList.remove('drag');rolha.classList.add('fora');
+ rolha.style.setProperty('--dx',((parseFloat(rolha.style.getPropertyValue('--dx'))||0)+160)+'px');rolha.style.setProperty('--dy',((parseFloat(rolha.style.getPropertyValue('--dy'))||0)+120)+'px');rolha.style.setProperty('--rr','140deg');
+ setTimeout(()=>{$('#c1').hidden=false;abrirCap($('#c1'),true)},900)}
+(()=>{let on=false,sx,sy;
+ rolha.addEventListener('pointerdown',e=>{if(gf.classList.contains('aberta'))return;on=true;sx=e.clientX;sy=e.clientY;rolha.setPointerCapture(e.pointerId);rolha.classList.add('drag');e.preventDefault()});
+ rolha.addEventListener('pointermove',e=>{if(!on)return;const dx=e.clientX-sx,dy=(e.clientY-sy)*.5;rolha.style.setProperty('--dx',dx+'px');rolha.style.setProperty('--dy',dy+'px');if(Math.hypot(e.clientX-sx,e.clientY-sy)>22){on=false;abrirGarrafa()}});
+ rolha.addEventListener('pointerup',e=>{if(!on)return;on=false;const dx=e.clientX-sx;if(Math.abs(dx)<6){abrirGarrafa()}else{rolha.classList.remove('drag');rolha.style.setProperty('--dx','0px');rolha.style.setProperty('--dy','0px')}});
+ rolha.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();abrirGarrafa()}})})();
+// --- codigo
+const got=new Set(),mestra=$('#mestra');
+function letra(l){if(!got.has(l)&&!lendo)som('cad');got.add(l);$$('.hud span,.codigo span').forEach(s=>{if(s.dataset.l===l){s.textContent=l;s.classList.add('on')}});
+ if(got.size===6){$('#falta').textContent='';mestra.hidden=false}
+ else{const n=6-got.size;$('#falta').textContent=''}}
+function abrirCap(sec,scroll){if(sec.dataset.done)return;sec.dataset.done=1;const g=sec.querySelector('.gate:not(.mini)'),ab=sec.querySelector('.aberto');
+ const fim=()=>{const nx=sec.nextElementSibling;if(nx&&(nx.matches('.cap')||nx.id==='final'))nx.hidden=false;if(g)g.hidden=true;ab.hidden=false;const c=sec.querySelector('.conteudo');c.hidden=false;
+  c.querySelectorAll('video[data-auto]').forEach(v=>{v.play().catch(()=>{})});letra(g?g.dataset.l:sec.dataset.l);if(scroll)(g?sec:ab).scrollIntoView({behavior:'smooth',block:'start'})};
+ if(scroll&&g){g.classList.add('sai');setTimeout(fim,600)}else fim()}
+
+$$('.gate').forEach(g=>{const al=g.querySelector('[data-alvo]'),sec=g.closest('.cap');
+ const alvo=()=>{const r=al.getBoundingClientRect();return{l:r.left,t:r.top,r:r.right,b:r.bottom,cx:r.left+r.width*.5,cy:r.top+r.height*.6}};
+ g.querySelectorAll('.key').forEach(k=>arrasta(k,alvo,()=>{if(k.dataset.ok==='1'){if(g.classList.contains('mini')){setTimeout(()=>{g.hidden=true;g.nextElementSibling.hidden=false},350)}else setTimeout(()=>abrirCap(sec,true),250);return true}
+  g.querySelector('.hint').hidden=false;setTimeout(()=>k.classList.add('errada'),540);return false},on=>al.classList.toggle('alvo-on',on)))});
+// --- final
+const fb=$('#fbau');
+function posUni(){const u=$('#uni2'),b=u.parentElement,w=b.clientWidth,h=b.clientHeight,k=Math.max(w/1280,h/714),ox=(w-1280*k)/2,oy=(h-714*k)/2;u.style.setProperty('--sx',Math.min(w*.85,Math.max(w*.15,ox+.665*1280*k))+'px');u.style.setProperty('--sy',(oy+.322*714*k)+'px');u.style.setProperty('--kx',(ox+.43*1280*k)+'px');u.style.setProperty('--ky',(oy+.62*714*k)+'px')}
+addEventListener('resize',()=>{if(!$('#tesouro').hidden)posUni()});
+let uniu=false;function unir(){if(uniu)return;uniu=true;posUni();$('#uni2').classList.add('on');setTimeout(()=>$('#tesouro').classList.add('uniu'),3900)}
+function abrirFinal(){$('#tesouro').hidden=false;$('#cofre').hidden=true;$('#tesouro').scrollIntoView({behavior:'smooth'});som('bau');posUni();const v=$('#vfim');v.addEventListener('ended',unir,{once:true});setTimeout(()=>{try{v.currentTime=0;v.play().catch(()=>unir())}catch(e){unir()}},700);setTimeout(unir,7200)}
+arrasta(mestra,()=>{const r=fb.getBoundingClientRect();return{l:r.left+r.width*.2,t:r.top,r:r.left+r.width*.7,b:r.bottom,cx:r.left+r.width*.46,cy:r.top+r.height*.6}},()=>{setTimeout(abrirFinal,300);return true},on=>fb.classList.toggle('alvo-on',on));
+const lb=$('#lb'),lbi=lb.querySelector('img'),lbc=lb.querySelector('p');let lbs=[],lbk=0;
+function lbShow(k){lbk=(k+lbs.length)%lbs.length;const f=lbs[lbk];lbi.src=f.querySelector('img').getAttribute('src');lbi.alt=f.querySelector('img').alt;const c=f.querySelector('figcaption');lbc.textContent=c?c.textContent:'';lb.querySelector('.lp').hidden=lb.querySelector('.ln').hidden=lbs.length<2}
+document.addEventListener('click',e=>{const im=e.target.closest('.ph img,.evt img');if(!im)return;const f=im.closest('.ph,.evt'),grp=f.parentElement;lbs=[...grp.children].filter(x=>x.matches&&x.matches('.ph,.evt')&&x.querySelector('img'));lb.hidden=false;lbShow(lbs.indexOf(f));lb.querySelector('.lx').focus()});
+lb.querySelector('.lx').addEventListener('click',()=>lb.hidden=true);lb.querySelector('.lp').addEventListener('click',()=>lbShow(lbk-1));lb.querySelector('.ln').addEventListener('click',()=>lbShow(lbk+1));
+lb.addEventListener('click',e=>{if(e.target===lb)lb.hidden=true});
+document.addEventListener('keydown',e=>{if(lb.hidden)return;if(e.key==='Escape')lb.hidden=true;if(e.key==='ArrowLeft')lbShow(lbk-1);if(e.key==='ArrowRight')lbShow(lbk+1)});
+
+// --- som (desligado por padrao)
+let somOn=false,lendo=false;const SONS={bau:'i/s_bau.mp3',cad:'i/s_cad.mp3',rolha:'i/s_rolha.mp3'},mar=new Audio('i/s_mar.mp3');mar.loop=true;mar.volume=.3;
+function som(k){if(!somOn)return;try{const a=new Audio(SONS[k]);a.volume=.8;a.play().catch(()=>{})}catch(e){}}
+$('#bsom').addEventListener('click',()=>{somOn=!somOn;const b=$('#bsom');b.classList.toggle('on',somOn);b.setAttribute('aria-pressed',somOn);b.setAttribute('aria-label',somOn?'Desligar o som':'Ligar o som');if(somOn){mar.play().catch(()=>{})}else mar.pause()});
+// --- dica da chave
+// --- videos que tocam quando aparecem
+const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting){v.play().catch(()=>{})}else v.pause()}),{threshold:.35});$$('video.vauto').forEach(v=>vio.observe(v));
+// --- continuar, atalhos das letras e setas do teclado
+$$('.cap .conteudo').forEach(c=>{const b=document.createElement('button');b.type='button';b.className='seg';b.innerHTML='Próximo cadeado <span aria-hidden="true">↓</span>';
+ b.addEventListener('click',()=>{const nx=c.closest('.cap').nextElementSibling;if(nx&&!nx.hidden)nx.scrollIntoView({behavior:'smooth',block:'start'})});const w=document.createElement('div');w.className='wrap segw';w.appendChild(b);c.appendChild(w)});
+const ORD='SAUÍPE';$$('.hud span').forEach(s=>{s.setAttribute('role','button');s.tabIndex=0;const go=()=>{if(!s.classList.contains('on'))return;const sec=$('#c'+(ORD.indexOf(s.dataset.l)+1));if(sec&&!sec.hidden)sec.scrollIntoView({behavior:'smooth',block:'start'})};s.addEventListener('click',go);s.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}})});
+function marcos(){return $$('#mapa,.cap,#final,.cap .conteudo,.bleed,.perg,.parc,.conta,.fecho,.conteudo h2,.conteudo h3,.galw,.evt').filter(x=>!x.hidden&&x.offsetParent!==null&&!x.closest('[hidden]')).map(x=>x.getBoundingClientRect().top+scrollY).sort((a,b)=>a-b).filter((v,i,ar)=>i===0||v-ar[i-1]>Math.max(220,innerHeight*.35))}
+document.addEventListener('keydown',e=>{if(!lb.hidden||/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;const k=e.key;if(!['ArrowRight','ArrowLeft','PageDown','PageUp'].includes(k))return;
+ if(document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('key'))return;
+ const m=marcos(),y=scrollY+70;let t;if(k==='ArrowRight'||k==='PageDown')t=m.find(v=>v>y+20);else t=[...m].reverse().find(v=>v<y-20);if(t!==undefined){e.preventDefault();scrollTo({top:t-64,behavior:'smooth'})}});
+
+$$('.galw').forEach(w=>{const g=w.querySelector('.gal');w.querySelector('.gp').addEventListener('click',()=>g.scrollBy({left:-g.clientWidth*.8,behavior:'smooth'}));w.querySelector('.gn').addEventListener('click',()=>g.scrollBy({left:g.clientWidth*.8,behavior:'smooth'}))});
+$$('.rota .mais').forEach(m=>m.addEventListener('click',()=>{const d=m.nextElementSibling,o=d.hidden;d.hidden=!o;m.setAttribute('aria-expanded',o)}));
+$('#ler').addEventListener('click',()=>{lendo=true;$$('.cap,#final').forEach(s=>s.hidden=false);abrirMapa();resolveMapa(true);$('#c1').hidden=false;$$('.gate.mini').forEach(g=>{g.hidden=true;g.nextElementSibling.hidden=false});$$('.cap').forEach(s=>abrirCap(s,false));$('#tesouro').hidden=false;$('#cofre').hidden=true;const v=$('#vfim');try{v.currentTime=v.duration||5}catch(e){}uniu=true;$('#uni2').classList.add('est');$('#tesouro').classList.add('uniu');setTimeout(posUni,60)});
+</script></body></html>

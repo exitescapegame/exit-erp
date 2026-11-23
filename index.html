@@ -1487,6 +1487,11 @@ tbody tr:hover td { background: #f4f4ff !important; }
           <span style="font-size:12px;color:var(--text2)">Colaborador ativo</span>
         </div>
       </div>
+      <div class="ir">
+        <div class="fg"><label>🚌 Vale transporte (R$/dia)</label><input type="number" id="mClVT" min="0" step="0.01" value="0" placeholder="0,00"></div>
+        <div class="fg"><label>🍽️ Vale alimentação (R$/dia)</label><input type="number" id="mClVA" min="0" step="0.01" value="0" placeholder="0,00"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin:-4px 0 10px">Valores pagos por dia trabalhado (dias com ponto registrado). Deixe 0 se o colaborador não recebe.</div>
       <!-- Nota sobre sessão ADM -->
       <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:var(--rsm);padding:8px 10px;font-size:11px;color:#166534">
         ℹ️ Sua sessão de Administrador <strong>não será encerrada</strong> ao salvar. Você pode criar vários colaboradores consecutivamente.
@@ -2788,6 +2793,8 @@ async function salvarColabSeguro() {
       unidadeId: String(typeof ev === 'function' ? ev('mClUn') : ''), // [v45] String direto — parseInt quebrava IDs não-numéricos (ex: "mpn5jhsjipuuy2erv5n"→NaN)
       valorHora: parseFloat(typeof ev === 'function' ? ev('mClHr') : 0) || 0,
       email: (typeof ev === 'function' ? ev('mClEmail') : '').trim(),
+      valeTransporte: Math.max(0, parseFloat(document.getElementById('mClVT')?.value) || 0),
+      valeAlimentacao: Math.max(0, parseFloat(document.getElementById('mClVA')?.value) || 0),
       ativo: document.getElementById('mClAt')?.checked !== false
     };
 
@@ -12605,6 +12612,7 @@ function rPonto(){
       const dias= [...new Set(pp.map(p=>p.data))].length;
       const hrs = pp.reduce((s,p)=>s+(p.duracaoMs||0),0)/3600000;
       const prev= +(hrs*(c.valorHora||0)).toFixed(2);
+      const benef= +(dias*((parseFloat(c.valeTransporte)||0)+(parseFloat(c.valeAlimentacao)||0))).toFixed(2);
       const cg  = DB.cargos.find(g=>g.id===c.cargoId);
       return`<tr>
         <td>
@@ -12615,6 +12623,7 @@ function rPonto(){
         <td style="color:var(--accent);font-weight:600">${hrs.toFixed(1)}h</td>
         <td>${fM(c.valorHora||0)}</td>
         <td style="font-weight:700;color:${prev>0?'var(--success)':'var(--text2)'}">${fM(prev)}</td>
+        <td title="VT ${fM(c.valeTransporte||0)} + VA ${fM(c.valeAlimentacao||0)} × ${dias} dia(s)" style="color:var(--info);font-weight:600">${benef>0?fM(benef):'—'}</td>
         <td><button class="btn bg bxs" onclick="verPt('${c.id}')">Ver</button></td>
       </tr>`;
     }).join('');
@@ -12626,7 +12635,7 @@ function rPonto(){
         <span style="font-size:11px;color:var(--accent);font-weight:700">${fM(+totalPrev.toFixed(2))}</span>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>Colaborador</th><th>Dias</th><th>Horas</th><th>R$/h</th><th>Previsão</th><th></th></tr></thead>
+        <thead><tr><th>Colaborador</th><th>Dias</th><th>Horas</th><th>R$/h</th><th>Previsão</th><th>Benefícios (VT+VA)</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
     </div>`;
@@ -12782,7 +12791,7 @@ function rStaff(){
     ? `<select style="width:160px" onchange="window._staffFiltroUnidade=this.value;renderPage()"><option value="">Todas as unidades</option>${DB.unidades.map(u=>`<option value="${u.id}" ${_fu==u.id?'selected':''}>${san(u.nome)}</option>`).join('')}</select>`
     : '';
   return`<div class="ph"><div><div class="pt">👤 Equipe</div></div><div class="br">${filtroHtml}<button class="btn bp bsm" onclick="abrirColab()">+ Novo Colaborador</button></div></div>
-  <div class="pb"><div class="g2">${lista.map(c=>{const cg=DB.cargos.find(g=>g.id===c.cargoId);const u=DB.unidades.find(x=>String(x.id)===String(c.unidadeId));const em=DB.pontos.some(p=>p.colaboradorId===c.id&&p.data===hoje()&&!p.saida);const podeExcluir=isAdm()&&c.id!==UA.id;return`<div class="card card-sm"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="sb-av" style="width:40px;height:40px;font-size:14px;${em?'border-color:var(--success)':''}">${ini(c.nome)}</div><div style="flex:1"><div style="font-size:13px;font-weight:700">${san(c.nome)}</div><div style="font-size:11px;color:var(--text2)">${san(cg?.nome||'')} • ${san(u?.nome||'')}</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="bdg ${c.ativo?'b-ok':'b-gh'}">${c.ativo?'Ativo':'Inativo'}</span>${em?'<span class="bdg b-ok">● Serviço</span>':''}${(c.pinPendente||(!c.pinHashSec&&!c.pinHash))?'<span class="bdg b-wn" title="Aguardando o colaborador criar o próprio PIN no primeiro acesso">⏳ PIN pendente</span>':''}</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px">R$/hora: <strong style="color:var(--accent)">${fM(c.valorHora||0)}</strong></div><div style="display:flex;gap:6px"><button class="btn bg bxs" onclick="abrirColab('${c.id}')">✏️ Editar</button>${podeExcluir?`<button class="btn bd bxs" onclick="excluirColab('${c.id}')" title="Excluir colaborador">🗑 Excluir</button>`:''}</div></div>`;}).join('')}</div></div>`;
+  <div class="pb"><div class="g2">${lista.map(c=>{const cg=DB.cargos.find(g=>g.id===c.cargoId);const u=DB.unidades.find(x=>String(x.id)===String(c.unidadeId));const em=DB.pontos.some(p=>p.colaboradorId===c.id&&p.data===hoje()&&!p.saida);const podeExcluir=isAdm()&&c.id!==UA.id;return`<div class="card card-sm"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="sb-av" style="width:40px;height:40px;font-size:14px;${em?'border-color:var(--success)':''}">${ini(c.nome)}</div><div style="flex:1"><div style="font-size:13px;font-weight:700">${san(c.nome)}</div><div style="font-size:11px;color:var(--text2)">${san(cg?.nome||'')} • ${san(u?.nome||'')}</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="bdg ${c.ativo?'b-ok':'b-gh'}">${c.ativo?'Ativo':'Inativo'}</span>${em?'<span class="bdg b-ok">● Serviço</span>':''}${(c.pinPendente||(!c.pinHashSec&&!c.pinHash))?'<span class="bdg b-wn" title="Aguardando o colaborador criar o próprio PIN no primeiro acesso">⏳ PIN pendente</span>':''}</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px">R$/hora: <strong style="color:var(--accent)">${fM(c.valorHora||0)}</strong>${(c.valeTransporte>0||c.valeAlimentacao>0)?` &nbsp;•&nbsp; 🚌 VT: <strong>${fM(c.valeTransporte||0)}</strong>/dia &nbsp;•&nbsp; 🍽️ VA: <strong>${fM(c.valeAlimentacao||0)}</strong>/dia`:''}</div><div style="display:flex;gap:6px"><button class="btn bg bxs" onclick="abrirColab('${c.id}')">✏️ Editar</button>${podeExcluir?`<button class="btn bd bxs" onclick="excluirColab('${c.id}')" title="Excluir colaborador">🗑 Excluir</button>`:''}</div></div>`;}).join('')}</div></div>`;
 }
 function excluirColab(id){
   // FIX: normaliza id para comparação segura
@@ -12908,6 +12917,8 @@ function abrirColab(id){
   el('mClPin').value='';
   el('mClHr').value=c?.valorHora||15;
   el('mClEmail').value=c?.email||'';
+  const _vt=el('mClVT');if(_vt)_vt.value=c?.valeTransporte||0;
+  const _va=el('mClVA');if(_va)_va.value=c?.valeAlimentacao||0;
   el('mClAt').checked=c?.ativo!==false;
   // Reset PIN fields
   const pinConf=el('mClPinConf');if(pinConf)pinConf.value='';

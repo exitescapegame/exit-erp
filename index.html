@@ -27624,6 +27624,9 @@ function runFinancialTests() {
 // com PIN na loja não desconta da gaveta.
 // Servidor: tabela pagamento_links, funções pagamento_link_criar/ver/responder, função pagamento-link.
 // Bloco 100% aditivo: embrulha rFolha, _verificarPagamentosPendentes e _aprovarPagamento.
+// [v108] SALDO A PAGAR — 24/11/2026: saldo por colaborador = devido desde 11/2026 (horas + VT/VA) − pagamentos
+//   confirmados − pagamentos aguardando confirmação. Pagamento parcial deixa saldo, que passa de um mês para o outro.
+//   O botão Pagar sugere o saldo. Só cálculo e tela: não altera pagamentos nem registros.
 // Reverter: remover este bloco <script> inteiro (volta à v106).
 // ═══════════════════════════════════════════════════════════════════
 (function(){
@@ -27656,6 +27659,31 @@ function runFinancialTests() {
     var porDia = (parseFloat(c.valeTransporte)||0)+(parseFloat(c.valeAlimentacao)||0);
     var valorBeneficios = +(dias*porDia).toFixed(2);
     return { mes:mes, hrs:hrs, dias:dias, valorHoras:valorHoras, porDia:porDia, valorBeneficios:valorBeneficios, total:+(valorHoras+valorBeneficios).toFixed(2) };
+  }
+
+  // [v108] Saldo acumulado desde o início do Controle de Acesso (nov/2026). Mesma conta mês a mês da Folha.
+  var INICIO = '2026-11';
+  function _saldo(c){
+    var porDia = (parseFloat(c.valeTransporte)||0)+(parseFloat(c.valeAlimentacao)||0);
+    var pts = (typeof rlsPontos==='function' ? rlsPontos() : (DB.pontos||[]))
+      .filter(function(p){ return p.data && String(p.data).slice(0,7)>=INICIO && p.saida && String(p.colaboradorId)===String(c.id); });
+    var porMes = {};
+    pts.forEach(function(p){ var m=String(p.data).slice(0,7); var o=porMes[m]||(porMes[m]={ms:0,dias:{}}); o.ms+=(p.duracaoMs||0); o.dias[p.data]=1; });
+    var vh=0, vb=0, hrs=0, dias=0;
+    Object.keys(porMes).forEach(function(m){
+      var h=porMes[m].ms/3600000, d=Object.keys(porMes[m].dias).length;
+      vh += +(h*(c.valorHora||0)).toFixed(2); vb += +(d*porDia).toFixed(2); hrs+=h; dias+=d;
+    });
+    var pago=0, aguard=0;
+    (DB.recibos||[]).forEach(function(r){
+      if (r.categoria!=='colaborador' || String(r.refId)!==String(c.id)) return;
+      if (String(r.solicitadoEm||r.dataHora||r.data||'').slice(0,7)<INICIO) return;
+      if (r.statusAprovacao==='aguardando_aprovacao') aguard += (+r.valor||0);
+      else if (r.statusAprovacao==='aprovado' || (r.assinado===true && !r.statusAprovacao)) pago += (+r.valor||0);
+    });
+    var devido = +(vh+vb).toFixed(2);
+    return { valorHoras:+vh.toFixed(2), valorBeneficios:+vb.toFixed(2), hrs:hrs, dias:dias, porDia:porDia, meses:Object.keys(porMes).length,
+             devido:devido, pago:+pago.toFixed(2), aguard:+aguard.toFixed(2), saldo:+(devido-pago-aguard).toFixed(2) };
   }
 
   async function _token(){
@@ -27727,24 +27755,25 @@ function runFinancialTests() {
     if (!_pode()) { toast('Sem permissão para pagar colaboradores.','error'); return; }
     var c = _colab(colabId);
     if (!c) { toast('Colaborador não encontrado.','error'); return; }
-    var k = _calc(c);
-    _ctx = { colabId:String(colabId), calc:k };
-    var meus = (DB.recibos||[]).filter(function(r){ return r.categoria==='colaborador' && String(r.refId)===String(colabId); });
-    var pend = meus.filter(function(r){ return r.statusAprovacao==='aguardando_aprovacao'; });
-    var jaMes = meus.filter(function(r){ return r.statusAprovacao==='aprovado' && String(r.assinaturaDataHora||r.data||'').slice(0,7)===k.mes; })
-                    .reduce(function(s,r){ return s+(+r.valor||0); },0);
+    var k = _calc(c), sd = _saldo(c);
+    _ctx = { colabId:String(colabId), calc:k, saldo:sd };
+    var sugerido = sd.saldo>0 ? sd.saldo : 0;
     _modal();
     el('mPg107T').textContent = 'Pagar — ' + (c.nome||'');
     var h = '';
-    if (pend.length) h += '<div style="background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.45);border-radius:8px;padding:10px;font-size:12px;margin-bottom:10px">⚠️ Já existe pagamento aguardando confirmação de '+_e(c.nome)+': <strong>'+pend.map(function(r){ return fM(r.valor); }).join(', ')+'</strong>. Confira a lista "Pagamentos lançados" antes de lançar outro.</div>';
-    if (jaMes>0) h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Já confirmado por '+_e(c.nome)+' neste mês: <strong>'+fM(jaMes)+'</strong>. O valor abaixo é o do mês inteiro — desconte o que já foi pago, se for o caso.</div>';
+    if (sd.aguard>0) h += '<div style="background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.45);border-radius:8px;padding:10px;font-size:12px;margin-bottom:10px">⚠️ Já existe pagamento aguardando confirmação de '+_e(c.nome)+': <strong>'+fM(sd.aguard)+'</strong>. Ele já está descontado do saldo abaixo.</div>';
+    if (sd.saldo<=0) h += '<div style="background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.4);border-radius:8px;padding:10px;font-size:12px;margin-bottom:10px">'+(sd.saldo<0 ? 'Foi pago '+fM(-sd.saldo)+' a mais do que o devido até agora.' : 'Não há saldo a pagar para '+_e(c.nome)+' neste momento.')+'</div>';
     h += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
-      _linha('Horas trabalhadas em '+_e(k.mes)+' ('+k.hrs.toFixed(1)+'h × '+fM(c.valorHora||0)+')', fM(k.valorHoras))+
-      _linha('Benefícios VT + VA ('+k.dias+' dia(s) × '+fM(k.porDia)+')', fM(k.valorBeneficios))+
-      _linha('Total sugerido', fM(k.total), true)+'</div>'+
-      '<div class="ir"><div class="fg"><label>Valor a pagar (R$)</label><input type="text" id="pg107Valor" inputmode="decimal" value="'+k.total.toFixed(2).replace('.',',')+'"></div>'+
+      _linha('Horas trabalhadas desde 11/2026 ('+sd.hrs.toFixed(1)+'h)', fM(sd.valorHoras))+
+      _linha('Benefícios VT + VA ('+sd.dias+' dia(s) × '+fM(sd.porDia)+')', fM(sd.valorBeneficios))+
+      _linha('Total devido', fM(sd.devido))+
+      _linha('Já pago (confirmado)', '− '+fM(sd.pago))+
+      _linha('Aguardando confirmação', '− '+fM(sd.aguard))+
+      _linha('Saldo a pagar', fM(sd.saldo), true)+'</div>'+
+      '<div class="ir"><div class="fg"><label>Valor a pagar agora (R$)</label><input type="text" id="pg107Valor" inputmode="decimal" value="'+(sugerido>0?sugerido.toFixed(2).replace('.',','):'')+'"></div>'+
       '<div class="fg"><label>Pago por</label><select id="pg107Origem"><option value="">Escolha…</option>'+
         Object.keys(ORIGENS).map(function(o){ return '<option value="'+o+'">'+ORIGENS[o]+'</option>'; }).join('')+'</select></div></div>'+
+      '<div style="font-size:11px;color:var(--text3);margin:4px 0 6px">Para pagar só uma parte, digite um valor menor: o restante fica como saldo para pagar depois.</div>'+
       '<div style="font-size:11px;color:var(--text3);margin:4px 0 12px">Depois de lançar, você recebe um link para enviar a '+_e(c.nome)+'. A confirmação pelo celular não mexe no caixa da loja.</div>'+
       '<div id="pg107Err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>'+
       '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bg" onclick="CM(\'mPg107\')">Cancelar</button><button class="btn bs" id="pg107Lancar" onclick="_pg107Lancar()">Lançar pagamento</button></div>';
@@ -27766,6 +27795,8 @@ function runFinancialTests() {
     if (isNaN(valor) || valor<=0) return mostra('Valor inválido. Use o formato 210,88.');
     var origem = String((el('pg107Origem')||{}).value||'');
     if (!ORIGENS[origem]) return mostra('Escolha por onde o pagamento foi feito.');
+    var sdAgora = _saldo(c);
+    if (valor > sdAgora.saldo+0.005 && !confirm('⚠️ O valor de '+fM(valor)+' é MAIOR que o saldo a pagar ('+fM(Math.max(0,sdAgora.saldo))+').\n\nConfirme só se for isso mesmo (ex.: adiantamento).')) return;
     if (valor>3000 && !confirm('⚠️ ATENÇÃO: valor de '+fM(valor)+' é bem acima do comum para um pagamento individual.\n\nConfirme só se o valor estiver correto.')) return;
     _lancando = true; var b = el('pg107Lancar'); if (b){ b.disabled=true; b.textContent='Lançando…'; }
     try {
@@ -27777,10 +27808,14 @@ function runFinancialTests() {
       rec.statusAprovacao = 'aguardando_aprovacao';
       rec.solicitadoPorId = UA && UA.id; rec.solicitadoPorNome = UA && UA.nome; rec.solicitadoEm = agora();
       rec.origemPagamento = origem; rec.mesReferencia = k.mes;
-      if (Math.abs(valor-k.total)<0.005){   // só detalha quando o valor é o calculado
-        rec.valorHoras = k.valorHoras; rec.valorBeneficios = k.valorBeneficios;
-        rec.horas = +k.hrs.toFixed(1); rec.dias = k.dias;
-      } else { rec.valorAjustadoManual = true; }
+      rec.saldoAntes = sdAgora.saldo; rec.saldoDepois = +(sdAgora.saldo-valor).toFixed(2);
+      var integral = Math.abs(valor-sdAgora.saldo)<0.005;
+      if (integral && sdAgora.pago===0 && sdAgora.aguard===0 && sdAgora.meses<=1){   // pagamento do total, de um mês só: detalha as parcelas
+        rec.valorHoras = sdAgora.valorHoras; rec.valorBeneficios = sdAgora.valorBeneficios;
+        rec.horas = +sdAgora.hrs.toFixed(1); rec.dias = sdAgora.dias;
+      }
+      if (valor < sdAgora.saldo-0.005) { rec.parcial = true; rec.descricao += ' (pagamento parcial)'; }
+      else if (!integral) { rec.acimaDoSaldo = true; }
       sDB();
       try { registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO','Pagamento de '+fM(valor)+' para '+c.nome+' ('+ORIGENS[origem]+'), aguardando confirmação dele',UA && UA.id,rec); } catch(e){}
       _ctx = null;
@@ -27883,13 +27918,30 @@ function runFinancialTests() {
     return h;
   }
 
+  // [v108] Quadro "Saldo a pagar" (acumulado desde 11/2026)
+  function _saldoHtml(){
+    var colabs = (typeof rlsColaboradores==='function' ? rlsColaboradores() : (DB.colaboradores||[])).filter(function(c){ return c.ativo; });
+    var pode = _pode(), tot = 0;
+    var linhas = colabs.map(function(c){ return { c:c, s:_saldo(c) }; }).filter(function(x){ return x.s.devido>0 || x.s.pago>0 || x.s.aguard>0; });
+    linhas.forEach(function(x){ if (x.s.saldo>0) tot += x.s.saldo; });
+    var h = '<div class="card" style="margin-top:14px"><div class="ct" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Saldo a pagar — acumulado desde 11/2026</span><span style="font-weight:800;color:var(--success)">'+fM(tot)+'</span></div>';
+    if (!linhas.length) return h+'<div class="empty"><div>Nenhum valor devido até agora.</div></div></div>';
+    h += '<div class="tw"><table><thead><tr><th>Colaborador</th><th>Total devido (horas + VT/VA)</th><th>Já pago</th><th>Aguardando confirmação</th><th>Saldo</th><th>Ação</th></tr></thead><tbody>'+
+      linhas.map(function(x){ var s=x.s;
+        return '<tr><td>'+_e(x.c.nome)+'</td><td>'+fM(s.devido)+'</td><td>'+fM(s.pago)+'</td><td>'+(s.aguard>0?'<span style="color:#b8962e;font-weight:700">'+fM(s.aguard)+'</span>':fM(0))+'</td>'+
+          '<td style="font-weight:800;color:'+(s.saldo>0?'var(--success)':(s.saldo<0?'var(--danger)':'var(--text2)'))+'">'+(s.saldo<0?'− '+fM(-s.saldo)+' (pago a mais)':fM(s.saldo))+'</td>'+
+          '<td>'+(pode && s.saldo>0 ? '<button class="btn bs bxs" onclick="_pg107Abrir(\''+_e(x.c.id)+'\')">💵 Pagar</button>' : '—')+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+    return h;
+  }
+
   var _rFolhaOrig = window.rFolha;
   if (typeof _rFolhaOrig === 'function') {
     window.rFolha = function(){
       var html = _rFolhaOrig.apply(this, arguments);
       try {
         if (typeof html === 'string') {
-          html = html.replace(/onclick="_pagarColaborador\('([^'"\\<>]+)',[^)"]*\)"/g, 'onclick="_pg107Abrir(\'$1\')"') + _listaHtml();
+          html = html.replace(/onclick="_pagarColaborador\('([^'"\\<>]+)',[^)"]*\)"/g, 'onclick="_pg107Abrir(\'$1\')"') + _saldoHtml() + _listaHtml();
           // Busca novidades da nuvem (no máximo 1 vez a cada 30 s) e redesenha se algo mudou
           if (Date.now()-_ultimaAtualizacao > 30000) {
             _ultimaAtualizacao = Date.now();
@@ -27950,7 +28002,9 @@ function runFinancialTests() {
   window._pg107Copiar = _pg107Copiar;
   window._pg107AtualizarTela = _pg107AtualizarTela;
   window._pg107Atualizar = _pg107Atualizar;
+  window._pg108Saldo = _saldo;
   console.log('🔒 [INTEGRIDADE v107] Pagamento de colaborador com horas + VT/VA, origem do pagamento e confirmação por link no celular ativo');
+  console.log('🔒 [INTEGRIDADE v108] Saldo a pagar por colaborador (pagamento parcial deixa saldo; passa de um mês para o outro) ativo');
 })();
   </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->

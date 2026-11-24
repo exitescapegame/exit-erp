@@ -66,6 +66,11 @@ h2{font-size:15px;font-weight:700;color:#5b21b6;margin-bottom:12px}
 .aviso p{font-size:15px;color:#5b4d85;line-height:1.5}
 .load{text-align:center;color:#7a6aa3;padding:26px 0;font-size:15px}
 .ft{text-align:center;font-size:11px;color:#a497c7;margin-top:16px}
+.pgl{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:#5b4d85;margin-top:8px}
+.pgl b{color:#2a1a52;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pgt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:12px;padding-top:12px;border-top:1.5px solid #e6dcfa;font-size:15px;font-weight:700;color:#5b21b6}
+.pgt b{font-size:28px;font-weight:800;color:#15803d;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ok .vl{font-size:40px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;color:#15803d}
 </style>
 </head>
 <body>
@@ -295,7 +300,133 @@ function telaOk(j){
   };
 }
 
-carregar();
+// ═══ [v107] CONFIRMAÇÃO DE PAGAMENTO POR LINK — 24/11/2026 ═══
+// Aberta com acesso.html?pg=<recibo>&t=<código>. Funciona de qualquer lugar; exige a senha do Controle de Acesso.
+// Não registra entrada/saída e não usa o QR code. Reverter: remover este trecho e voltar a chamar só carregar().
+var API_PG='https://utivaczfuuazspychdxt.supabase.co/functions/v1/pagamento-link';
+var PG=null;
+try{
+  var qp=new URLSearchParams(location.search);
+  var pgR=(qp.get('pg')||'').trim(), pgT=(qp.get('t')||'').trim();
+  if(/^[A-Za-z0-9_-]{6,80}$/.test(pgR)&&/^[a-f0-9]{32,64}$/.test(pgT)) PG={rec:pgR,token:pgT};
+}catch(e){}
+
+function brl(v){var n=Number(v||0).toFixed(2).split('.');return 'R$ '+n[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+n[1];}
+function dataHora(iso){
+  try{var d=new Date(iso);if(isNaN(d.getTime()))return '';
+    return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Bahia',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replace(',',' às');
+  }catch(e){return '';}
+}
+function soData(iso){
+  try{var d=new Date(iso);if(isNaN(d.getTime()))return '';
+    return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Bahia',day:'2-digit',month:'2-digit',year:'numeric'}).format(d);
+  }catch(e){return '';}
+}
+function pgChamar(corpo){
+  corpo.rec=PG.rec;corpo.token=PG.token;
+  var ctl=('AbortController' in window)?new AbortController():null;
+  var t=setTimeout(function(){if(ctl)ctl.abort();},20000);
+  return fetch(API_PG,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo),signal:ctl?ctl.signal:undefined,cache:'no-store'})
+    .then(function(r){var dataSrv=r.headers.get('date');return r.json().then(function(j){j._date=dataSrv;return j;});})
+    .finally(function(){clearTimeout(t);});
+}
+function pgAviso(titulo,texto,botao){
+  app.innerHTML='<div class="aviso"><div class="big">'+esc(titulo)+'</div><p>'+esc(texto)+'</p></div>'+(botao?'<button class="btn sec" id="bTentar">Tentar de novo</button>':'');
+  if(botao) document.getElementById('bTentar').onclick=pgCarregar;
+}
+function pgCarregar(){
+  var ft=document.querySelector('.ft');if(ft)ft.textContent='Confirmação registrada com assinatura eletrônica';
+  app.innerHTML='<div class="load">Carregando…</div>';
+  pgChamar({acao:'ver'}).then(function(j){
+    if(!j||!j.ok){
+      if(j&&j.erro==='LINK_INVALIDO'){pgAviso('Link inválido','Este link não vale mais. Peça um novo link à gerência.',false);return;}
+      pgAviso('Não foi possível carregar','Tente de novo em instantes.',true);return;
+    }
+    if(j._date){var ds=Date.parse(j._date);if(!isNaN(ds))deslocMs=ds-Date.now();relogio();}
+    document.getElementById('un').textContent=j.unidade||'';
+    if(j.status==='aguardando_aprovacao'){pgTela(j,'');}else{pgJaRespondido(j);}
+  }).catch(function(){pgAviso('Sem internet','Confira a conexão do celular e tente de novo.',true);});
+}
+function pgResumo(j){
+  var h='<div class="sel"><div class="av">'+esc(ini(j.nome))+'</div><div><div class="nm">'+esc(j.nome)+'</div><div class="st">'+esc(j.unidade||'')+'</div></div></div>';
+  h+='<div class="aj"><div class="ajd">'+esc(j.descricao||'Pagamento')+'</div>';
+  if(j.valorHoras!=null) h+='<div class="pgl"><span>Horas trabalhadas'+(j.horas!=null?' ('+String(Number(j.horas).toFixed(1)).replace('.',',')+'h)':'')+'</span><b>'+brl(j.valorHoras)+'</b></div>';
+  if(j.valorBeneficios!=null&&Number(j.valorBeneficios)>0) h+='<div class="pgl"><span>Benefícios (VT + VA)'+(j.dias!=null?' — '+Number(j.dias)+' dia(s)':'')+'</span><b>'+brl(j.valorBeneficios)+'</b></div>';
+  h+='<div class="pgt"><span>Valor total</span><b>'+brl(j.valor)+'</b></div>';
+  if(j.origem) h+='<div class="aja">Pago por: '+esc(j.origem)+'</div>';
+  if(j.solicitadoPor) h+='<div class="aja">Lançado por '+esc(j.solicitadoPor)+(j.solicitadoEm?' em '+esc(soData(j.solicitadoEm)):'')+'</div>';
+  h+='</div>';
+  return h;
+}
+var pgDados=null, pgNaoArmado=false;
+function pgTela(j,erro){
+  pgDados=j;pgNaoArmado=false;ocupado=false;
+  var h='<h2>Confirmação de pagamento</h2>'+pgResumo(j);
+  if(!j.temSenha){
+    h+='<div class="msg err" style="display:block">Você ainda não criou sua senha do Controle de Acesso. Ela é criada no seu primeiro registro de entrada, pelo QR code da loja. Depois disso, abra este link de novo.</div>';
+    app.innerHTML=h;return;
+  }
+  h+='<div class="msg'+(erro?' err':'')+'" id="pgMsg">'+esc(erro||'')+'</div>'+
+     '<label class="lb" for="pgPin">Sua senha do Controle de Acesso</label>'+
+     '<input class="in" id="pgPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="••••">'+
+     '<button class="btn" id="pgOk">Confirmo o recebimento</button>'+
+     '<button class="btn sec" id="pgNo">Não concordo</button>'+
+     '<div class="assn">Confirme só depois de conferir que o valor chegou.<br>Sua resposta fica registrada com assinatura eletrônica.</div>';
+  app.innerHTML=h;
+  document.getElementById('pgOk').onclick=function(){pgEnviar('confirmo');};
+  document.getElementById('pgNo').onclick=function(){
+    if(!pgNaoArmado){pgNaoArmado=true;this.textContent='Toque de novo para registrar que NÃO concorda';return;}
+    pgEnviar('contesto');
+  };
+}
+function pgErro(t){var m=document.getElementById('pgMsg');if(m){m.textContent=t;m.className='msg err';}}
+function pgEnviar(resposta){
+  if(ocupado)return;
+  var inp=document.getElementById('pgPin');var senha=inp?String(inp.value||'').trim():'';
+  if(!/^[0-9]{4,8}$/.test(senha)){pgErro('Digite sua senha do Controle de Acesso (4 a 8 números).');return;}
+  ocupado=true;
+  var bOk=document.getElementById('pgOk'),bNo=document.getElementById('pgNo');
+  if(bOk)bOk.disabled=true;if(bNo)bNo.disabled=true;
+  var b=resposta==='confirmo'?bOk:bNo;if(b)b.textContent='Registrando…';
+  pgChamar({acao:'responder',resposta:resposta,pin:senha}).then(function(j){
+    ocupado=false;
+    if(j&&j.ok){pgFim(j);return;}
+    var e=j&&j.erro;
+    if(e==='PIN_INCORRETO'){pgTela(pgDados,'Senha incorreta.'+(j.restantes!=null?' Tentativas restantes: '+j.restantes+'.':''));return;}
+    if(e==='BLOQUEADO'){pgTela(pgDados,'Muitas senhas erradas. Aguarde '+(j.minutos||10)+' minutos e tente de novo.');return;}
+    if(e==='JA_RESPONDIDO'){pgCarregar();return;}
+    if(e==='SEM_SENHA'){pgDados.temSenha=false;pgTela(pgDados,'');return;}
+    if(e==='LINK_INVALIDO'){pgAviso('Link inválido','Este link não vale mais. Peça um novo link à gerência.',false);return;}
+    pgTela(pgDados,'Não foi possível registrar. Tente de novo em instantes.');
+  }).catch(function(){ocupado=false;pgTela(pgDados,'Sem internet. Confira a conexão e tente de novo.');});
+}
+function pgAssin(j){
+  return j.assinatura?'<div class="sig"><div class="sigt">Assinatura eletrônica</div><div class="sigc">'+esc(j.assinatura)+'</div>'+(j.declaracao?'<div class="sigd">'+esc(j.declaracao)+'</div>':'')+'</div>':'';
+}
+function pgFim(j){
+  if(j.resposta==='confirmo'){
+    app.innerHTML='<div class="ok"><div class="ic">✓</div><div class="tp">RECEBIMENTO CONFIRMADO</div><div class="vl">'+brl(j.valor)+'</div>'+
+      '<div class="who">'+esc(j.nome||'')+'</div><div class="ex">'+esc(j.data||'')+' às '+esc(j.hora||'')+'</div>'+pgAssin(j)+
+      '</div><div class="assn">Pode fechar esta página.</div>';
+  }else{
+    app.innerHTML='<div class="aviso"><div class="big">Resposta registrada</div><p>Você informou que NÃO concorda com este pagamento de '+brl(j.valor)+'. A gerência verá sua resposta no sistema.</p></div>'+pgAssin(j)+
+      '<div class="assn">Pode fechar esta página.</div>';
+  }
+}
+function pgJaRespondido(j){
+  var quando=j.respondidoEm?dataHora(j.respondidoEm):'';
+  if(j.status==='aprovado'){
+    app.innerHTML='<div class="ok"><div class="ic">✓</div><div class="tp">PAGAMENTO JÁ CONFIRMADO</div><div class="vl">'+brl(j.valor)+'</div>'+
+      '<div class="who">'+esc(j.nome||'')+'</div>'+(quando?'<div class="ex">Confirmado em '+esc(quando)+'</div>':'')+'</div>';
+  }else if(j.status==='recusado'){
+    pgAviso('Resposta já registrada','Você informou que não concorda com este pagamento de '+brl(j.valor)+(quando?' em '+quando:'')+'.',false);
+  }else{
+    pgAviso('Pagamento indisponível','Este pagamento não está mais aguardando confirmação.',false);
+  }
+}
+// ═══ fim [v107] ═══
+
+if(PG){pgCarregar();}else{carregar();}
 })();
 </script>
 </body>

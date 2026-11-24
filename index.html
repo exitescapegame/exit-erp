@@ -27609,6 +27609,350 @@ function runFinancialTests() {
   console.log('🔒 [INTEGRIDADE v106] Ajuste manual de horário (ADM) com registro permanente + confirmação do colaborador ativo');
 })();
   </script>
+  <script>
+// ═══════════════════════════════════════════════════════════════════
+// [v107] PAGAMENTO DE COLABORADOR COM CONFIRMAÇÃO POR LINK (celular) — 24/11/2026
+// Financeiro → Folha de Pagamento:
+//   • o botão "Pagar" abre uma janela com horas + benefícios (VT/VA), valor editável e a ORIGEM
+//     do pagamento (dinheiro, conta Sicredi ou conta Banco do Brasil);
+//   • depois de lançar, o ERP gera um link para o colaborador confirmar o recebimento pelo celular,
+//     de qualquer lugar, com a senha do Controle de Acesso (página acesso.html);
+//   • a confirmação pelo link NÃO mexe no caixa (gaveta) da loja;
+//   • lista "Pagamentos lançados" com a situação de cada um.
+// A confirmação com PIN na loja continua existindo. Antes de abrir/aprovar, o ERP confere na nuvem
+// se o pagamento já foi respondido pelo celular. Pagamento com origem em conta bancária aprovado
+// com PIN na loja não desconta da gaveta.
+// Servidor: tabela pagamento_links, funções pagamento_link_criar/ver/responder, função pagamento-link.
+// Bloco 100% aditivo: embrulha rFolha, _verificarPagamentosPendentes e _aprovarPagamento.
+// Reverter: remover este bloco <script> inteiro (volta à v106).
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+  var ORIGENS = { dinheiro:'Dinheiro', sicredi:'Conta Sicredi', bb:'Conta Banco do Brasil' };
+  var MSG = {
+    SEM_PERMISSAO: 'Sem permissão para gerar o link deste pagamento.',
+    RECIBO_NAO_ENCONTRADO: 'O pagamento ainda não chegou à nuvem. Confira a internet e tente de novo.',
+    RECIBO_INVALIDO: 'Este registro não é um pagamento de colaborador.',
+    JA_RESPONDIDO: 'Este pagamento já foi respondido pelo colaborador.',
+    TOKEN_INVALIDO: 'Não foi possível gerar o link. Tente de novo.'
+  };
+  var _links = {};   // links gerados nesta sessão (recibo -> endereço)
+
+  function _e(s){ return (typeof san==='function') ? san(s) : String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function _mes(){ return (typeof hoje==='function' ? hoje() : new Date().toISOString().slice(0,10)).slice(0,7); }
+  function _colab(id){ return (DB.colaboradores||[]).find(function(c){ return String(c.id)===String(id); }); }
+  function _pode(){ try { return (typeof isAdm==='function' && isAdm()) || (typeof tP==='function' && tP('pagar_folha')); } catch(e){ return false; } }
+  function _rec(id){ return (DB.recibos||[]).find(function(r){ return String(r.id)===String(id); }); }
+  function _dh(iso){ try { var d=new Date(iso); if(isNaN(d.getTime())) return ''; return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); } catch(e){ return ''; } }
+
+  // Mesma conta da Folha (horas) e do Ponto & RH (benefícios)
+  function _calc(c){
+    var mes = _mes();
+    var pts = (typeof rlsPontos==='function' ? rlsPontos() : (DB.pontos||[]))
+      .filter(function(p){ return p.data && p.data.indexOf(mes)===0 && p.saida && String(p.colaboradorId)===String(c.id); });
+    var hrs = pts.reduce(function(s,p){ return s+(p.duracaoMs||0); },0)/3600000;
+    var dias = pts.map(function(p){ return p.data; }).filter(function(d,i,a){ return a.indexOf(d)===i; }).length;
+    var valorHoras = +(hrs*(c.valorHora||0)).toFixed(2);
+    var porDia = (parseFloat(c.valeTransporte)||0)+(parseFloat(c.valeAlimentacao)||0);
+    var valorBeneficios = +(dias*porDia).toFixed(2);
+    return { mes:mes, hrs:hrs, dias:dias, valorHoras:valorHoras, porDia:porDia, valorBeneficios:valorBeneficios, total:+(valorHoras+valorBeneficios).toFixed(2) };
+  }
+
+  async function _token(){
+    try { if (typeof unidadeRenovarToken==='function' && window._unidadeSession) await unidadeRenovarToken().catch(function(){}); } catch(e){}
+    return (window._unidadeSession && window._unidadeSession.access_token) ? window._unidadeSession.access_token : SUPA_KEY;
+  }
+  async function _rest(caminho, metodo, corpo, prefer){
+    var tok = await _token();
+    var h = { 'apikey':SUPA_KEY, 'Authorization':'Bearer '+tok, 'Content-Type':'application/json' };
+    if (prefer) h['Prefer'] = prefer;
+    var r, txt = '';
+    try {
+      r = await fetch(SUPA_URL + '/rest/v1/' + caminho, { method:metodo, headers:h, body: corpo==null ? undefined : JSON.stringify(corpo) });
+      txt = await r.text();
+    } catch(e){ return { ok:false, erro:'Sem conexão com a nuvem. Tente de novo.' }; }
+    var j = null; try { j = txt ? JSON.parse(txt) : null; } catch(e){}
+    if (r.ok) return { ok:true, data:j };
+    var cod = (j && (j.message||j.hint||j.details)) || txt || ('HTTP '+r.status);
+    var chave = Object.keys(MSG).find(function(k){ return String(cod).indexOf(k)>=0; });
+    return { ok:false, erro: chave ? MSG[chave] : ('Não foi possível concluir: '+String(cod).slice(0,140)) };
+  }
+
+  // Traz da nuvem a situação dos pagamentos que aqui ainda constam como "aguardando".
+  var _atualizando = null, _ultimaAtualizacao = 0;
+  async function _pg107Atualizar(){
+    if (_atualizando) return _atualizando;
+    _atualizando = (async function(){
+      var mudou = 0;
+      try {
+        var pend = (DB.recibos||[]).filter(function(r){ return r.categoria==='colaborador' && r.statusAprovacao==='aguardando_aprovacao'; });
+        if (!pend.length) return 0;
+        var ids = pend.map(function(r){ return '"'+String(r.id).replace(/[^A-Za-z0-9_-]/g,'')+'"'; }).join(',');
+        var res = await _rest('recibos?select=id,dados&id=in.('+encodeURIComponent(ids)+')', 'GET');
+        if (!res.ok || !Array.isArray(res.data)) return 0;
+        res.data.forEach(function(row){
+          var local = _rec(row.id), d = row.dados;
+          if (!local || !d || local.statusAprovacao!=='aguardando_aprovacao') return;
+          if (d.statusAprovacao && d.statusAprovacao!=='aguardando_aprovacao'){ Object.assign(local, d); mudou++; }
+        });
+        if (mudou) { try { if (typeof salvarCacheLocal==='function') salvarCacheLocal(); } catch(e){} }
+      } catch(e){ console.warn('[v107] atualizar pagamentos:', e); }
+      finally { _ultimaAtualizacao = Date.now(); }
+      return mudou;
+    })();
+    try { return await _atualizando; } finally { _atualizando = null; }
+  }
+  async function _pg107AtualizarTela(){
+    var n = await _pg107Atualizar();
+    toast(n ? ('✅ '+n+' pagamento(s) atualizado(s).') : 'Nenhuma novidade nos pagamentos.', n ? 'success' : 'info');
+    try { if (typeof renderPage==='function') renderPage(); } catch(e){}
+  }
+
+  function _modal(){
+    var m = document.getElementById('mPg107');
+    if (!m){
+      m = document.createElement('div'); m.className='mo'; m.id='mPg107';
+      m.innerHTML = '<div class="md" style="max-width:520px"><div class="mh"><span class="mti" id="mPg107T">Pagamento</span><button class="mc" onclick="CM(\'mPg107\')">×</button></div><div class="mb" id="mPg107B"></div></div>';
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  function _linha(rotulo, valor, forte){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0'+(forte?';font-weight:800;border-top:1px solid var(--border);margin-top:4px;padding-top:9px':'')+'"><span>'+rotulo+'</span><span>'+valor+'</span></div>';
+  }
+
+  // ── Janela "Pagar" ──
+  var _ctx = null;
+  function _pg107Abrir(colabId){
+    if (!_pode()) { toast('Sem permissão para pagar colaboradores.','error'); return; }
+    var c = _colab(colabId);
+    if (!c) { toast('Colaborador não encontrado.','error'); return; }
+    var k = _calc(c);
+    _ctx = { colabId:String(colabId), calc:k };
+    var meus = (DB.recibos||[]).filter(function(r){ return r.categoria==='colaborador' && String(r.refId)===String(colabId); });
+    var pend = meus.filter(function(r){ return r.statusAprovacao==='aguardando_aprovacao'; });
+    var jaMes = meus.filter(function(r){ return r.statusAprovacao==='aprovado' && String(r.assinaturaDataHora||r.data||'').slice(0,7)===k.mes; })
+                    .reduce(function(s,r){ return s+(+r.valor||0); },0);
+    _modal();
+    el('mPg107T').textContent = 'Pagar — ' + (c.nome||'');
+    var h = '';
+    if (pend.length) h += '<div style="background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.45);border-radius:8px;padding:10px;font-size:12px;margin-bottom:10px">⚠️ Já existe pagamento aguardando confirmação de '+_e(c.nome)+': <strong>'+pend.map(function(r){ return fM(r.valor); }).join(', ')+'</strong>. Confira a lista "Pagamentos lançados" antes de lançar outro.</div>';
+    if (jaMes>0) h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Já confirmado por '+_e(c.nome)+' neste mês: <strong>'+fM(jaMes)+'</strong>. O valor abaixo é o do mês inteiro — desconte o que já foi pago, se for o caso.</div>';
+    h += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      _linha('Horas trabalhadas em '+_e(k.mes)+' ('+k.hrs.toFixed(1)+'h × '+fM(c.valorHora||0)+')', fM(k.valorHoras))+
+      _linha('Benefícios VT + VA ('+k.dias+' dia(s) × '+fM(k.porDia)+')', fM(k.valorBeneficios))+
+      _linha('Total sugerido', fM(k.total), true)+'</div>'+
+      '<div class="ir"><div class="fg"><label>Valor a pagar (R$)</label><input type="text" id="pg107Valor" inputmode="decimal" value="'+k.total.toFixed(2).replace('.',',')+'"></div>'+
+      '<div class="fg"><label>Pago por</label><select id="pg107Origem"><option value="">Escolha…</option>'+
+        Object.keys(ORIGENS).map(function(o){ return '<option value="'+o+'">'+ORIGENS[o]+'</option>'; }).join('')+'</select></div></div>'+
+      '<div style="font-size:11px;color:var(--text3);margin:4px 0 12px">Depois de lançar, você recebe um link para enviar a '+_e(c.nome)+'. A confirmação pelo celular não mexe no caixa da loja.</div>'+
+      '<div id="pg107Err" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bg" onclick="CM(\'mPg107\')">Cancelar</button><button class="btn bs" id="pg107Lancar" onclick="_pg107Lancar()">Lançar pagamento</button></div>';
+    el('mPg107B').innerHTML = h;
+    OM('mPg107');
+  }
+
+  var _lancando = false;
+  async function _pg107Lancar(){
+    if (_lancando || !_ctx) return;
+    var err = el('pg107Err');
+    var mostra = function(t){ if(err){ err.textContent=t; err.style.display='block'; } };
+    if (!_pode()) return mostra('Sem permissão para pagar colaboradores.');
+    var c = _colab(_ctx.colabId);
+    if (!c) return mostra('Colaborador não encontrado.');
+    var bruto = String((el('pg107Valor')||{}).value||'').trim().replace(/\s/g,'').replace(/^R\$/i,'');
+    if (bruto.indexOf(',')>=0) bruto = bruto.replace(/\./g,'').replace(',','.');
+    var valor = /^\d+(\.\d{1,2})?$/.test(bruto) ? +parseFloat(bruto).toFixed(2) : NaN;
+    if (isNaN(valor) || valor<=0) return mostra('Valor inválido. Use o formato 210,88.');
+    var origem = String((el('pg107Origem')||{}).value||'');
+    if (!ORIGENS[origem]) return mostra('Escolha por onde o pagamento foi feito.');
+    if (valor>3000 && !confirm('⚠️ ATENÇÃO: valor de '+fM(valor)+' é bem acima do comum para um pagamento individual.\n\nConfirme só se o valor estiver correto.')) return;
+    _lancando = true; var b = el('pg107Lancar'); if (b){ b.disabled=true; b.textContent='Lançando…'; }
+    try {
+      var k = _ctx.calc;
+      var rec = _registrarReciboAuto('colaborador', {
+        refId:_ctx.colabId, valor:valor, colaboradorNome:c.nome,
+        descricao:'Pagamento de prestação de serviços — '+k.mes, unidadeId:c.unidadeId, formaPagamento:'folha'
+      });
+      rec.statusAprovacao = 'aguardando_aprovacao';
+      rec.solicitadoPorId = UA && UA.id; rec.solicitadoPorNome = UA && UA.nome; rec.solicitadoEm = agora();
+      rec.origemPagamento = origem; rec.mesReferencia = k.mes;
+      if (Math.abs(valor-k.total)<0.005){   // só detalha quando o valor é o calculado
+        rec.valorHoras = k.valorHoras; rec.valorBeneficios = k.valorBeneficios;
+        rec.horas = +k.hrs.toFixed(1); rec.dias = k.dias;
+      } else { rec.valorAjustadoManual = true; }
+      sDB();
+      try { registrarAuditoria('PAGAMENTO_COLABORADOR_SOLICITADO','Pagamento de '+fM(valor)+' para '+c.nome+' ('+ORIGENS[origem]+'), aguardando confirmação dele',UA && UA.id,rec); } catch(e){}
+      _ctx = null;
+      await _pg107Link(rec.id);
+      try { if (typeof renderPage==='function') renderPage(); } catch(e){}
+    } finally { _lancando = false; if (b){ b.disabled=false; b.textContent='Lançar pagamento'; } }
+  }
+
+  // ── Link de confirmação ──
+  function _novoCodigo(){
+    var a = new Uint8Array(16); crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function(x){ return ('0'+x.toString(16)).slice(-2); }).join('');
+  }
+  function _enderecoBase(){
+    var u = new URL('acesso.html', location.href); u.search=''; u.hash='';
+    return u.href;
+  }
+  async function _gerarLink(rec){
+    // 1) garante que o pagamento está na nuvem  2) grava o código do link (o servidor só guarda o resumo dele)
+    var linha = [{ id:String(rec.id), unidade_id:String(rec.unidadeId), categoria:rec.categoria||null, dados:rec, criado_em: rec.dataHora || new Date().toISOString() }];
+    var up = await _rest('recibos', 'POST', linha, 'resolution=merge-duplicates,return=minimal');
+    if (!up.ok) return up;
+    var cod = _novoCodigo();
+    var cr = await _rest('rpc/pagamento_link_criar', 'POST', { p_rec:String(rec.id), p_token:cod });
+    if (!cr.ok) return cr;
+    var link = _enderecoBase()+'?pg='+encodeURIComponent(String(rec.id))+'&t='+cod;
+    _links[rec.id] = link;
+    return { ok:true, link:link };
+  }
+  async function _pg107Link(recId, novo){
+    var rec = _rec(recId);
+    if (!rec) { toast('Pagamento não encontrado.','error'); return; }
+    if (!_pode()) { toast('Sem permissão.','error'); return; }
+    var c = _colab(rec.refId) || { nome: rec.colaboradorNome };
+    _modal();
+    el('mPg107T').textContent = 'Link de confirmação — ' + (c.nome||'');
+    el('mPg107B').innerHTML = '<div class="empty">Gerando o link…</div>';
+    OM('mPg107');
+    await _pg107Atualizar();
+    rec = _rec(recId);
+    if (!rec || rec.statusAprovacao!=='aguardando_aprovacao'){
+      el('mPg107B').innerHTML = '<div style="font-size:13px;margin-bottom:12px">Este pagamento já foi respondido por '+_e(c.nome||'')+'.</div><div style="display:flex;justify-content:flex-end"><button class="btn bg" onclick="CM(\'mPg107\')">Fechar</button></div>';
+      try { if (typeof renderPage==='function') renderPage(); } catch(e){}
+      return;
+    }
+    var link = (!novo && _links[recId]) || null;
+    if (!link){
+      var g = await _gerarLink(rec);
+      if (!g.ok){
+        el('mPg107B').innerHTML = '<div style="color:var(--danger);font-size:13px;margin-bottom:10px">'+_e(g.erro)+'</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">O pagamento de '+fM(rec.valor)+' ficou lançado. Gere o link depois em Financeiro → Folha de Pagamento → Pagamentos lançados.</div>'+
+          '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bg" onclick="CM(\'mPg107\')">Fechar</button><button class="btn bp" onclick="_pg107Link(\''+_e(recId)+'\',true)">Tentar de novo</button></div>';
+        return;
+      }
+      link = g.link;
+    }
+    var zap = String(c.whatsapp||'').replace(/\D/g,'');
+    var texto = 'Olá, '+(c.nome||'')+'! Seu pagamento da Exit Games está disponível para confirmação. Abra o link e confirme com a sua senha do Controle de Acesso: '+link;
+    el('mPg107B').innerHTML =
+      '<div style="font-size:13px;margin-bottom:10px">Pagamento de <strong>'+fM(rec.valor)+'</strong> para <strong>'+_e(c.nome||'')+'</strong>'+(ORIGENS[rec.origemPagamento]?' — '+ORIGENS[rec.origemPagamento]:'')+'.<br>Envie o link abaixo. '+_e(c.nome||'')+' confirma pelo celular com a senha do Controle de Acesso.</div>'+
+      '<div class="fg"><label>Link de confirmação</label><input type="text" id="pg107Link" readonly value="'+_e(link)+'" onclick="this.select()"></div>'+
+      '<div style="font-size:11px;color:var(--text3);margin:4px 0 12px">O link vale só para este pagamento e não confirma nada sem a senha. Se gerar um novo link, o anterior deixa de valer.</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'+
+        '<button class="btn bg" onclick="CM(\'mPg107\')">Fechar</button>'+
+        '<button class="btn bg" onclick="_pg107Copiar()">Copiar link</button>'+
+        (zap.length>=12 ? '<a class="btn bs" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/'+zap+'?text='+encodeURIComponent(texto)+'">Abrir WhatsApp</a>' : '')+
+      '</div>'+
+      (zap.length>=12 ? '' : '<div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:right">Sem WhatsApp no cadastro: copie o link e envie por onde preferir.</div>');
+  }
+  async function _pg107Copiar(){
+    var i = el('pg107Link'); if (!i) return;
+    var ok = false;
+    try { if (navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(i.value); ok = true; } } catch(e){}
+    if (!ok){ try { i.focus(); i.select(); ok = document.execCommand('copy'); } catch(e){} }
+    toast(ok ? '✅ Link copiado.' : 'Selecione o link e copie (Ctrl+C).', ok ? 'success' : 'info');
+  }
+
+  // ── Lista "Pagamentos lançados" na Folha ──
+  function _situacao(r){
+    if (r.statusAprovacao==='aguardando_aprovacao') return '<span style="color:#b8962e;font-weight:700">Aguardando confirmação</span>';
+    if (r.statusAprovacao==='recusado') return '<span style="color:var(--danger);font-weight:700">Não concordou</span>'+(r.recusadoEm?'<div style="font-size:10px;color:var(--text3)">'+_e(_dh(r.recusadoEm))+'</div>':'');
+    if (r.statusAprovacao==='aprovado' || r.assinado) return '<span style="color:var(--success);font-weight:700">Confirmado</span><div style="font-size:10px;color:var(--text3)">'+_e(_dh(r.assinaturaDataHora))+(r.canalAssinatura==='link_celular'?' · pelo celular':' · com PIN no ERP')+'</div>';
+    return '—';
+  }
+  function _listaHtml(){
+    var mes = _mes();
+    var vis = (DB.recibos||[]).filter(function(r){
+      if (r.categoria!=='colaborador' || !r.statusAprovacao) return false;
+      try { if (typeof rlsCanAccess==='function' && !rlsCanAccess(r.unidadeId)) return false; } catch(e){}
+      return r.statusAprovacao==='aguardando_aprovacao' || String(r.solicitadoEm||r.data||'').slice(0,7)===mes;
+    }).sort(function(a,b){ return String(b.solicitadoEm||'').localeCompare(String(a.solicitadoEm||'')); });
+    var pode = _pode();
+    var h = '<div class="card" style="margin-top:14px"><div class="ct" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Pagamentos lançados — '+_e(mes)+'</span><button class="btn bg bxs" onclick="_pg107AtualizarTela()">Atualizar</button></div>';
+    if (!vis.length) return h+'<div class="empty"><div>Nenhum pagamento lançado neste mês.</div></div></div>';
+    h += '<div class="tw"><table><thead><tr><th>Lançado em</th><th>Colaborador</th><th>Valor</th><th>Pago por</th><th>Situação</th><th>Ação</th></tr></thead><tbody>'+
+      vis.map(function(r){
+        return '<tr><td>'+_e(_dh(r.solicitadoEm||r.dataHora))+'</td><td>'+_e(r.colaboradorNome||'')+'</td><td style="font-weight:700">'+fM(r.valor)+'</td><td>'+_e(ORIGENS[r.origemPagamento]||'—')+'</td><td>'+_situacao(r)+'</td><td>'+
+          (r.statusAprovacao==='aguardando_aprovacao' && pode ? '<button class="btn bp bxs" onclick="_pg107Link(\''+_e(r.id)+'\')">Enviar link</button>' : '—')+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+    return h;
+  }
+
+  var _rFolhaOrig = window.rFolha;
+  if (typeof _rFolhaOrig === 'function') {
+    window.rFolha = function(){
+      var html = _rFolhaOrig.apply(this, arguments);
+      try {
+        if (typeof html === 'string') {
+          html = html.replace(/onclick="_pagarColaborador\('([^'"\\<>]+)',[^)"]*\)"/g, 'onclick="_pg107Abrir(\'$1\')"') + _listaHtml();
+          // Busca novidades da nuvem (no máximo 1 vez a cada 30 s) e redesenha se algo mudou
+          if (Date.now()-_ultimaAtualizacao > 30000) {
+            _ultimaAtualizacao = Date.now();
+            _pg107Atualizar().then(function(n){ if (n) { try { renderPage(); } catch(e){} } });
+          }
+        }
+      } catch(e){ console.warn('[v107] rFolha:', e); }
+      return html;
+    };
+  }
+
+  // ── Confirmação com PIN na loja: confere antes se já foi respondido pelo celular ──
+  var _verifOrig = window._verificarPagamentosPendentes;
+  if (typeof _verifOrig === 'function') {
+    window._verificarPagamentosPendentes = function(colaboradorId){
+      var self = this, alvo = colaboradorId || (UA && UA.id);
+      var tem = (DB.recibos||[]).some(function(r){ return r.categoria==='colaborador' && r.statusAprovacao==='aguardando_aprovacao' && String(r.refId)===String(alvo); });
+      if (!tem) return _verifOrig.call(self, colaboradorId);
+      var espera = new Promise(function(res){ setTimeout(res, 5000); });
+      Promise.race([_pg107Atualizar(), espera]).catch(function(){}).then(function(){ _verifOrig.call(self, colaboradorId); });
+    };
+  }
+  var _aprovOrig = window._aprovarPagamento;
+  if (typeof _aprovOrig === 'function') {
+    window._aprovarPagamento = async function(){
+      var ctx = window._aprovPagCtx, recId = ctx && ctx.recId;
+      try { await Promise.race([_pg107Atualizar(), new Promise(function(res){ setTimeout(res, 5000); })]); } catch(e){}
+      var rec = recId ? _rec(recId) : null;
+      if (rec && rec.statusAprovacao!=='aguardando_aprovacao' && rec.canalAssinatura==='link_celular'){
+        toast('Este pagamento já foi respondido pelo celular.','info');
+        try { CM('mAprovPag'); } catch(e){}
+        return;
+      }
+      var banco = rec && (rec.origemPagamento==='sicredi' || rec.origemPagamento==='bb');
+      var cx = null, antes = null;
+      if (banco) {
+        try { cx = getCx(rec.unidadeId); } catch(e){ cx = null; }
+        if (cx && cx.aberto && Array.isArray(cx.historico)) antes = { saidas:cx.saidas, saldoAtual:cx.saldoAtual, n:cx.historico.length };
+      }
+      var ret = await _aprovOrig.apply(this, arguments);
+      // Pagamento feito por conta bancária não sai da gaveta: desfaz só a saída que a aprovação acabou de lançar
+      try {
+        if (antes && rec.statusAprovacao==='aprovado' && cx.historico.length===antes.n+1) {
+          var ult = cx.historico[cx.historico.length-1];
+          if (ult && ult.tipo==='saida' && +ult.valor===+rec.valor && String(ult.desc||'').indexOf('Pagamento colaborador')===0) {
+            cx.historico.pop(); cx.saidas = antes.saidas; cx.saldoAtual = antes.saldoAtual;
+            sDB();
+          }
+        }
+      } catch(e){ console.warn('[v107] ajuste de caixa:', e); }
+      return ret;
+    };
+  }
+
+  window._pg107Abrir = _pg107Abrir;
+  window._pg107Lancar = _pg107Lancar;
+  window._pg107Link = _pg107Link;
+  window._pg107Copiar = _pg107Copiar;
+  window._pg107AtualizarTela = _pg107AtualizarTela;
+  window._pg107Atualizar = _pg107Atualizar;
+  console.log('🔒 [INTEGRIDADE v107] Pagamento de colaborador com horas + VT/VA, origem do pagamento e confirmação por link no celular ativo');
+})();
+  </script>
   <!-- ═══ KEYO ENGINE — NÃO REORDENAR ═══ -->
   <script src="keyo-00-core.js"></script>
   <script src="keyo-01-ui.js"></script>

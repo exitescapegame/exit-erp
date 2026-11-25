@@ -28004,12 +28004,31 @@ function runFinancialTests() {
     setTimeout(function(){ window.print(); setTimeout(function(){ if (area) area.innerHTML=''; }, 1800); }, 150);
   }
 
+  // [v110 — 25/11/2026] A tabela de cima da Folha (previsão do mês) mostrava o botão "Pagar" mesmo para quem
+  // já recebeu tudo, porque ela só olha as horas do mês e não os pagamentos. Agora a coluna Ação segue o mesmo
+  // saldo do quadro "Saldo a pagar": saldo zerado e já pago -> "✓ Pago"; saldo zerado com pagamento aguardando
+  // a confirmação do colaborador -> "Aguardando confirmação". Com saldo a pagar, o botão continua igual.
+  // Só troca o botão; não altera valores, cálculos nem dados. Reverter: remover esta função e a chamada dela.
+  function _pg110Acao(html){
+    try {
+      return html.replace(/<button class="btn bs bxs" onclick="_pagarColaborador\('([^'"\\<>]+)',[^)"]*\)">[^<]*<\/button>/g, function(tudo, id){
+        var c = _colab(id); if (!c) return tudo;
+        var s = _saldo(c);
+        if (s.saldo > 0) return tudo;
+        if (s.aguard > 0) return '<span style="color:#b8962e;font-weight:700">Aguardando confirmação</span>';
+        if (s.pago > 0) return '<span style="color:var(--success);font-weight:700">✓ Pago</span>';
+        return tudo;
+      });
+    } catch(e){ console.warn('[v110] ação da folha:', e); return html; }
+  }
+
   var _rFolhaOrig = window.rFolha;
   if (typeof _rFolhaOrig === 'function') {
     window.rFolha = function(){
       var html = _rFolhaOrig.apply(this, arguments);
       try {
         if (typeof html === 'string') {
+          html = _pg110Acao(html);   // [v110] quem já foi pago (saldo zerado) não mostra o botão Pagar na tabela de cima
           html = html.replace(/onclick="_pagarColaborador\('([^'"\\<>]+)',[^)"]*\)"/g, 'onclick="_pg107Abrir(\'$1\')"') + _saldoHtml() + _listaHtml();
           // Busca novidades da nuvem (no máximo 1 vez a cada 30 s) e redesenha se algo mudou
           if (Date.now()-_ultimaAtualizacao > 30000) {
@@ -28077,6 +28096,7 @@ function runFinancialTests() {
   window._pg109ReciboHtml = _reciboHtml;
   console.log('🔒 [INTEGRIDADE v107] Pagamento de colaborador com horas + VT/VA, origem do pagamento e confirmação por link no celular ativo');
   console.log('🔒 [INTEGRIDADE v108] Saldo a pagar por colaborador (pagamento parcial deixa saldo; passa de um mês para o outro) ativo');
+  console.log('🔒 [INTEGRIDADE v110] Folha: quem já foi pago não mostra o botão Pagar na tabela de previsão — ativo');
   console.log('🔒 [INTEGRIDADE v109] Forma de pagamento (colaborador não vê o banco) + recibo no padrão da papelaria com impressão ativo');
 })();
   </script>

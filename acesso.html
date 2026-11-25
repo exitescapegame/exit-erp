@@ -66,11 +66,37 @@ h2{font-size:15px;font-weight:700;color:#5b21b6;margin-bottom:12px}
 .aviso p{font-size:15px;color:#5b4d85;line-height:1.5}
 .load{text-align:center;color:#7a6aa3;padding:26px 0;font-size:15px}
 .ft{text-align:center;font-size:11px;color:#a497c7;margin-top:16px}
-.pgl{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:#5b4d85;margin-top:8px}
-.pgl b{color:#2a1a52;font-variant-numeric:tabular-nums;white-space:nowrap}
-.pgt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:12px;padding-top:12px;border-top:1.5px solid #e6dcfa;font-size:15px;font-weight:700;color:#5b21b6}
-.pgt b{font-size:28px;font-weight:800;color:#15803d;font-variant-numeric:tabular-nums;white-space:nowrap}
-.ok .vl{font-size:40px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;color:#15803d}
+/* [v109] Recibo de pagamento (link) — visual da papelaria Exit: fundo claro, roxo e dourado */
+body.pg{background:#faf9fc}
+body.pg .top{padding:14px 18px;margin-bottom:14px}
+body.pg .top .hd{margin-bottom:0}
+body.pg .top .un,body.pg .top .clk,body.pg .top .dt{display:none}
+body.pg .card{padding:22px 20px 0;overflow:hidden}
+.rct{font-family:Rockwell,'Roboto Slab','Zilla Slab',Georgia,'Times New Roman',serif;font-size:25px;font-weight:700;color:#5b21b6;line-height:1.15}
+.rcs{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:#9a7d33;font-weight:800;margin-top:6px}
+.rcr{height:2px;width:56px;background:#C4A55B;margin:12px 0 8px}
+.rcl{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:10px 0;border-bottom:1px solid #efe9fb;font-size:14px}
+.rcl span{color:#7a6aa3;flex-shrink:0}
+.rcl b{color:#2a1a52;font-weight:700;text-align:right}
+.rcv{margin-top:18px;border:1.5px solid #C4A55B;background:#fdfaf1;border-radius:14px;padding:16px 14px;text-align:center}
+.rcv .l{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;font-weight:800;color:#8a7230}
+.rcv .v{font-size:38px;font-weight:800;color:#5b21b6;line-height:1.15;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap}
+.rcv .tg{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#5b21b6;background:#f1eafd;border-radius:999px;padding:4px 11px;margin-top:8px}
+.rcv .s{font-size:13.5px;color:#5b4d85;margin-top:12px;padding-top:11px;border-top:1px dashed #e0d2a0}
+.rcv .s b{color:#2a1a52;white-space:nowrap}
+.rcst{display:flex;align-items:center;gap:12px;margin-top:16px;padding:13px 14px;border-radius:12px;background:#f4eefe;border:1px solid #dccdf8;color:#3b1a7a;font-weight:700;font-size:14.5px;line-height:1.35}
+.rcst .ck{width:34px;height:34px;border-radius:50%;background:#5b21b6;color:#f5d565;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;flex-shrink:0}
+.rcst.no{background:#fdecec;border-color:#f6c7c2;color:#b42318}
+.rcst.no .ck{background:#b42318;color:#fff}
+.rcf{margin:20px -20px 0;padding:12px 16px 13px;border-top:4px solid #5b21b6;background:#fff;text-align:center;font-size:11px;color:#7a6aa3;line-height:1.55}
+.rcf b{color:#5b21b6;letter-spacing:.6px}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body,body.pg{background:#fff!important;display:block}
+  .wrap{max-width:560px;margin:0 auto;padding:0}
+  .top,.card{box-shadow:none!important}
+  .np,.btn,.ft{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -300,8 +326,9 @@ function telaOk(j){
   };
 }
 
-// ═══ [v107] CONFIRMAÇÃO DE PAGAMENTO POR LINK — 24/11/2026 ═══
+// ═══ [v107/v109] CONFIRMAÇÃO E RECIBO DE PAGAMENTO POR LINK — 24/11/2026 ═══
 // Aberta com acesso.html?pg=<recibo>&t=<código>. Funciona de qualquer lugar; exige a senha do Controle de Acesso.
+// v109: visual da papelaria (recibo), só a FORMA do pagamento (sem banco), saldo após o pagamento e botão de imprimir.
 // Não registra entrada/saída e não usa o QR code. Reverter: remover este trecho e voltar a chamar só carregar().
 var API_PG='https://utivaczfuuazspychdxt.supabase.co/functions/v1/pagamento-link';
 var PG=null;
@@ -311,7 +338,7 @@ try{
   if(/^[A-Za-z0-9_-]{6,80}$/.test(pgR)&&/^[a-f0-9]{32,64}$/.test(pgT)) PG={rec:pgR,token:pgT};
 }catch(e){}
 
-function brl(v){var n=Number(v||0).toFixed(2).split('.');return 'R$ '+n[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+n[1];}
+function brl(v){var neg=Number(v||0)<0;var n=Math.abs(Number(v||0)).toFixed(2).split('.');return (neg?'− ':'')+'R$ '+n[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+n[1];}
 function dataHora(iso){
   try{var d=new Date(iso);if(isNaN(d.getTime()))return '';
     return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Bahia',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replace(',',' às');
@@ -331,53 +358,92 @@ function pgChamar(corpo){
     .finally(function(){clearTimeout(t);});
 }
 function pgAviso(titulo,texto,botao){
-  app.innerHTML='<div class="aviso"><div class="big">'+esc(titulo)+'</div><p>'+esc(texto)+'</p></div>'+(botao?'<button class="btn sec" id="bTentar">Tentar de novo</button>':'');
+  app.innerHTML='<div class="aviso" style="padding-bottom:26px"><div class="big">'+esc(titulo)+'</div><p>'+esc(texto)+'</p>'+(botao?'<button class="btn sec" id="bTentar">Tentar de novo</button>':'')+'</div>';
   if(botao) document.getElementById('bTentar').onclick=pgCarregar;
 }
 function pgCarregar(){
-  var ft=document.querySelector('.ft');if(ft)ft.textContent='Confirmação registrada com assinatura eletrônica';
-  app.innerHTML='<div class="load">Carregando…</div>';
+  document.body.className='pg';
+  document.title='Pagamento — Exit Games';
+  var mk=document.querySelector('.top .mk');if(mk)mk.textContent='PAGAMENTO';
+  var ft=document.querySelector('.ft');if(ft)ft.style.display='none';
+  app.innerHTML='<div class="load" style="padding-bottom:40px">Carregando…</div>';
   pgChamar({acao:'ver'}).then(function(j){
     if(!j||!j.ok){
       if(j&&j.erro==='LINK_INVALIDO'){pgAviso('Link inválido','Este link não vale mais. Peça um novo link à gerência.',false);return;}
       pgAviso('Não foi possível carregar','Tente de novo em instantes.',true);return;
     }
-    if(j._date){var ds=Date.parse(j._date);if(!isNaN(ds))deslocMs=ds-Date.now();relogio();}
-    document.getElementById('un').textContent=j.unidade||'';
-    if(j.status==='aguardando_aprovacao'){pgTela(j,'');}else{pgJaRespondido(j);}
+    if(j._date){var ds=Date.parse(j._date);if(!isNaN(ds))deslocMs=ds-Date.now();}
+    pgTela(j,'');
   }).catch(function(){pgAviso('Sem internet','Confira a conexão do celular e tente de novo.',true);});
 }
-function pgResumo(j){
-  var h='<div class="sel"><div class="av">'+esc(ini(j.nome))+'</div><div><div class="nm">'+esc(j.nome)+'</div><div class="st">'+esc(j.unidade||'')+'</div></div></div>';
-  h+='<div class="aj"><div class="ajd">'+esc(j.descricao||'Pagamento')+'</div>';
-  if(j.valorHoras!=null) h+='<div class="pgl"><span>Horas trabalhadas'+(j.horas!=null?' ('+String(Number(j.horas).toFixed(1)).replace('.',',')+'h)':'')+'</span><b>'+brl(j.valorHoras)+'</b></div>';
-  if(j.valorBeneficios!=null&&Number(j.valorBeneficios)>0) h+='<div class="pgl"><span>Benefícios (VT + VA)'+(j.dias!=null?' — '+Number(j.dias)+' dia(s)':'')+'</span><b>'+brl(j.valorBeneficios)+'</b></div>';
-  h+='<div class="pgt"><span>Valor total</span><b>'+brl(j.valor)+'</b></div>';
-  if(j.origem) h+='<div class="aja">Pago por: '+esc(j.origem)+'</div>';
-  if(j.solicitadoPor) h+='<div class="aja">Lançado por '+esc(j.solicitadoPor)+(j.solicitadoEm?' em '+esc(soData(j.solicitadoEm)):'')+'</div>';
+// Corpo do recibo (igual na confirmação, no recibo assinado e na impressão)
+function pgRecibo(j,titulo){
+  var forma=j.forma||j.origem||'';
+  var ref=String(j.descricao||'Pagamento').replace(/\s*\(pagamento parcial\)\s*$/,'').replace(/(\d{4})-(\d{2})/,'$2/$1');
+  var h='<div class="rct">'+esc(titulo)+'</div><div class="rcs">'+esc(j.unidade||'Exit Games')+'</div><div class="rcr"></div>';
+  h+='<div class="rcl"><span>Colaborador</span><b>'+esc(j.nome)+'</b></div>';
+  h+='<div class="rcl"><span>Referente a</span><b>'+esc(ref)+'</b></div>';
+  if(forma) h+='<div class="rcl"><span>Forma de pagamento</span><b>'+esc(forma)+'</b></div>';
+  if(j.solicitadoPor) h+='<div class="rcl"><span>Lançado por</span><b>'+esc(j.solicitadoPor)+(j.solicitadoEm?' em '+esc(soData(j.solicitadoEm)):'')+'</b></div>';
+  if(j.valorHoras!=null) h+='<div class="rcl"><span>Horas trabalhadas'+(j.horas!=null?' ('+String(Number(j.horas).toFixed(1)).replace('.',',')+'h)':'')+'</span><b>'+brl(j.valorHoras)+'</b></div>';
+  if(j.valorBeneficios!=null&&Number(j.valorBeneficios)>0) h+='<div class="rcl"><span>Benefícios (VT + VA)'+(j.dias!=null?' · '+Number(j.dias)+' dia(s)':'')+'</span><b>'+brl(j.valorBeneficios)+'</b></div>';
+  h+='<div class="rcv"><div class="l">Valor deste pagamento</div><div class="v">'+brl(j.valor)+'</div>';
+  if(j.parcial) h+='<div class="tg">Pagamento parcial</div>';
+  if(j.saldoDepois!=null&&Number(j.saldoDepois)>=0) h+='<div class="s">Saldo a receber após este pagamento: <b>'+brl(j.saldoDepois)+'</b></div>';
   h+='</div>';
   return h;
+}
+function pgRodape(){
+  return '<div class="rcf"><b>EXIT GAMES</b><br>exitgamesbrasil.com.br · contato@exitgamesbrasil.com.br</div>';
+}
+function pgAssin(j){
+  return j.assinatura?'<div class="sig"><div class="sigt">Assinatura eletrônica</div><div class="sigc">'+esc(j.assinatura)+'</div>'+(j.declaracao?'<div class="sigd">'+esc(j.declaracao)+'</div>':'')+'</div>':'';
 }
 var pgDados=null, pgNaoArmado=false;
 function pgTela(j,erro){
   pgDados=j;pgNaoArmado=false;ocupado=false;
-  var h='<h2>Confirmação de pagamento</h2>'+pgResumo(j);
-  if(!j.temSenha){
-    h+='<div class="msg err" style="display:block">Você ainda não criou sua senha do Controle de Acesso. Ela é criada no seu primeiro registro de entrada, pelo QR code da loja. Depois disso, abra este link de novo.</div>';
-    app.innerHTML=h;return;
+  var quando=j.respondidoEm?dataHora(j.respondidoEm):'';
+  var h;
+  if(j.status==='aguardando_aprovacao'){
+    h=pgRecibo(j,'Confirmação de pagamento');
+    if(!j.temSenha){
+      h+='<div class="msg err" style="display:block;margin-top:16px">Você ainda não criou sua senha do Controle de Acesso. Ela é criada no seu primeiro registro de entrada, pelo QR code da loja. Depois disso, abra este link de novo.</div>';
+    }else{
+      h+='<div class="np" style="margin-top:16px"><div class="msg'+(erro?' err':'')+'" id="pgMsg">'+esc(erro||'')+'</div>'+
+         '<label class="lb" for="pgPin">Sua senha do Controle de Acesso</label>'+
+         '<input class="in" id="pgPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="••••">'+
+         '<button class="btn" id="pgOk">Confirmo o recebimento</button>'+
+         '<button class="btn sec" id="pgNo">Não concordo</button>'+
+         '<div class="assn">Confirme só depois de conferir que o valor chegou.<br>Sua resposta fica registrada com assinatura eletrônica.</div></div>';
+    }
+    app.innerHTML=h+pgRodape();
+    if(j.temSenha){
+      document.getElementById('pgOk').onclick=function(){pgEnviar('confirmo');};
+      document.getElementById('pgNo').onclick=function(){
+        if(!pgNaoArmado){pgNaoArmado=true;this.textContent='Toque de novo para registrar que NÃO concorda';return;}
+        pgEnviar('contesto');
+      };
+    }
+    return;
   }
-  h+='<div class="msg'+(erro?' err':'')+'" id="pgMsg">'+esc(erro||'')+'</div>'+
-     '<label class="lb" for="pgPin">Sua senha do Controle de Acesso</label>'+
-     '<input class="in" id="pgPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="••••">'+
-     '<button class="btn" id="pgOk">Confirmo o recebimento</button>'+
-     '<button class="btn sec" id="pgNo">Não concordo</button>'+
-     '<div class="assn">Confirme só depois de conferir que o valor chegou.<br>Sua resposta fica registrada com assinatura eletrônica.</div>';
-  app.innerHTML=h;
-  document.getElementById('pgOk').onclick=function(){pgEnviar('confirmo');};
-  document.getElementById('pgNo').onclick=function(){
-    if(!pgNaoArmado){pgNaoArmado=true;this.textContent='Toque de novo para registrar que NÃO concorda';return;}
-    pgEnviar('contesto');
-  };
+  if(j.status==='aprovado'){
+    h=pgRecibo(j,'Recibo de pagamento')+
+      '<div class="rcst"><div class="ck">✓</div><div>Recebimento confirmado por '+esc(j.nome||'')+(quando?'<br>em '+esc(quando):'')+'</div></div>'+
+      pgAssin(j)+
+      '<button class="btn sec" id="pgPrint">Imprimir recibo</button>'+
+      '<div class="assn np">Guarde este link: ele abre o seu recibo sempre que precisar.</div>';
+    app.innerHTML=h+pgRodape();
+    document.getElementById('pgPrint').onclick=function(){try{window.print();}catch(e){}};
+    return;
+  }
+  if(j.status==='recusado'){
+    h=pgRecibo(j,'Pagamento não confirmado')+
+      '<div class="rcst no"><div class="ck">!</div><div>'+esc(j.nome||'')+' informou que NÃO concorda com este pagamento'+(quando?'<br>em '+esc(quando):'')+'</div></div>'+
+      pgAssin(j)+'<div class="assn np">A gerência verá sua resposta no sistema.</div>';
+    app.innerHTML=h+pgRodape();
+    return;
+  }
+  pgAviso('Pagamento indisponível','Este pagamento não está mais aguardando confirmação.',false);
 }
 function pgErro(t){var m=document.getElementById('pgMsg');if(m){m.textContent=t;m.className='msg err';}}
 function pgEnviar(resposta){
@@ -390,7 +456,15 @@ function pgEnviar(resposta){
   var b=resposta==='confirmo'?bOk:bNo;if(b)b.textContent='Registrando…';
   pgChamar({acao:'responder',resposta:resposta,pin:senha}).then(function(j){
     ocupado=false;
-    if(j&&j.ok){pgFim(j);return;}
+    if(j&&j.ok){
+      // junta a resposta ao recibo que já está na tela
+      var r={};var k;for(k in pgDados){r[k]=pgDados[k];}
+      r.status=j.status||(j.resposta==='confirmo'?'aprovado':'recusado');
+      r.respondidoEm=j.respondidoEm||new Date(Date.now()+deslocMs).toISOString();
+      r.assinatura=j.assinatura||'';r.declaracao=j.declaracao||'';
+      pgTela(r,'');try{window.scrollTo(0,0);}catch(e){}
+      return;
+    }
     var e=j&&j.erro;
     if(e==='PIN_INCORRETO'){pgTela(pgDados,'Senha incorreta.'+(j.restantes!=null?' Tentativas restantes: '+j.restantes+'.':''));return;}
     if(e==='BLOQUEADO'){pgTela(pgDados,'Muitas senhas erradas. Aguarde '+(j.minutos||10)+' minutos e tente de novo.');return;}
@@ -400,31 +474,7 @@ function pgEnviar(resposta){
     pgTela(pgDados,'Não foi possível registrar. Tente de novo em instantes.');
   }).catch(function(){ocupado=false;pgTela(pgDados,'Sem internet. Confira a conexão e tente de novo.');});
 }
-function pgAssin(j){
-  return j.assinatura?'<div class="sig"><div class="sigt">Assinatura eletrônica</div><div class="sigc">'+esc(j.assinatura)+'</div>'+(j.declaracao?'<div class="sigd">'+esc(j.declaracao)+'</div>':'')+'</div>':'';
-}
-function pgFim(j){
-  if(j.resposta==='confirmo'){
-    app.innerHTML='<div class="ok"><div class="ic">✓</div><div class="tp">RECEBIMENTO CONFIRMADO</div><div class="vl">'+brl(j.valor)+'</div>'+
-      '<div class="who">'+esc(j.nome||'')+'</div><div class="ex">'+esc(j.data||'')+' às '+esc(j.hora||'')+'</div>'+pgAssin(j)+
-      '</div><div class="assn">Pode fechar esta página.</div>';
-  }else{
-    app.innerHTML='<div class="aviso"><div class="big">Resposta registrada</div><p>Você informou que NÃO concorda com este pagamento de '+brl(j.valor)+'. A gerência verá sua resposta no sistema.</p></div>'+pgAssin(j)+
-      '<div class="assn">Pode fechar esta página.</div>';
-  }
-}
-function pgJaRespondido(j){
-  var quando=j.respondidoEm?dataHora(j.respondidoEm):'';
-  if(j.status==='aprovado'){
-    app.innerHTML='<div class="ok"><div class="ic">✓</div><div class="tp">PAGAMENTO JÁ CONFIRMADO</div><div class="vl">'+brl(j.valor)+'</div>'+
-      '<div class="who">'+esc(j.nome||'')+'</div>'+(quando?'<div class="ex">Confirmado em '+esc(quando)+'</div>':'')+'</div>';
-  }else if(j.status==='recusado'){
-    pgAviso('Resposta já registrada','Você informou que não concorda com este pagamento de '+brl(j.valor)+(quando?' em '+quando:'')+'.',false);
-  }else{
-    pgAviso('Pagamento indisponível','Este pagamento não está mais aguardando confirmação.',false);
-  }
-}
-// ═══ fim [v107] ═══
+// ═══ fim [v107/v109] ═══
 
 if(PG){pgCarregar();}else{carregar();}
 })();
